@@ -6,13 +6,24 @@ export enum UserRole {
   INSTITUTION = 'INSTITUTION' // 机构用户
 }
 
+// 角色对象接口
+export interface Role {
+  id: number;
+  name: string;
+  code: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  permissions?: any[];
+}
+
 // 用户类型定义
 export interface User {
   id: number;
   username: string;
   email: string;
   avatar?: string;
-  role: UserRole;
+  roles: Role[];  // 角色对象数组
   createdAt: string;
   updatedAt: string;
 }

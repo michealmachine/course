@@ -27,6 +27,7 @@ const api = axios.create({
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
+    'Accept': 'application/json'
   },
 });
 
@@ -37,8 +38,12 @@ api.interceptors.request.use(
     const token = getStorageItem('token');
     
     // 如果存在token，添加到请求头
-    if (token) {
+    if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
+      // 确保不将token作为URL参数
+      if (config.params && config.params.headers) {
+        delete config.params.headers;
+      }
     }
     
     return config;
@@ -145,19 +150,67 @@ api.interceptors.response.use(
   }
 );
 
-// 通用请求方法
+/**
+ * 封装的请求函数
+ */
 export const request = {
-  get: <T>(url: string, params?: any, config?: AxiosRequestConfig) =>
-    api.get<ApiResponse<T>>(url, { params, ...config }),
-    
-  post: <T>(url: string, data?: any, config?: AxiosRequestConfig) =>
-    api.post<ApiResponse<T>>(url, data, config),
-    
-  put: <T>(url: string, data?: any, config?: AxiosRequestConfig) =>
-    api.put<ApiResponse<T>>(url, data, config),
-    
-  delete: <T>(url: string, config?: AxiosRequestConfig) =>
-    api.delete<ApiResponse<T>>(url, config),
+  /**
+   * GET请求
+   * @param url 请求路径
+   * @param config 请求配置
+   */
+  get: async <T>(url: string, config?: any): Promise<AxiosResponse<ApiResponse<T>>> => {
+    try {
+      return await api.get<ApiResponse<T>>(url, config);
+    } catch (error) {
+      console.error(`GET ${url} 请求失败:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * POST请求
+   * @param url 请求路径
+   * @param data 请求数据
+   * @param config 请求配置
+   */
+  post: async <T>(url: string, data?: any, config?: any): Promise<AxiosResponse<ApiResponse<T>>> => {
+    try {
+      return await api.post<ApiResponse<T>>(url, data, config);
+    } catch (error) {
+      console.error(`POST ${url} 请求失败:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * PUT请求
+   * @param url 请求路径
+   * @param data 请求数据
+   * @param config 请求配置
+   */
+  put: async <T>(url: string, data?: any, config?: any): Promise<AxiosResponse<ApiResponse<T>>> => {
+    try {
+      return await api.put<ApiResponse<T>>(url, data, config);
+    } catch (error) {
+      console.error(`PUT ${url} 请求失败:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * DELETE请求
+   * @param url 请求路径
+   * @param config 请求配置
+   */
+  delete: async <T>(url: string, config?: any): Promise<AxiosResponse<ApiResponse<T>>> => {
+    try {
+      return await api.delete<ApiResponse<T>>(url, config);
+    } catch (error) {
+      console.error(`DELETE ${url} 请求失败:`, error);
+      throw error;
+    }
+  }
 };
 
 export default api; 

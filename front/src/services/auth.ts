@@ -122,18 +122,22 @@ const authService = {
     try {
       // 获取用户信息
       console.log('尝试获取用户信息，使用令牌：', loginResponse.accessToken);
+      // 确保使用正确的授权头
       const authHeader = {
         headers: {
-          Authorization: `${loginResponse.tokenType} ${loginResponse.accessToken}`
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `${loginResponse.tokenType} ${loginResponse.accessToken}`
         }
       };
       
       // 获取用户信息
-      const userResponse = await request.get<User>('/auth/me', authHeader);
+      const userResponse = await request.get<User>('/users/current', authHeader);
       console.log('用户信息响应：', userResponse);
       
       if (userResponse?.data?.data) {
         loginResponse.user = userResponse.data.data;
+        console.log('成功设置用户信息到登录响应');
       } else {
         console.warn('未获取到用户信息或格式不正确');
       }
@@ -216,7 +220,22 @@ const authService = {
   getCurrentUser: async () => {
     console.log('开始获取当前用户信息');
     try {
-      const response = await request.get<any>('/auth/me');
+      // 获取存储的访问令牌
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('获取用户信息失败：未找到访问令牌');
+        throw new Error('获取用户信息失败：未找到访问令牌');
+      }
+      
+      // 确保使用正确的API路径和授权头
+      const response = await request.get<any>('/users/current', {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
       console.log('获取用户信息响应：', response);
       
       // 检查是否有响应和响应数据

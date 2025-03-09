@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { UserRole } from '@/types/auth';
+import { UserRole, Role } from '@/types/auth';
 import { useAuthStore } from '@/stores/auth-store';
 import { useUIStore } from '@/stores/ui-store';
 import { cn } from '@/lib/utils';
@@ -73,7 +73,7 @@ const menuItems: MenuItem[] = [
     title: '课程管理',
     href: '/dashboard/courses',
     icon: <BookOpen className="w-5 h-5" />,
-    roles: [UserRole.ADMIN, UserRole.TEACHER],
+    roles: [UserRole.ADMIN, UserRole.INSTITUTION],
   },
   {
     title: '内容审核',
@@ -96,7 +96,23 @@ export default function Sidebar() {
 
   // 根据用户角色过滤菜单项
   const filteredMenuItems = menuItems.filter(
-    (item) => !item.roles || (user && item.roles.includes(user.role))
+    (item) => {
+      // 如果菜单项没有角色限制，所有人可见
+      if (!item.roles) return true;
+      
+      // 如果用户不存在或没有角色信息，不显示
+      if (!user || !user.roles || user.roles.length === 0) return false;
+      
+      // 检查用户角色数组中是否有菜单要求的角色
+      return item.roles.some(requiredRole => 
+        user.roles.some(userRole => {
+          // 从角色代码中提取角色名
+          const roleName = userRole.code?.replace('ROLE_', '');
+          // 比较角色是否匹配
+          return roleName === requiredRole;
+        })
+      );
+    }
   );
 
   return (

@@ -56,16 +56,53 @@ export const useAuthStore = create<AuthState>()(
           localStorage.setItem('token', response.accessToken);
           localStorage.setItem('refreshToken', response.refreshToken);
           
-          if (!response.user) {
-            console.warn('登录成功但未获取到用户信息');
-          }
+          // 设置cookie
+          document.cookie = `token=${response.accessToken}; path=/`;
+          document.cookie = `refreshToken=${response.refreshToken}; path=/`;
           
-          // 更新状态
-          set({
-            user: response.user || null,
-            isAuthenticated: true,
-            isLoading: false,
-          });
+          try {
+            // 如果响应中没有用户信息，则主动获取
+            if (!response.user) {
+              console.log('登录成功，未获取到用户信息，主动获取用户信息');
+              try {
+                const user = await authService.getCurrentUser();
+                console.log('成功获取用户信息：', user);
+                
+                // 更新状态，包含用户信息
+                set({
+                  user: user,
+                  isAuthenticated: true,
+                  isLoading: false,
+                });
+              } catch (userError) {
+                console.error('获取用户信息失败：', userError);
+                // 即使获取用户信息失败，我们仍然认为登录成功了，只是没有用户信息
+                set({
+                  user: null,
+                  isAuthenticated: true,
+                  isLoading: false,
+                  error: '登录成功，但获取用户信息失败'
+                });
+              }
+            } else {
+              // 如果响应中包含用户信息，直接使用
+              console.log('登录响应中包含用户信息，直接使用');
+              set({
+                user: response.user,
+                isAuthenticated: true,
+                isLoading: false,
+              });
+            }
+          } catch (userError) {
+            console.error('获取用户信息过程中出现异常：', userError);
+            // 即使获取用户信息失败，我们仍然认为登录成功了，只是没有用户信息
+            set({
+              user: null,
+              isAuthenticated: true,
+              isLoading: false,
+              error: '登录成功，但获取用户信息失败'
+            });
+          }
           
           console.log('认证状态已更新，isAuthenticated: true');
         } catch (error) {
@@ -124,6 +161,10 @@ export const useAuthStore = create<AuthState>()(
           localStorage.removeItem('token');
           localStorage.removeItem('refreshToken');
           
+          // 清除cookie
+          document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+          document.cookie = 'refreshToken=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+          
           // 更新状态
           set({
             user: null,
@@ -169,6 +210,10 @@ export const useAuthStore = create<AuthState>()(
           // 更新令牌 - 使用accessToken作为主要的认证令牌
           localStorage.setItem('token', response.accessToken);
           localStorage.setItem('refreshToken', response.refreshToken);
+          
+          // 设置cookie
+          document.cookie = `token=${response.accessToken}; path=/`;
+          document.cookie = `refreshToken=${response.refreshToken}; path=/`;
           
           // 尝试获取用户信息
           try {
