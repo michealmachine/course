@@ -11,6 +11,7 @@ import com.zhangziqi.online_course_mine.model.vo.UserVO;
 import com.zhangziqi.online_course_mine.repository.RoleRepository;
 import com.zhangziqi.online_course_mine.repository.UserRepository;
 import com.zhangziqi.online_course_mine.service.EmailService;
+import com.zhangziqi.online_course_mine.service.MinioService;
 import com.zhangziqi.online_course_mine.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,13 +24,18 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.persistence.criteria.Predicate;
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -44,6 +50,7 @@ public class UserServiceImpl implements UserService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final MinioService minioService;
 
     /**
      * 注册用户
@@ -548,11 +555,100 @@ public class UserServiceImpl implements UserService {
     public UserVO updateAvatar(String username, String avatarUrl) {
         User user = getUserByUsername(username);
         
+        // 获取旧头像URL
+        String oldAvatarUrl = user.getAvatar();
+        
         // 更新头像
         user.setAvatar(avatarUrl);
         User updatedUser = userRepository.save(user);
         log.info("用户头像更新成功: {}", username);
+        
+        // 删除旧头像
+        if (oldAvatarUrl != null && !oldAvatarUrl.isEmpty()) {
+            try {
+                // 从URL中提取对象名
+                String objectName = extractObjectNameFromUrl(oldAvatarUrl);
+                if (objectName != null) {
+                    boolean deleted = minioService.deleteFile(objectName);
+                    if (deleted) {
+                        log.info("删除旧头像成功: {}", objectName);
+                    } else {
+                        log.warn("删除旧头像失败: {}", objectName);
+                    }
+                }
+            } catch (Exception e) {
+                log.error("删除旧头像出错: {}", e.getMessage(), e);
+                // 继续执行，不影响头像更新
+            }
+        }
+        
         return convertToUserVO(updatedUser);
+    }
+    
+    /**
+     * 从URL中提取对象名
+     * 例如：http://localhost:8999/media/avatars/username/uuid-filename.jpg
+     * 提取为：avatars/username/uuid-filename.jpg
+     */
+    private String extractObjectNameFromUrl(String url) {
+        if (url == null || url.isEmpty()) {
+            return null;
+        }
+        
+        try {
+            // 查找桶名在URL中的位置
+            String bucketName = "media"; // MinIO配置中的桶名
+            int bucketIndex = url.indexOf("/" + bucketName + "/");
+            
+            if (bucketIndex != -1) {
+                // +桶名长度+2，是为了跳过"/桶名/"
+                return url.substring(bucketIndex + bucketName.length() + 2);
+            }
+            
+            // 如果使用特殊格式，尝试直接从路径中提取
+            String[] parts = url.split("/");
+            if (parts.length >= 2) {
+                // 假设最后两部分是路径，如：avatars/username/uuid-filename.jpg
+                return String.join("/", parts[parts.length - 3], parts[parts.length - 2], parts[parts.length - 1]);
+            }
+            
+            log.warn("无法从URL中提取对象名: {}", url);
+            return null;
+        } catch (Exception e) {
+            log.error("提取对象名出错: {}", e.getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * 上传并更新用户头像
+     */
+    @Override
+    @Transactional
+    public Map<String, String> uploadAndUpdateAvatar(String username, MultipartFile file) throws IOException {
+        // 检查文件类型
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new BusinessException(400, "只支持上传图片文件");
+        }
+        
+        // 检查文件大小（最大2MB）
+        if (file.getSize() > 2 * 1024 * 1024) {
+            throw new BusinessException(400, "文件大小不能超过2MB");
+        }
+        
+        // 生成唯一的对象名
+        String objectName = "avatars/" + username + "/" + UUID.randomUUID() + "-" + file.getOriginalFilename();
+        
+        // 上传到MinIO
+        String avatarUrl = minioService.uploadFile(objectName, file.getInputStream(), file.getContentType());
+        
+        // 更新用户头像
+        updateAvatar(username, avatarUrl);
+        
+        Map<String, String> result = new HashMap<>();
+        result.put("avatarUrl", avatarUrl);
+        return result;
     }
     
     /**

@@ -63,14 +63,8 @@ public class MinioServiceImpl implements MinioService {
     @Override
     public String getFileUrl(String objectName) {
         try {
-            return minioClient.getPresignedObjectUrl(
-                    GetPresignedObjectUrlArgs.builder()
-                            .bucket(minioConfig.getBucketName())
-                            .object(objectName)
-                            .method(Method.GET)
-                            .expiry(7, TimeUnit.DAYS)
-                            .build()
-            );
+            // 返回直接访问URL，而不是预签名URL
+            return minioConfig.getEndpoint() + "/" + minioConfig.getBucketName() + "/" + objectName;
         } catch (Exception e) {
             log.error("获取文件URL失败: {}", e.getMessage(), e);
             throw new RuntimeException("获取文件URL失败", e);

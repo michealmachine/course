@@ -22,10 +22,14 @@ export interface User {
   id: number;
   username: string;
   email: string;
+  nickname?: string;
+  phone?: string;
   avatar?: string;
+  status?: number;
   roles: Role[];  // 角色对象数组
   createdAt: string;
   updatedAt: string;
+  lastLoginAt?: string;
 }
 
 // 登录请求参数

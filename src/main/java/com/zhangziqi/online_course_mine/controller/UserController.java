@@ -1,5 +1,6 @@
 package com.zhangziqi.online_course_mine.controller;
 
+import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.model.dto.ChangePasswordDTO;
 import com.zhangziqi.online_course_mine.model.dto.EmailUpdateDTO;
 import com.zhangziqi.online_course_mine.model.dto.UserDTO;
@@ -7,7 +8,6 @@ import com.zhangziqi.online_course_mine.model.dto.UserProfileDTO;
 import com.zhangziqi.online_course_mine.model.dto.UserQueryDTO;
 import com.zhangziqi.online_course_mine.model.vo.Result;
 import com.zhangziqi.online_course_mine.model.vo.UserVO;
-import com.zhangziqi.online_course_mine.service.MinioService;
 import com.zhangziqi.online_course_mine.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -42,7 +42,6 @@ import java.util.UUID;
 public class UserController {
 
     private final UserService userService;
-    private final MinioService minioService;
 
     /**
      * 分页查询用户列表
@@ -271,30 +270,12 @@ public class UserController {
         String username = getCurrentUsername();
         log.info("上传头像: {}, 文件大小: {}", username, file.getSize());
         
-        // 检查文件类型
-        String contentType = file.getContentType();
-        if (contentType == null || !contentType.startsWith("image/")) {
-            return Result.fail(400, "只支持上传图片文件");
-        }
-        
-        // 检查文件大小（最大2MB）
-        if (file.getSize() > 2 * 1024 * 1024) {
-            return Result.fail(400, "文件大小不能超过2MB");
-        }
-        
         try {
-            // 生成唯一的对象名
-            String objectName = "avatars/" + username + "/" + UUID.randomUUID() + "-" + file.getOriginalFilename();
-            
-            // 上传到MinIO
-            String avatarUrl = minioService.uploadFile(objectName, file.getInputStream(), file.getContentType());
-            
-            // 更新用户头像
-            userService.updateAvatar(username, avatarUrl);
-            
-            Map<String, String> result = new HashMap<>();
-            result.put("avatarUrl", avatarUrl);
+            // 调用服务层方法上传并更新头像
+            Map<String, String> result = userService.uploadAndUpdateAvatar(username, file);
             return Result.success(result);
+        } catch (BusinessException e) {
+            return Result.fail(e.getCode(), e.getMessage());
         } catch (IOException e) {
             log.error("头像上传失败", e);
             return Result.fail(500, "头像上传失败: " + e.getMessage());

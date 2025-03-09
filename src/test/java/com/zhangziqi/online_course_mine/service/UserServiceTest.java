@@ -14,16 +14,26 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
@@ -44,6 +54,9 @@ public class UserServiceTest {
     
     @Mock
     private EmailService emailService;
+
+    @Mock
+    private MinioService minioService;
 
     @InjectMocks
     private UserServiceImpl userService;
@@ -495,5 +508,67 @@ public class UserServiceTest {
         );
         
         verify(userRepository).findById(userId);
+    }
+
+    @Test
+    void uploadAndUpdateAvatarShouldSucceedWhenFileValid() throws IOException {
+        // 准备
+        String avatarUrl = "http://localhost:8999/media/avatars/testuser/uuid-test.jpg";
+        String objectName = "avatars/testuser/uuid-test.jpg";
+        
+        MultipartFile mockFile = mock(MultipartFile.class);
+        when(mockFile.getContentType()).thenReturn("image/jpeg");
+        when(mockFile.getSize()).thenReturn(1024L); // 1KB
+        when(mockFile.getOriginalFilename()).thenReturn("test.jpg");
+        
+        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.of(user));
+        when(minioService.uploadFile(contains("avatars/" + user.getUsername()), any(), eq("image/jpeg"))).thenReturn(avatarUrl);
+        when(userRepository.save(any(User.class))).thenReturn(user);
+        
+        // 执行
+        Map<String, String> result = userService.uploadAndUpdateAvatar(user.getUsername(), mockFile);
+        
+        // 验证
+        assertNotNull(result);
+        assertTrue(result.containsKey("avatarUrl"));
+        assertEquals(avatarUrl, result.get("avatarUrl"));
+        verify(userRepository).findByUsername(user.getUsername());
+        verify(minioService).uploadFile(anyString(), any(), anyString());
+        verify(userRepository).save(user);
+    }
+    
+    @Test
+    void uploadAndUpdateAvatarShouldThrowExceptionWhenFileTypeInvalid() {
+        // 准备
+        MultipartFile mockFile = mock(MultipartFile.class);
+        when(mockFile.getContentType()).thenReturn("application/pdf");
+        
+        // 执行和验证
+        BusinessException exception = assertThrows(BusinessException.class, () -> {
+            userService.uploadAndUpdateAvatar(user.getUsername(), mockFile);
+        });
+        
+        assertEquals(400, exception.getCode());
+        assertTrue(exception.getMessage().contains("只支持上传图片文件"));
+        verify(minioService, never()).uploadFile(anyString(), any(), anyString());
+        verify(userRepository, never()).save(any(User.class));
+    }
+    
+    @Test
+    void uploadAndUpdateAvatarShouldThrowExceptionWhenFileSizeTooLarge() {
+        // 准备
+        MultipartFile mockFile = mock(MultipartFile.class);
+        when(mockFile.getContentType()).thenReturn("image/jpeg");
+        when(mockFile.getSize()).thenReturn(3 * 1024 * 1024L); // 3MB
+        
+        // 执行和验证
+        BusinessException exception = assertThrows(BusinessException.class, () -> {
+            userService.uploadAndUpdateAvatar(user.getUsername(), mockFile);
+        });
+        
+        assertEquals(400, exception.getCode());
+        assertTrue(exception.getMessage().contains("文件大小不能超过2MB"));
+        verify(minioService, never()).uploadFile(anyString(), any(), anyString());
+        verify(userRepository, never()).save(any(User.class));
     }
 } 

@@ -8,7 +8,6 @@ import com.zhangziqi.online_course_mine.model.dto.UserProfileDTO;
 import com.zhangziqi.online_course_mine.model.dto.UserQueryDTO;
 import com.zhangziqi.online_course_mine.model.entity.Role;
 import com.zhangziqi.online_course_mine.model.vo.UserVO;
-import com.zhangziqi.online_course_mine.service.MinioService;
 import com.zhangziqi.online_course_mine.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,9 +48,6 @@ public class UserControllerTest {
 
     @MockBean
     private UserService userService;
-    
-    @MockBean
-    private MinioService minioService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -333,8 +329,10 @@ public class UserControllerTest {
                 "test image content".getBytes()
         );
         
-        when(minioService.uploadFile(anyString(), any(), anyString())).thenReturn(avatarUrl);
-        when(userService.updateAvatar(eq("testuser"), eq(avatarUrl))).thenReturn(userVO);
+        // 模拟上传并更新头像的服务方法
+        Map<String, String> resultMap = new HashMap<>();
+        resultMap.put("avatarUrl", avatarUrl);
+        when(userService.uploadAndUpdateAvatar(eq("testuser"), any())).thenReturn(resultMap);
         
         mockMvc.perform(multipart("/api/users/current/avatar")
                 .file(file))

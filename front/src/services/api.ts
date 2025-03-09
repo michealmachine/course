@@ -163,7 +163,13 @@ export const request = {
     try {
       return await api.get<ApiResponse<T>>(url, config);
     } catch (error) {
-      console.error(`GET ${url} 请求失败:`, error);
+      // 如果配置中设置了silentOnAuthError，且是401或403错误，则静默失败（不打印错误）
+      const isAuthError = axios.isAxiosError(error) && 
+        (error.response?.status === 401 || error.response?.status === 403);
+      
+      if (!(config?.silentOnAuthError && isAuthError)) {
+        console.error(`GET ${url} 请求失败:`, error);
+      }
       throw error;
     }
   },
@@ -178,7 +184,13 @@ export const request = {
     try {
       return await api.post<ApiResponse<T>>(url, data, config);
     } catch (error) {
-      console.error(`POST ${url} 请求失败:`, error);
+      // 如果配置中设置了silentOnAuthError，且是401或403错误，则静默失败（不打印错误）
+      const isAuthError = axios.isAxiosError(error) && 
+        (error.response?.status === 401 || error.response?.status === 403);
+      
+      if (!(config?.silentOnAuthError && isAuthError)) {
+        console.error(`POST ${url} 请求失败:`, error);
+      }
       throw error;
     }
   },
@@ -193,7 +205,13 @@ export const request = {
     try {
       return await api.put<ApiResponse<T>>(url, data, config);
     } catch (error) {
-      console.error(`PUT ${url} 请求失败:`, error);
+      // 如果配置中设置了silentOnAuthError，且是401或403错误，则静默失败（不打印错误）
+      const isAuthError = axios.isAxiosError(error) && 
+        (error.response?.status === 401 || error.response?.status === 403);
+      
+      if (!(config?.silentOnAuthError && isAuthError)) {
+        console.error(`PUT ${url} 请求失败:`, error);
+      }
       throw error;
     }
   },
@@ -207,7 +225,13 @@ export const request = {
     try {
       return await api.delete<ApiResponse<T>>(url, config);
     } catch (error) {
-      console.error(`DELETE ${url} 请求失败:`, error);
+      // 如果配置中设置了silentOnAuthError，且是401或403错误，则静默失败（不打印错误）
+      const isAuthError = axios.isAxiosError(error) && 
+        (error.response?.status === 401 || error.response?.status === 403);
+      
+      if (!(config?.silentOnAuthError && isAuthError)) {
+        console.error(`DELETE ${url} 请求失败:`, error);
+      }
       throw error;
     }
   }

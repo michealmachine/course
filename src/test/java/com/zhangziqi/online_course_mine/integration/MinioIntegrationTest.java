@@ -39,11 +39,13 @@ class MinioIntegrationTest {
             // 1. 上传文件
             String url = minioService.uploadFile(objectName, inputStream, contentType);
             assertNotNull(url);
+            // 永久URL应该包含对象名
             assertTrue(url.contains(objectName));
             
             // 2. 获取文件URL
             String fileUrl = minioService.getFileUrl(objectName);
             assertNotNull(fileUrl);
+            // 两个URL应该完全相同，因为都是用相同方式构建的永久URL
             assertEquals(url, fileUrl);
             
             // 3. 列出所有文件

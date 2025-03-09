@@ -19,6 +19,7 @@ import org.mockito.ArgumentCaptor;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import java.util.concurrent.TimeUnit;
+import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -53,6 +54,15 @@ public class EmailServiceTest {
     void setUp() {
         emailService.setVerificationCodePrefix("email:verification:");
         emailService.setVerificationCodeExpiration(5L);
+        
+        // 使用反射设置私有字段emailFrom
+        try {
+            Field emailFromField = EmailServiceImpl.class.getDeclaredField("emailFrom");
+            emailFromField.setAccessible(true);
+            emailFromField.set(emailService, "test@example.com");
+        } catch (Exception e) {
+            fail("无法设置emailFrom字段: " + e.getMessage());
+        }
     }
 
     @Test

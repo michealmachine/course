@@ -51,6 +51,7 @@ public class User extends BaseEntity {
     /**
      * 头像
      */
+    @Column(length = 255)
     private String avatar;
 
     /**

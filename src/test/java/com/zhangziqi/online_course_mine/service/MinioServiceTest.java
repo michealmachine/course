@@ -48,9 +48,14 @@ class MinioServiceTest {
         // 模拟MinIO客户端行为
         when(minioClient.bucketExists(any(BucketExistsArgs.class))).thenReturn(true);
         
-        // Mock获取预签名URL的响应
-        String expectedUrl = "http://localhost:8999/media-test/test-file.txt";
-        when(minioClient.getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class))).thenReturn(expectedUrl);
+        // 模拟配置
+        String endpoint = "http://localhost:8999";
+        String bucketName = "media-test";
+        when(minioConfig.getEndpoint()).thenReturn(endpoint);
+        when(minioConfig.getBucketName()).thenReturn(bucketName);
+        
+        // 预期的永久URL
+        String expectedUrl = endpoint + "/" + bucketName + "/" + objectName;
         
         // 执行测试
         String url = minioService.uploadFile(objectName, inputStream, contentType);
@@ -62,7 +67,7 @@ class MinioServiceTest {
         // 验证MinIO客户端的方法被调用
         verify(minioClient).bucketExists(any(BucketExistsArgs.class));
         verify(minioClient).putObject(any(PutObjectArgs.class));
-        verify(minioClient).getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class));
+        // 不再验证getPresignedObjectUrl，因为我们不再使用它
     }
 
     @Test
@@ -137,5 +142,27 @@ class MinioServiceTest {
         // 验证MinIO客户端的方法被调用
         verify(minioClient).bucketExists(any(BucketExistsArgs.class));
         verify(minioClient).makeBucket(any(MakeBucketArgs.class));
+    }
+
+    @Test
+    void getFileUrl_Success() {
+        // 准备测试数据
+        String objectName = "test-file.txt";
+        String endpoint = "http://localhost:8999";
+        String bucketName = "media-test";
+        
+        // 模拟配置
+        when(minioConfig.getEndpoint()).thenReturn(endpoint);
+        when(minioConfig.getBucketName()).thenReturn(bucketName);
+        
+        // 预期的永久URL
+        String expectedUrl = endpoint + "/" + bucketName + "/" + objectName;
+        
+        // 执行测试
+        String url = minioService.getFileUrl(objectName);
+        
+        // 验证结果
+        assertNotNull(url);
+        assertEquals(expectedUrl, url);
     }
 } 

@@ -6,8 +6,11 @@ import com.zhangziqi.online_course_mine.model.dto.UserQueryDTO;
 import com.zhangziqi.online_course_mine.model.entity.User;
 import com.zhangziqi.online_course_mine.model.vo.UserVO;
 import org.springframework.data.domain.Page;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -163,6 +166,16 @@ public interface UserService {
      * @return 更新后的用户信息
      */
     UserVO updateAvatar(String username, String avatarUrl);
+    
+    /**
+     * 上传并更新用户头像
+     *
+     * @param username 当前登录用户名
+     * @param file 头像文件
+     * @return 头像URL和用户信息的映射
+     * @throws IOException 文件处理异常
+     */
+    Map<String, String> uploadAndUpdateAvatar(String username, MultipartFile file) throws IOException;
     
     /**
      * 更新当前用户邮箱
