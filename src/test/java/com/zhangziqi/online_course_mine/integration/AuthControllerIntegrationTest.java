@@ -22,9 +22,15 @@ import org.springframework.test.web.servlet.result.MockMvcResultHandlers;
 import java.awt.image.BufferedImage;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -213,6 +219,67 @@ public class AuthControllerIntegrationTest {
         verify(captchaService).validateCaptcha(eq("test-key"), eq("1234"));
         verify(emailService, never()).generateVerificationCode();
         verify(emailService, never()).sendVerificationCode(any(), any());
+        verify(emailService, never()).saveVerificationCode(any(), any());
+    }
+
+    @Test
+    public void testSendEmailUpdateCode() throws Exception {
+        // 准备邮箱更新验证码请求数据
+        EmailVerificationDTO emailVerificationDTO = new EmailVerificationDTO();
+        emailVerificationDTO.setEmail("newemail@example.com");
+        emailVerificationDTO.setCaptchaKey("test-key");
+        emailVerificationDTO.setCaptchaCode("1234");
+
+        String verificationCode = "654321";
+        
+        // 模拟图形验证码验证通过
+        given(captchaService.validateCaptcha("test-key", "1234")).willReturn(true);
+        
+        // 模拟验证码生成
+        given(emailService.generateVerificationCode()).willReturn(verificationCode);
+        
+        // 模拟邮件发送
+        doNothing().when(emailService).sendEmailUpdateCode(eq("newemail@example.com"), eq(verificationCode));
+        
+        // 模拟验证码保存
+        doNothing().when(emailService).saveVerificationCode(eq("newemail@example.com"), eq(verificationCode));
+
+        mockMvc.perform(post("/api/auth/email-update-code")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(emailVerificationDTO)))
+                .andDo(MockMvcResultHandlers.print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.message").value("操作成功"));
+
+        verify(captchaService).validateCaptcha(eq("test-key"), eq("1234"));
+        verify(emailService).generateVerificationCode();
+        verify(emailService).sendEmailUpdateCode(eq("newemail@example.com"), eq(verificationCode));
+        verify(emailService).saveVerificationCode(eq("newemail@example.com"), eq(verificationCode));
+    }
+    
+    @Test
+    public void testSendEmailUpdateCodeWithInvalidCaptcha() throws Exception {
+        // 准备邮箱更新验证码请求数据
+        EmailVerificationDTO emailVerificationDTO = new EmailVerificationDTO();
+        emailVerificationDTO.setEmail("newemail@example.com");
+        emailVerificationDTO.setCaptchaKey("test-key");
+        emailVerificationDTO.setCaptchaCode("1234");
+
+        // 模拟图形验证码验证失败
+        given(captchaService.validateCaptcha("test-key", "1234")).willReturn(false);
+
+        mockMvc.perform(post("/api/auth/email-update-code")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(emailVerificationDTO)))
+                .andDo(MockMvcResultHandlers.print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(500))
+                .andExpect(jsonPath("$.message").value("验证码错误"));
+
+        verify(captchaService).validateCaptcha(eq("test-key"), eq("1234"));
+        verify(emailService, never()).generateVerificationCode();
+        verify(emailService, never()).sendEmailUpdateCode(any(), any());
         verify(emailService, never()).saveVerificationCode(any(), any());
     }
 

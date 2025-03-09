@@ -63,6 +63,30 @@ public class EmailServiceImpl implements EmailService {
             throw new RuntimeException("验证码邮件发送失败", e);
         }
     }
+    
+    @Override
+    public void sendEmailUpdateCode(String to, String code) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+            helper.setFrom("no-reply@example.com");
+            helper.setTo(to);
+            helper.setSubject("在线课程平台 - 邮箱更新验证码");
+
+            // 使用Thymeleaf模板引擎渲染邮件内容
+            Context context = new Context();
+            context.setVariable("code", code);
+            context.setVariable("expirationMinutes", verificationCodeExpiration);
+            String content = templateEngine.process("email/email-update-code", context);
+
+            helper.setText(content, true);
+            mailSender.send(message);
+            log.info("邮箱更新验证码邮件发送成功: {}", to);
+        } catch (MessagingException e) {
+            log.error("邮箱更新验证码邮件发送失败: {}", to, e);
+            throw new RuntimeException("邮箱更新验证码邮件发送失败", e);
+        }
+    }
 
     @Override
     public String generateVerificationCode() {

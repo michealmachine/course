@@ -5,6 +5,7 @@ import com.zhangziqi.online_course_mine.model.dto.RegisterDTO;
 import com.zhangziqi.online_course_mine.model.entity.Role;
 import com.zhangziqi.online_course_mine.model.entity.User;
 import com.zhangziqi.online_course_mine.model.enums.RoleEnum;
+import com.zhangziqi.online_course_mine.model.vo.UserVO;
 import com.zhangziqi.online_course_mine.repository.RoleRepository;
 import com.zhangziqi.online_course_mine.repository.UserRepository;
 import com.zhangziqi.online_course_mine.service.impl.UserServiceImpl;
@@ -40,6 +41,9 @@ public class UserServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+    
+    @Mock
+    private EmailService emailService;
 
     @InjectMocks
     private UserServiceImpl userService;
@@ -223,5 +227,273 @@ public class UserServiceTest {
         assertThrows(BusinessException.class, () -> userService.updateLastLoginTime("nonexistentuser"));
         verify(userRepository).findByUsername("nonexistentuser");
         verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void getCurrentUserShouldReturnUserInfoWhenUserExists() {
+        // 准备
+        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.of(user));
+        
+        // 执行
+        UserVO result = userService.getCurrentUser(user.getUsername());
+        
+        // 验证
+        assertNotNull(result);
+        assertEquals(user.getUsername(), result.getUsername());
+        assertEquals(user.getEmail(), result.getEmail());
+        assertEquals(user.getPhone(), result.getPhone());
+        verify(userRepository).findByUsername(user.getUsername());
+    }
+    
+    @Test
+    void updateCurrentUserProfileShouldUpdateUserInfoWhenValid() {
+        // 准备
+        String nickname = "新昵称";
+        String phone = "13900001111";
+        
+        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.of(user));
+        when(userRepository.existsByPhone(phone)).thenReturn(false);
+        when(userRepository.save(any(User.class))).thenReturn(user);
+        
+        // 执行
+        UserVO result = userService.updateCurrentUserProfile(user.getUsername(), nickname, phone);
+        
+        // 验证
+        assertNotNull(result);
+        assertEquals(nickname, user.getNickname());
+        assertEquals(phone, user.getPhone());
+        verify(userRepository).findByUsername(user.getUsername());
+        verify(userRepository).existsByPhone(phone);
+        verify(userRepository).save(user);
+    }
+    
+    @Test
+    void updateCurrentUserProfileShouldThrowExceptionWhenPhoneExists() {
+        // 准备
+        String nickname = "新昵称";
+        String phone = "13900001111";
+        
+        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.of(user));
+        when(userRepository.existsByPhone(phone)).thenReturn(true);
+        
+        // 执行与验证
+        assertThrows(BusinessException.class, () -> 
+            userService.updateCurrentUserProfile(user.getUsername(), nickname, phone)
+        );
+        
+        verify(userRepository).findByUsername(user.getUsername());
+        verify(userRepository).existsByPhone(phone);
+        verify(userRepository, never()).save(any(User.class));
+    }
+    
+    @Test
+    void changePasswordShouldSucceedWhenOldPasswordCorrect() {
+        // 准备
+        String oldPassword = "oldPassword";
+        String newPassword = "newPassword";
+        
+        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(oldPassword, user.getPassword())).thenReturn(true);
+        when(passwordEncoder.matches(newPassword, user.getPassword())).thenReturn(false);
+        when(passwordEncoder.encode(newPassword)).thenReturn("encodedNewPassword");
+        
+        // 执行
+        boolean result = userService.changePassword(user.getUsername(), oldPassword, newPassword);
+        
+        // 验证
+        assertTrue(result);
+        assertEquals("encodedNewPassword", user.getPassword());
+        verify(userRepository).findByUsername(user.getUsername());
+        verify(passwordEncoder).encode(newPassword);
+        verify(userRepository).save(user);
+    }
+    
+    @Test
+    void changePasswordShouldThrowExceptionWhenOldPasswordIncorrect() {
+        // 准备
+        String oldPassword = "wrongPassword";
+        String newPassword = "newPassword";
+        
+        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(oldPassword, user.getPassword())).thenReturn(false);
+        
+        // 执行与验证
+        assertThrows(BusinessException.class, () -> 
+            userService.changePassword(user.getUsername(), oldPassword, newPassword)
+        );
+        
+        verify(userRepository).findByUsername(user.getUsername());
+        verify(passwordEncoder, never()).encode(any(String.class));
+        verify(userRepository, never()).save(any(User.class));
+    }
+    
+    @Test
+    void changePasswordShouldThrowExceptionWhenNewPasswordSameAsOld() {
+        // 准备
+        String oldPassword = "oldPassword";
+        String newPassword = "oldPassword"; // 新密码与旧密码相同
+        
+        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(oldPassword, user.getPassword())).thenReturn(true);
+        when(passwordEncoder.matches(newPassword, user.getPassword())).thenReturn(true);
+        
+        // 执行与验证
+        assertThrows(BusinessException.class, () -> 
+            userService.changePassword(user.getUsername(), oldPassword, newPassword)
+        );
+        
+        verify(userRepository).findByUsername(user.getUsername());
+        verify(passwordEncoder, never()).encode(any(String.class));
+        verify(userRepository, never()).save(any(User.class));
+    }
+    
+    @Test
+    void updateAvatarShouldUpdateAvatarUrlWhenUserExists() {
+        // 准备
+        String avatarUrl = "https://example.com/avatar.jpg";
+        
+        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenReturn(user);
+        
+        // 执行
+        UserVO result = userService.updateAvatar(user.getUsername(), avatarUrl);
+        
+        // 验证
+        assertNotNull(result);
+        assertEquals(avatarUrl, user.getAvatar());
+        verify(userRepository).findByUsername(user.getUsername());
+        verify(userRepository).save(user);
+    }
+    
+    @Test
+    void updateEmailShouldUpdateEmailWhenValid() {
+        // 准备
+        String newEmail = "newemail@example.com";
+        String emailCode = "123456";
+        String password = "password123";
+        
+        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(password, user.getPassword())).thenReturn(true);
+        when(userRepository.existsByEmail(newEmail)).thenReturn(false);
+        when(emailService.validateVerificationCode(newEmail, emailCode)).thenReturn(true);
+        when(userRepository.save(any(User.class))).thenReturn(user);
+        
+        // 执行
+        UserVO result = userService.updateEmail(user.getUsername(), newEmail, emailCode, password);
+        
+        // 验证
+        assertNotNull(result);
+        assertEquals(newEmail, user.getEmail());
+        verify(userRepository).findByUsername(user.getUsername());
+        verify(passwordEncoder).matches(password, user.getPassword());
+        verify(userRepository).existsByEmail(newEmail);
+        verify(emailService).validateVerificationCode(newEmail, emailCode);
+        verify(userRepository).save(user);
+    }
+    
+    @Test
+    void updateEmailShouldThrowExceptionWhenPasswordIncorrect() {
+        // 准备
+        String newEmail = "newemail@example.com";
+        String emailCode = "123456";
+        String password = "wrongPassword";
+        
+        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(password, user.getPassword())).thenReturn(false);
+        
+        // 执行与验证
+        assertThrows(BusinessException.class, () -> 
+            userService.updateEmail(user.getUsername(), newEmail, emailCode, password)
+        );
+        
+        verify(userRepository).findByUsername(user.getUsername());
+        verify(passwordEncoder).matches(password, user.getPassword());
+        verify(userRepository, never()).existsByEmail(any());
+        verify(emailService, never()).validateVerificationCode(any(), any());
+        verify(userRepository, never()).save(any(User.class));
+    }
+    
+    @Test
+    void updateEmailShouldThrowExceptionWhenEmailExists() {
+        // 准备
+        String newEmail = "newemail@example.com";
+        String emailCode = "123456";
+        String password = "password123";
+        
+        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(password, user.getPassword())).thenReturn(true);
+        when(userRepository.existsByEmail(newEmail)).thenReturn(true);
+        
+        // 执行与验证
+        assertThrows(BusinessException.class, () -> 
+            userService.updateEmail(user.getUsername(), newEmail, emailCode, password)
+        );
+        
+        verify(userRepository).findByUsername(user.getUsername());
+        verify(passwordEncoder).matches(password, user.getPassword());
+        verify(userRepository).existsByEmail(newEmail);
+        verify(emailService, never()).validateVerificationCode(any(), any());
+        verify(userRepository, never()).save(any(User.class));
+    }
+    
+    @Test
+    void updateEmailShouldThrowExceptionWhenEmailCodeInvalid() {
+        // 准备
+        String newEmail = "newemail@example.com";
+        String emailCode = "123456";
+        String password = "password123";
+        
+        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(password, user.getPassword())).thenReturn(true);
+        when(userRepository.existsByEmail(newEmail)).thenReturn(false);
+        when(emailService.validateVerificationCode(newEmail, emailCode)).thenReturn(false);
+        
+        // 执行与验证
+        assertThrows(BusinessException.class, () -> 
+            userService.updateEmail(user.getUsername(), newEmail, emailCode, password)
+        );
+        
+        verify(userRepository).findByUsername(user.getUsername());
+        verify(passwordEncoder).matches(password, user.getPassword());
+        verify(userRepository).existsByEmail(newEmail);
+        verify(emailService).validateVerificationCode(newEmail, emailCode);
+        verify(userRepository, never()).save(any(User.class));
+    }
+    
+    @Test
+    void getBasicUserInfoShouldReturnBasicInfoWhenUserExists() {
+        // 准备
+        Long userId = 1L;
+        user.setId(userId);
+        user.setNickname("测试用户");
+        user.setAvatar("https://example.com/avatar.jpg");
+        
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        
+        // 执行
+        UserVO result = userService.getBasicUserInfo(userId);
+        
+        // 验证
+        assertNotNull(result);
+        assertEquals(userId, result.getId());
+        assertEquals(user.getUsername(), result.getUsername());
+        assertEquals(user.getNickname(), result.getNickname());
+        assertEquals(user.getAvatar(), result.getAvatar());
+        verify(userRepository).findById(userId);
+    }
+    
+    @Test
+    void getBasicUserInfoShouldThrowExceptionWhenUserNotExists() {
+        // 准备
+        Long userId = 1L;
+        
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
+        
+        // 执行与验证
+        assertThrows(BusinessException.class, () -> 
+            userService.getBasicUserInfo(userId)
+        );
+        
+        verify(userRepository).findById(userId);
     }
 } 

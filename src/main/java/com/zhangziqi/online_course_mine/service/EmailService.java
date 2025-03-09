@@ -14,6 +14,14 @@ public interface EmailService {
     void sendVerificationCode(String to, String code);
 
     /**
+     * 发送邮箱更新验证码邮件
+     *
+     * @param to 新邮箱地址
+     * @param code 验证码
+     */
+    void sendEmailUpdateCode(String to, String code);
+
+    /**
      * 生成验证码
      *
      * @return 6位数字验证码

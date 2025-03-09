@@ -10,6 +10,7 @@ import com.zhangziqi.online_course_mine.model.enums.RoleEnum;
 import com.zhangziqi.online_course_mine.model.vo.UserVO;
 import com.zhangziqi.online_course_mine.repository.RoleRepository;
 import com.zhangziqi.online_course_mine.repository.UserRepository;
+import com.zhangziqi.online_course_mine.service.EmailService;
 import com.zhangziqi.online_course_mine.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +43,7 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
 
     /**
      * 注册用户
@@ -457,6 +459,157 @@ public class UserServiceImpl implements UserService {
                 .updatedAt(user.getUpdatedAt())
                 .lastLoginAt(user.getLastLoginAt())
                 .roles(user.getRoles())
+                .build();
+    }
+
+    /**
+     * 获取当前登录用户信息
+     *
+     * @param username 当前登录用户名
+     * @return 用户详细信息
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public UserVO getCurrentUser(String username) {
+        User user = getUserByUsername(username);
+        return convertToUserVO(user);
+    }
+    
+    /**
+     * 更新当前用户个人信息
+     *
+     * @param username 当前登录用户名
+     * @param nickname 昵称
+     * @param phone 手机号
+     * @return 更新后的用户信息
+     */
+    @Override
+    @Transactional
+    public UserVO updateCurrentUserProfile(String username, String nickname, String phone) {
+        User user = getUserByUsername(username);
+        
+        // 检查手机号是否已被其他用户使用
+        if (StringUtils.hasText(phone) && !phone.equals(user.getPhone()) && existsByPhone(phone)) {
+            throw new BusinessException("手机号已存在");
+        }
+        
+        // 更新用户信息
+        if (StringUtils.hasText(nickname)) {
+            user.setNickname(nickname);
+        }
+        if (StringUtils.hasText(phone)) {
+            user.setPhone(phone);
+        }
+        
+        User updatedUser = userRepository.save(user);
+        log.info("用户个人信息更新成功: {}", username);
+        return convertToUserVO(updatedUser);
+    }
+    
+    /**
+     * 修改当前用户密码
+     *
+     * @param username 当前登录用户名
+     * @param oldPassword 旧密码
+     * @param newPassword 新密码
+     * @return 是否修改成功
+     */
+    @Override
+    @Transactional
+    public boolean changePassword(String username, String oldPassword, String newPassword) {
+        User user = getUserByUsername(username);
+        
+        // 验证旧密码
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            throw new BusinessException("旧密码不正确");
+        }
+        
+        // 验证新旧密码不能相同
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new BusinessException("新密码不能与旧密码相同");
+        }
+        
+        // 更新密码
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        log.info("用户密码修改成功: {}", username);
+        return true;
+    }
+    
+    /**
+     * 更新当前用户头像
+     *
+     * @param username 当前登录用户名
+     * @param avatarUrl 头像URL
+     * @return 更新后的用户信息
+     */
+    @Override
+    @Transactional
+    public UserVO updateAvatar(String username, String avatarUrl) {
+        User user = getUserByUsername(username);
+        
+        // 更新头像
+        user.setAvatar(avatarUrl);
+        User updatedUser = userRepository.save(user);
+        log.info("用户头像更新成功: {}", username);
+        return convertToUserVO(updatedUser);
+    }
+    
+    /**
+     * 更新当前用户邮箱
+     *
+     * @param username 当前登录用户名
+     * @param newEmail 新邮箱
+     * @param emailCode 邮箱验证码
+     * @param password 当前密码 (用于安全验证)
+     * @return 更新后的用户信息
+     */
+    @Override
+    @Transactional
+    public UserVO updateEmail(String username, String newEmail, String emailCode, String password) {
+        User user = getUserByUsername(username);
+        
+        // 验证用户密码
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new BusinessException("密码不正确");
+        }
+        
+        // 检查邮箱是否已被其他用户使用
+        if (existsByEmail(newEmail)) {
+            throw new BusinessException("邮箱已存在");
+        }
+        
+        // 验证邮箱验证码
+        boolean isValid = emailService.validateVerificationCode(newEmail, emailCode);
+        if (!isValid) {
+            throw new BusinessException("邮箱验证码不正确或已过期");
+        }
+        
+        // 更新邮箱
+        user.setEmail(newEmail);
+        User updatedUser = userRepository.save(user);
+        log.info("用户邮箱更新成功: {}, 新邮箱: {}", username, newEmail);
+        return convertToUserVO(updatedUser);
+    }
+    
+    /**
+     * 获取用户基本信息（用于前端展示）
+     *
+     * @param userId 用户ID
+     * @return 用户基本信息
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public UserVO getBasicUserInfo(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException("用户不存在"));
+        
+        // 创建基本信息VO，不包含敏感信息
+        return UserVO.builder()
+                .id(user.getId())
+                .username(user.getUsername())
+                .nickname(user.getNickname())
+                .avatar(user.getAvatar())
                 .build();
     }
 } 

@@ -88,7 +88,7 @@ public class AuthController {
      */
     @PostMapping("/email-verification-code")
     @ResponseStatus(HttpStatus.OK)
-    @Operation(summary = "发送邮箱验证码", description = "发送邮箱验证码")
+    @Operation(summary = "发送邮箱验证码", description = "发送邮箱验证码（用于用户注册）")
     public Result<Void> sendEmailVerificationCode(@Valid @RequestBody EmailVerificationDTO emailVerificationDTO) {
         // 验证图形验证码
         if (!captchaService.validateCaptcha(emailVerificationDTO.getCaptchaKey(), emailVerificationDTO.getCaptchaCode())) {
@@ -99,6 +99,31 @@ public class AuthController {
         String code = emailService.generateVerificationCode();
         // 发送验证码
         emailService.sendVerificationCode(emailVerificationDTO.getEmail(), code);
+        // 保存验证码到Redis
+        emailService.saveVerificationCode(emailVerificationDTO.getEmail(), code);
+
+        return Result.success();
+    }
+
+    /**
+     * 发送邮箱更新验证码
+     *
+     * @param emailVerificationDTO 邮箱验证码请求
+     * @return 结果
+     */
+    @PostMapping("/email-update-code")
+    @ResponseStatus(HttpStatus.OK)
+    @Operation(summary = "发送邮箱更新验证码", description = "发送邮箱更新验证码（用于更换邮箱）")
+    public Result<Void> sendEmailUpdateCode(@Valid @RequestBody EmailVerificationDTO emailVerificationDTO) {
+        // 验证图形验证码
+        if (!captchaService.validateCaptcha(emailVerificationDTO.getCaptchaKey(), emailVerificationDTO.getCaptchaCode())) {
+            return Result.fail("验证码错误");
+        }
+
+        // 生成邮箱验证码
+        String code = emailService.generateVerificationCode();
+        // 发送更新验证码邮件
+        emailService.sendEmailUpdateCode(emailVerificationDTO.getEmail(), code);
         // 保存验证码到Redis
         emailService.saveVerificationCode(emailVerificationDTO.getEmail(), code);
 

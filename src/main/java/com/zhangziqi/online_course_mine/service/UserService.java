@@ -126,4 +126,60 @@ public interface UserService {
      * @param ids 用户ID列表
      */
     void batchDeleteUsers(List<Long> ids);
+    
+    /**
+     * 获取当前登录用户信息
+     *
+     * @param username 当前登录用户名
+     * @return 用户详细信息
+     */
+    UserVO getCurrentUser(String username);
+    
+    /**
+     * 更新当前用户个人信息
+     *
+     * @param username 当前登录用户名
+     * @param nickname 昵称
+     * @param phone 手机号
+     * @return 更新后的用户信息
+     */
+    UserVO updateCurrentUserProfile(String username, String nickname, String phone);
+    
+    /**
+     * 修改当前用户密码
+     *
+     * @param username 当前登录用户名
+     * @param oldPassword 旧密码
+     * @param newPassword 新密码
+     * @return 是否修改成功
+     */
+    boolean changePassword(String username, String oldPassword, String newPassword);
+    
+    /**
+     * 更新当前用户头像
+     *
+     * @param username 当前登录用户名
+     * @param avatarUrl 头像URL
+     * @return 更新后的用户信息
+     */
+    UserVO updateAvatar(String username, String avatarUrl);
+    
+    /**
+     * 更新当前用户邮箱
+     *
+     * @param username 当前登录用户名
+     * @param newEmail 新邮箱
+     * @param emailCode 邮箱验证码
+     * @param password 当前密码 (用于安全验证)
+     * @return 更新后的用户信息
+     */
+    UserVO updateEmail(String username, String newEmail, String emailCode, String password);
+    
+    /**
+     * 获取用户基本信息（用于前端展示）
+     *
+     * @param userId 用户ID
+     * @return 用户基本信息
+     */
+    UserVO getBasicUserInfo(Long userId);
 } 

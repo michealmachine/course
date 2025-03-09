@@ -1,10 +1,14 @@
 package com.zhangziqi.online_course_mine.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zhangziqi.online_course_mine.model.dto.ChangePasswordDTO;
+import com.zhangziqi.online_course_mine.model.dto.EmailUpdateDTO;
 import com.zhangziqi.online_course_mine.model.dto.UserDTO;
+import com.zhangziqi.online_course_mine.model.dto.UserProfileDTO;
 import com.zhangziqi.online_course_mine.model.dto.UserQueryDTO;
 import com.zhangziqi.online_course_mine.model.entity.Role;
 import com.zhangziqi.online_course_mine.model.vo.UserVO;
+import com.zhangziqi.online_course_mine.service.MinioService;
 import com.zhangziqi.online_course_mine.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +19,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -44,6 +49,9 @@ public class UserControllerTest {
 
     @MockBean
     private UserService userService;
+    
+    @MockBean
+    private MinioService minioService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -51,6 +59,9 @@ public class UserControllerTest {
     private UserVO userVO;
     private UserDTO userDTO;
     private List<UserVO> userVOList;
+    private UserProfileDTO profileDTO;
+    private ChangePasswordDTO changePasswordDTO;
+    private EmailUpdateDTO emailUpdateDTO;
 
     @BeforeEach
     public void setup() {
@@ -108,6 +119,23 @@ public class UserControllerTest {
                 .status(1)
                 .roleIds(Set.of(1L))
                 .build();
+
+        // 模拟个人信息DTO
+        profileDTO = new UserProfileDTO();
+        profileDTO.setNickname("新昵称");
+        profileDTO.setPhone("13900001111");
+        
+        // 模拟密码修改DTO
+        changePasswordDTO = new ChangePasswordDTO();
+        changePasswordDTO.setOldPassword("oldPassword");
+        changePasswordDTO.setNewPassword("newPassword123");
+        changePasswordDTO.setConfirmPassword("newPassword123");
+        
+        // 模拟邮箱更新DTO
+        emailUpdateDTO = new EmailUpdateDTO();
+        emailUpdateDTO.setNewEmail("newemail@example.com");
+        emailUpdateDTO.setEmailCode("123456");
+        emailUpdateDTO.setPassword("password123");
     }
 
     @Test
@@ -221,5 +249,109 @@ public class UserControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(ids)))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @WithMockUser(username = "testuser")
+    public void testGetCurrentUser() throws Exception {
+        when(userService.getCurrentUser("testuser")).thenReturn(userVO);
+        
+        mockMvc.perform(get("/api/users/current")
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code", is(200)))
+                .andExpect(jsonPath("$.data.username", is("testuser")))
+                .andExpect(jsonPath("$.data.email", is("test@example.com")))
+                .andExpect(jsonPath("$.data.nickname", is("测试用户")));
+    }
+    
+    @Test
+    @WithMockUser(username = "testuser")
+    public void testUpdateCurrentUser() throws Exception {
+        when(userService.updateCurrentUserProfile(eq("testuser"), anyString(), anyString())).thenReturn(userVO);
+        
+        mockMvc.perform(put("/api/users/current")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(profileDTO)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code", is(200)))
+                .andExpect(jsonPath("$.data.username", is("testuser")));
+    }
+    
+    @Test
+    @WithMockUser(username = "testuser")
+    public void testChangePassword() throws Exception {
+        when(userService.changePassword(eq("testuser"), eq("oldPassword"), eq("newPassword123"))).thenReturn(true);
+        
+        mockMvc.perform(put("/api/users/current/password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(changePasswordDTO)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code", is(200)));
+    }
+    
+    @Test
+    @WithMockUser(username = "testuser")
+    public void testChangePasswordWithMismatchConfirmation() throws Exception {
+        // 设置确认密码不一致
+        changePasswordDTO.setConfirmPassword("differentPassword");
+        
+        mockMvc.perform(put("/api/users/current/password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(changePasswordDTO)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code", is(400)))
+                .andExpect(jsonPath("$.message", is("新密码与确认密码不一致")));
+    }
+    
+    @Test
+    @WithMockUser(username = "testuser")
+    public void testUpdateEmail() throws Exception {
+        when(userService.updateEmail(
+                eq("testuser"), 
+                eq("newemail@example.com"), 
+                eq("123456"), 
+                eq("password123")
+        )).thenReturn(userVO);
+        
+        mockMvc.perform(put("/api/users/current/email")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(emailUpdateDTO)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code", is(200)))
+                .andExpect(jsonPath("$.data.username", is("testuser")));
+    }
+    
+    @Test
+    @WithMockUser(username = "testuser")
+    public void testUploadAvatar() throws Exception {
+        String avatarUrl = "https://example.com/avatars/testuser/avatar.jpg";
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "avatar.jpg",
+                "image/jpeg",
+                "test image content".getBytes()
+        );
+        
+        when(minioService.uploadFile(anyString(), any(), anyString())).thenReturn(avatarUrl);
+        when(userService.updateAvatar(eq("testuser"), eq(avatarUrl))).thenReturn(userVO);
+        
+        mockMvc.perform(multipart("/api/users/current/avatar")
+                .file(file))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code", is(200)))
+                .andExpect(jsonPath("$.data.avatarUrl", is(avatarUrl)));
+    }
+    
+    @Test
+    public void testGetBasicUserInfo() throws Exception {
+        when(userService.getBasicUserInfo(1L)).thenReturn(userVO);
+        
+        mockMvc.perform(get("/api/users/basic/1")
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code", is(200)))
+                .andExpect(jsonPath("$.data.username", is("testuser")))
+                .andExpect(jsonPath("$.data.nickname", is("测试用户")));
     }
 } 

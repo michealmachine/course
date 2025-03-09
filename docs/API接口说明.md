@@ -1101,4 +1101,426 @@
 4. 请求头中的认证信息格式必须为 `Authorization: Bearer {访问令牌}`
 5. 刷新令牌仅能使用一次，使用后会生成新的访问令牌，但刷新令牌本身不变
 6. 权限编码必须以`ROLE_`开头的才是角色，其他的是普通权限
-7. 系统内置了四种基本角色：普通用户(ROLE_USER)、管理员(ROLE_ADMIN)、审核人员(ROLE_REVIEWER)、机构用户(ROLE_INSTITUTION) 
+7. 系统内置了四种基本角色：普通用户(ROLE_USER)、管理员(ROLE_ADMIN)、审核人员(ROLE_REVIEWER)、机构用户(ROLE_INSTITUTION)
+
+## 用户自身管理接口
+
+### 获取当前用户信息
+
+- **URL**: `/api/users/current`
+- **方法**: `GET`
+- **描述**: 获取当前登录用户的详细信息
+- **请求头**: `Authorization: Bearer {accessToken}`
+- **成功响应** (200 OK):
+  ```json
+  {
+    "code": 200,
+    "message": "获取成功",
+    "data": {
+      "id": 1,
+      "username": "zhangsan",
+      "email": "zhangsan@example.com",
+      "nickname": "张三",
+      "phone": "13800138000",
+      "avatar": "https://example.com/avatars/default.png",
+      "status": 1,
+      "createdAt": "2023-01-01T12:00:00Z",
+      "lastLoginAt": "2023-01-01T12:00:00Z",
+      "roles": [
+        {
+          "id": 1,
+          "name": "普通用户",
+          "code": "ROLE_USER"
+        }
+      ]
+    }
+  }
+  ```
+- **错误响应**:
+  - 401 Unauthorized: 未授权
+
+### 更新当前用户信息
+
+- **URL**: `/api/users/current`
+- **方法**: `PUT`
+- **描述**: 更新当前登录用户的个人资料
+- **请求头**: `Authorization: Bearer {accessToken}`
+- **请求体**:
+  ```json
+  {
+    "nickname": "新昵称",
+    "phone": "13812345678"
+  }
+  ```
+- **成功响应** (200 OK):
+  ```json
+  {
+    "code": 200,
+    "message": "更新成功",
+    "data": {
+      "id": 1,
+      "username": "zhangsan",
+      "email": "zhangsan@example.com",
+      "nickname": "新昵称",
+      "phone": "13812345678",
+      "avatar": "https://example.com/avatars/default.png",
+      "updatedAt": "2023-01-01T13:00:00Z"
+    }
+  }
+  ```
+- **错误响应**:
+  - 400 Bad Request: 参数错误
+  - 401 Unauthorized: 未授权
+
+### 修改当前用户密码
+
+- **URL**: `/api/users/current/password`
+- **方法**: `PUT`
+- **描述**: 修改当前登录用户的密码
+- **请求头**: `Authorization: Bearer {accessToken}`
+- **请求体**:
+  ```json
+  {
+    "oldPassword": "Password123",
+    "newPassword": "NewPassword456",
+    "confirmPassword": "NewPassword456"
+  }
+  ```
+- **成功响应** (200 OK):
+  ```json
+  {
+    "code": 200,
+    "message": "密码修改成功",
+    "data": null
+  }
+  ```
+- **错误响应**:
+  - 400 Bad Request: 参数错误或新密码与确认密码不匹配
+  - 401 Unauthorized: 未授权或旧密码不正确
+
+### 上传用户头像
+
+- **URL**: `/api/users/current/avatar`
+- **方法**: `POST`
+- **描述**: 上传并设置当前用户的头像
+- **请求头**: `Authorization: Bearer {accessToken}`
+- **请求体**: `multipart/form-data` 类型，包含名为 `avatar` 的文件字段
+- **成功响应** (200 OK):
+  ```json
+  {
+    "code": 200,
+    "message": "头像上传成功",
+    "data": {
+      "avatarUrl": "https://example.com/avatars/user1/avatar.jpg"
+    }
+  }
+  ```
+- **错误响应**:
+  - 400 Bad Request: 文件格式不支持或文件大小超限
+  - 401 Unauthorized: 未授权
+
+### 获取邮箱更新验证码
+
+- **URL**: `/api/users/current/email-code`
+- **方法**: `POST`
+- **描述**: 向用户新邮箱发送验证码，用于更新邮箱地址
+- **请求头**: `Authorization: Bearer {accessToken}`
+- **请求体**:
+  ```json
+  {
+    "newEmail": "new-email@example.com"
+  }
+  ```
+- **成功响应** (200 OK):
+  ```json
+  {
+    "code": 200,
+    "message": "验证码已发送到新邮箱，请查收",
+    "data": null
+  }
+  ```
+- **错误响应**:
+  - 400 Bad Request: 邮箱格式不正确或已被其他用户使用
+  - 401 Unauthorized: 未授权
+  - 429 Too Many Requests: 请求频率过高
+
+### 更新用户邮箱
+
+- **URL**: `/api/users/current/email`
+- **方法**: `PUT`
+- **描述**: 使用验证码更新用户邮箱
+- **请求头**: `Authorization: Bearer {accessToken}`
+- **请求体**:
+  ```json
+  {
+    "newEmail": "new-email@example.com",
+    "verificationCode": "123456"
+  }
+  ```
+- **成功响应** (200 OK):
+  ```json
+  {
+    "code": 200,
+    "message": "邮箱更新成功",
+    "data": {
+      "email": "new-email@example.com",
+      "updatedAt": "2023-01-01T14:00:00Z"
+    }
+  }
+  ```
+- **错误响应**:
+  - 400 Bad Request: 参数错误
+  - 401 Unauthorized: 未授权
+  - 403 Forbidden: 验证码错误
+  - 410 Gone: 验证码已过期
+
+## 系统设置接口
+
+### 获取系统配置 (管理员)
+
+- **URL**: `/api/admin/settings`
+- **方法**: `GET`
+- **描述**: 获取系统配置信息
+- **请求头**: `Authorization: Bearer {accessToken}`
+- **成功响应** (200 OK):
+  ```json
+  {
+    "code": 200,
+    "message": "获取成功",
+    "data": {
+      "siteName": "在线课程平台",
+      "siteDescription": "提供优质的在线课程学习平台",
+      "contactEmail": "contact@example.com",
+      "registrationEnabled": true,
+      "maintenanceMode": false,
+      "fileStorageType": "minio",
+      "maxUploadSize": 10485760
+    }
+  }
+  ```
+- **错误响应**:
+  - 401 Unauthorized: 未授权
+  - 403 Forbidden: 无权限
+
+### 更新系统配置 (管理员)
+
+- **URL**: `/api/admin/settings`
+- **方法**: `PUT`
+- **描述**: 更新系统配置信息
+- **请求头**: `Authorization: Bearer {accessToken}`
+- **请求体**:
+  ```json
+  {
+    "siteName": "优质在线教育平台",
+    "siteDescription": "提供高质量的在线课程学习体验",
+    "contactEmail": "support@example.com",
+    "registrationEnabled": true,
+    "maintenanceMode": false,
+    "maxUploadSize": 20971520
+  }
+  ```
+- **成功响应** (200 OK):
+  ```json
+  {
+    "code": 200,
+    "message": "更新成功",
+    "data": {
+      "siteName": "优质在线教育平台",
+      "siteDescription": "提供高质量的在线课程学习体验",
+      "contactEmail": "support@example.com",
+      "registrationEnabled": true,
+      "maintenanceMode": false,
+      "maxUploadSize": 20971520,
+      "updatedAt": "2023-01-01T13:00:00Z"
+    }
+  }
+  ```
+- **错误响应**:
+  - 400 Bad Request: 参数错误
+  - 401 Unauthorized: 未授权
+  - 403 Forbidden: 无权限
+
+## 课程相关接口
+
+### 获取课程分类列表（待实现）
+
+- **URL**: `/api/categories`
+- **方法**: `GET`
+- **描述**: 获取所有课程分类
+- **请求参数**: 无
+- **成功响应** (200 OK):
+  ```json
+  {
+    "code": 200,
+    "message": "获取成功",
+    "data": [
+      {
+        "id": 1,
+        "name": "计算机科学",
+        "code": "computer-science",
+        "parentId": null,
+        "level": 1,
+        "children": [
+          {
+            "id": 2,
+            "name": "编程语言",
+            "code": "programming-languages",
+            "parentId": 1,
+            "level": 2,
+            "children": []
+          },
+          {
+            "id": 3,
+            "name": "数据库",
+            "code": "databases",
+            "parentId": 1,
+            "level": 2,
+            "children": []
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "name": "数学",
+        "code": "mathematics",
+        "parentId": null,
+        "level": 1,
+        "children": []
+      }
+    ]
+  }
+  ```
+
+### 获取课程标签列表（待实现）
+
+- **URL**: `/api/tags`
+- **方法**: `GET`
+- **描述**: 获取所有课程标签
+- **请求参数**:
+  - `size`: 返回标签数量，默认为20
+  - `popular`: 是否返回热门标签，默认为false
+- **成功响应** (200 OK):
+  ```json
+  {
+    "code": 200,
+    "message": "获取成功",
+    "data": [
+      {
+        "id": 1,
+        "name": "Java",
+        "courseCount": 42
+      },
+      {
+        "id": 2,
+        "name": "Spring Boot",
+        "courseCount": 38
+      },
+      {
+        "id": 3,
+        "name": "JavaScript",
+        "courseCount": 56
+      }
+    ]
+  }
+  ```
+
+### 获取课程列表（待实现）
+
+- **URL**: `/api/courses`
+- **方法**: `GET`
+- **描述**: 获取课程列表
+- **请求参数**:
+  - `page`: 页码，默认为0
+  - `size`: 每页大小，默认为10
+  - `sort`: 排序字段，默认为createdAt,desc
+  - `categoryId`: 按分类筛选
+  - `tagId`: 按标签筛选
+  - `keyword`: 搜索关键词
+  - `price`: 价格区间，格式为"min,max"，如"0,100"
+  - `level`: 难度级别，值为1(初级)、2(中级)或3(高级)
+- **成功响应** (200 OK):
+  ```json
+  {
+    "code": 200,
+    "message": "获取成功",
+    "data": {
+      "content": [
+        {
+          "id": 1,
+          "title": "Spring Boot实战入门到精通",
+          "summary": "全面讲解Spring Boot框架的使用方法和最佳实践",
+          "coverUrl": "https://example.com/covers/spring-boot.jpg",
+          "price": 199.00,
+          "discountPrice": 149.00,
+          "level": 2,
+          "totalDuration": 1240,
+          "studentCount": 1205,
+          "rating": 4.8,
+          "categoryId": 2,
+          "categoryName": "编程语言",
+          "teacherName": "张教授",
+          "tags": [
+            {
+              "id": 2,
+              "name": "Spring Boot"
+            },
+            {
+              "id": 8,
+              "name": "Java"
+            }
+          ]
+        }
+      ],
+      "pageable": {
+        "pageNumber": 0,
+        "pageSize": 10,
+        "sort": [
+          {
+            "direction": "DESC",
+            "property": "createdAt"
+          }
+        ]
+      },
+      "totalElements": 42,
+      "totalPages": 5,
+      "last": false,
+      "size": 10,
+      "number": 0,
+      "sort": {
+        "sorted": true,
+        "unsorted": false,
+        "empty": false
+      },
+      "numberOfElements": 10,
+      "first": true,
+      "empty": false
+    }
+  }
+  ```
+
+## 访问权限说明
+
+对API接口的访问权限采用基于角色的访问控制(RBAC)策略：
+
+- **公开接口**: 不需要任何权限即可访问，如注册、登录、公共课程列表等
+- **用户接口**: 需要普通用户权限(`ROLE_USER`)，如个人信息管理、课程观看等
+- **机构接口**: 需要机构权限(`ROLE_INSTITUTION`)，如创建和管理课程等
+- **管理员接口**: 需要管理员权限(`ROLE_ADMIN`)，如用户管理、系统设置等
+
+## 附录：错误码说明
+
+| 错误码 | 描述                       |
+|--------|----------------------------|
+| 40001  | 请求参数错误               |
+| 40002  | 表单验证失败               |
+| 40003  | 数据不存在                 |
+| 40004  | 用户名或密码错误           |
+| 40005  | 账号被锁定                 |
+| 40006  | 验证码错误或已过期         |
+| 40007  | 文件上传失败               |
+| 40008  | 操作频率超限               |
+| 40009  | 数据已存在                 |
+| 40010  | 数据关联，无法删除         |
+| 50001  | 系统内部错误               |
+| 50002  | 数据库操作失败             |
+| 50003  | 第三方服务调用失败         | 

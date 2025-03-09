@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultHandlers;
 import java.awt.image.BufferedImage;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
@@ -247,5 +248,56 @@ public class AuthControllerTest {
                 .andExpect(jsonPath("$.message").value("操作成功"));
 
         verify(authService, times(1)).logout(eq("test-token"));
+    }
+
+    @Test
+    public void testSendEmailUpdateCode() throws Exception {
+        // 准备
+        EmailVerificationDTO dto = new EmailVerificationDTO();
+        dto.setEmail("newemail@example.com");
+        dto.setCaptchaKey("123456");
+        dto.setCaptchaCode("1234");
+        
+        String code = "654321";
+        when(captchaService.validateCaptcha("123456", "1234")).thenReturn(true);
+        when(emailService.generateVerificationCode()).thenReturn(code);
+        doNothing().when(emailService).sendEmailUpdateCode(eq("newemail@example.com"), eq(code));
+        doNothing().when(emailService).saveVerificationCode(eq("newemail@example.com"), eq(code));
+        
+        // 执行 & 验证
+        mockMvc.perform(post("/api/auth/email-update-code")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+        
+        verify(captchaService, times(1)).validateCaptcha("123456", "1234");
+        verify(emailService, times(1)).generateVerificationCode();
+        verify(emailService, times(1)).sendEmailUpdateCode("newemail@example.com", code);
+        verify(emailService, times(1)).saveVerificationCode("newemail@example.com", code);
+    }
+    
+    @Test
+    public void testSendEmailUpdateCodeWithInvalidCaptcha() throws Exception {
+        // 准备
+        EmailVerificationDTO dto = new EmailVerificationDTO();
+        dto.setEmail("newemail@example.com");
+        dto.setCaptchaKey("123456");
+        dto.setCaptchaCode("1234");
+        
+        when(captchaService.validateCaptcha("123456", "1234")).thenReturn(false);
+        
+        // 执行 & 验证
+        mockMvc.perform(post("/api/auth/email-update-code")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(500))
+                .andExpect(jsonPath("$.message").value("验证码错误"));
+        
+        verify(captchaService, times(1)).validateCaptcha("123456", "1234");
+        verify(emailService, times(0)).generateVerificationCode();
+        verify(emailService, times(0)).sendEmailUpdateCode(anyString(), anyString());
+        verify(emailService, times(0)).saveVerificationCode(anyString(), anyString());
     }
 } 

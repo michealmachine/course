@@ -14,6 +14,7 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.test.context.ActiveProfiles;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
+import org.mockito.ArgumentCaptor;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -153,5 +154,30 @@ public class EmailServiceTest {
         assertFalse(result);
         verify(valueOperations).get("email:verification:test@example.com");
         verify(redisTemplate, never()).delete(anyString());
+    }
+
+    @Test
+    public void testSendEmailUpdateCode() throws MessagingException {
+        // 准备
+        String to = "test@example.com";
+        String code = "123456";
+        String emailContent = "<div>邮箱更新验证码：123456</div>";
+        
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(eq("email/email-update-code"), any(Context.class))).thenReturn(emailContent);
+        
+        // 执行
+        emailService.sendEmailUpdateCode(to, code);
+        
+        // 验证
+        verify(mailSender, times(1)).createMimeMessage();
+        verify(mailSender, times(1)).send(any(MimeMessage.class));
+        verify(templateEngine, times(1)).process(eq("email/email-update-code"), any(Context.class));
+        
+        // 验证上下文参数
+        ArgumentCaptor<Context> contextCaptor = ArgumentCaptor.forClass(Context.class);
+        verify(templateEngine).process(eq("email/email-update-code"), contextCaptor.capture());
+        Context context = contextCaptor.getValue();
+        assertNotNull(context);
     }
 } 
