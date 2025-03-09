@@ -1,6 +1,6 @@
 'use client';
 
-import { CaptchaResponse, LoginRequest, LoginResponse, RegisterRequest, User } from '@/types/auth';
+import { CaptchaResponse, EmailVerificationRequest, LoginRequest, LoginResponse, RegisterRequest, User } from '@/types/auth';
 import { request } from './api';
 import axios from 'axios';
 
@@ -15,38 +15,45 @@ const authService = {
     try {
       console.log('开始获取验证码');
       
-      // 先生成一个随机的captchaKey
-      const generatedCaptchaKey = Math.random().toString(36).substring(2, 15);
-      console.log('生成的captchaKey：', generatedCaptchaKey);
+      // 第一步：获取验证码key
+      const keyResponse = await request.get<any>('/auth/captcha/key');
       
-      // 将captchaKey作为查询参数传递给后端
-      const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api'}/auth/captcha?captchaKey=${encodeURIComponent(generatedCaptchaKey)}`, 
+      // 检查响应
+      if (!keyResponse || !keyResponse.data) {
+        console.error('获取验证码key响应为空');
+        throw new Error('获取验证码失败，响应为空');
+      }
+      
+      if (keyResponse.data.code !== 200) {
+        console.error('获取验证码key失败，错误码：', keyResponse.data.code, '错误信息：', keyResponse.data.message);
+        throw new Error(keyResponse.data.message || '获取验证码失败');
+      }
+      
+      // 提取验证码key
+      const captchaKey = keyResponse.data.data;
+      console.log('获取到验证码key：', captchaKey);
+      
+      if (!captchaKey) {
+        console.error('验证码key为空');
+        throw new Error('获取验证码失败，验证码key为空');
+      }
+      
+      // 第二步：获取验证码图片
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api';
+      const imageUrl = `${baseUrl}/auth/captcha/image/${encodeURIComponent(captchaKey)}`;
+      console.log('请求验证码图片URL:', imageUrl);
+      
+      const imageResponse = await axios.get(
+        imageUrl, 
         { 
-          responseType: 'arraybuffer',
-          // 添加请求完成回调以记录响应头
-          onDownloadProgress: (progressEvent) => {
-            if (progressEvent.loaded === progressEvent.total) {
-              console.log('验证码请求完成');
-            }
-          }
+          responseType: 'arraybuffer'
         }
       );
       
-      console.log('验证码响应状态：', response.status);
-      console.log('验证码响应头：', response.headers);
-      
-      // 优先使用响应头中的Captcha-Key，如果不存在再使用自生成的captchaKey
-      // 尝试各种大小写形式获取Captcha-Key
-      const headerCaptchaKey = response.headers['captcha-key'] ||
-                              response.headers['Captcha-Key'] ||
-                              response.headers['CAPTCHA-KEY'];
-      
-      const captchaKey = headerCaptchaKey || generatedCaptchaKey;
-      console.log('最终使用的验证码Key：', captchaKey);
+      console.log('验证码图片响应状态：', imageResponse.status);
       
       // 将图片数据转换为base64
-      const captchaImage = `data:image/jpeg;base64,${Buffer.from(response.data).toString('base64')}`;
+      const captchaImage = `data:image/jpeg;base64,${Buffer.from(imageResponse.data).toString('base64')}`;
       
       return { captchaId: captchaKey, captchaImage };
     } catch (error) {
@@ -238,6 +245,33 @@ const authService = {
       console.error('获取用户信息出错：', error);
       throw error;
     }
+  },
+
+  /**
+   * 发送邮箱验证码
+   */
+  sendEmailVerificationCode: async (data: EmailVerificationRequest) => {
+    console.log('开始发送邮箱验证码，参数：', {
+      email: data.email,
+      captchaKey: data.captchaKey,
+      captchaCode: data.captchaCode
+    });
+    
+    const response = await request.post<any>('/auth/email-verification-code', data);
+    console.log('发送邮箱验证码响应：', response);
+    
+    // 检查响应状态
+    if (!response || !response.data) {
+      console.error('发送邮箱验证码响应为空');
+      throw new Error('发送邮箱验证码失败，响应为空');
+    }
+    
+    if (response.data.code !== 200) {
+      console.error('发送邮箱验证码失败，错误码：', response.data.code, '错误信息：', response.data.message);
+      throw new Error(response.data.message || '发送邮箱验证码失败');
+    }
+    
+    return response.data.data;
   }
 };
 

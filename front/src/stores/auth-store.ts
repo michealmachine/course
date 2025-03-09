@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { User, LoginRequest, RegisterRequest } from '@/types/auth';
+import { User, LoginRequest, RegisterRequest, EmailVerificationRequest } from '@/types/auth';
 import authService from '@/services/auth';
 import { ApiError } from '@/types/api';
 
@@ -18,6 +18,7 @@ interface AuthState {
   register: (data: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
+  sendEmailVerificationCode: (data: EmailVerificationRequest) => Promise<void>;
   
   // 状态管理方法
   setUser: (user: User | null) => void;
@@ -90,6 +91,23 @@ export const useAuthStore = create<AuthState>()(
           set({
             isLoading: false,
             error: apiError.message || '注册失败',
+          });
+          throw error;
+        }
+      },
+      
+      // 发送邮箱验证码
+      sendEmailVerificationCode: async (data: EmailVerificationRequest) => {
+        set({ isLoading: true, error: null });
+        
+        try {
+          await authService.sendEmailVerificationCode(data);
+          set({ isLoading: false });
+        } catch (error) {
+          const apiError = error as ApiError;
+          set({
+            isLoading: false,
+            error: apiError.message || '发送邮箱验证码失败',
           });
           throw error;
         }

@@ -25,6 +25,13 @@ export interface LoginRequest {
   captchaKey: string;
 }
 
+// 邮箱验证码请求参数
+export interface EmailVerificationRequest {
+  email: string;
+  captchaCode: string;
+  captchaKey: string;
+}
+
 // 注册请求参数
 export interface RegisterRequest {
   username: string;
@@ -33,6 +40,7 @@ export interface RegisterRequest {
   confirmPassword: string;
   captchaCode: string;
   captchaKey: string;
+  emailCode: string;        // 邮箱验证码
 }
 
 // 登录响应

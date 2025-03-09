@@ -4,6 +4,7 @@ import com.zhangziqi.online_course_mine.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -27,6 +28,9 @@ public class EmailServiceImpl implements EmailService {
     private final JavaMailSender mailSender;
     private final StringRedisTemplate redisTemplate;
     private final TemplateEngine templateEngine;
+    
+    @Value("${spring.mail.username}")
+    private String emailFrom;
 
     /**
      * Redis中验证码的key前缀
@@ -45,7 +49,7 @@ public class EmailServiceImpl implements EmailService {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true);
-            helper.setFrom("no-reply@example.com");
+            helper.setFrom(emailFrom);
             helper.setTo(to);
             helper.setSubject("在线课程平台 - 邮箱验证码");
 
@@ -69,7 +73,7 @@ public class EmailServiceImpl implements EmailService {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true);
-            helper.setFrom("no-reply@example.com");
+            helper.setFrom(emailFrom);
             helper.setTo(to);
             helper.setSubject("在线课程平台 - 邮箱更新验证码");
 
