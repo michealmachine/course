@@ -68,10 +68,12 @@ api.interceptors.response.use(
                           requestUrl.includes('/auth/register') ||
                           requestUrl.includes('/auth/captcha');
     
-    // 处理401错误（未授权），但不处理认证请求
-    if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
+    // 处理401错误（未授权）或403错误（权限不足），但不处理认证请求
+    if ((error.response?.status === 401 || error.response?.status === 403) && 
+        !originalRequest._retry && 
+        !isAuthRequest) {
       originalRequest._retry = true;
-      console.log('收到401错误，尝试刷新令牌');
+      console.log(`收到${error.response?.status}错误，尝试刷新令牌`);
       
       try {
         // 尝试刷新令牌
@@ -190,6 +192,27 @@ export const request = {
       
       if (!(config?.silentOnAuthError && isAuthError)) {
         console.error(`POST ${url} 请求失败:`, error);
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * PATCH请求
+   * @param url 请求路径
+   * @param data 请求数据
+   * @param config 请求配置
+   */
+  patch: async <T>(url: string, data?: any, config?: any): Promise<AxiosResponse<ApiResponse<T>>> => {
+    try {
+      return await api.patch<ApiResponse<T>>(url, data, config);
+    } catch (error) {
+      // 如果配置中设置了silentOnAuthError，且是401或403错误，则静默失败（不打印错误）
+      const isAuthError = axios.isAxiosError(error) && 
+        (error.response?.status === 401 || error.response?.status === 403);
+      
+      if (!(config?.silentOnAuthError && isAuthError)) {
+        console.error(`PATCH ${url} 请求失败:`, error);
       }
       throw error;
     }

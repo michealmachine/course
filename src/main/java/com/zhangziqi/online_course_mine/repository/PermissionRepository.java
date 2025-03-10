@@ -28,4 +28,13 @@ public interface PermissionRepository extends JpaRepository<Permission, Long> {
      * @return 权限
      */
     Optional<Permission> findByUrlAndMethod(String url, String method);
+    
+    /**
+     * 根据权限编码查询，排除指定ID的权限
+     * 
+     * @param code 权限编码
+     * @param id 要排除的权限ID
+     * @return 权限
+     */
+    Optional<Permission> findByCodeAndIdNot(String code, Long id);
 } 

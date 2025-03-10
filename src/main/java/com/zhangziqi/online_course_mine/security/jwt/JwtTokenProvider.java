@@ -2,6 +2,9 @@ package com.zhangziqi.online_course_mine.security.jwt;
 
 import com.zhangziqi.online_course_mine.config.security.JwtConfig;
 import com.zhangziqi.online_course_mine.model.dto.JwtTokenDTO;
+import com.zhangziqi.online_course_mine.model.entity.Role;
+import com.zhangziqi.online_course_mine.model.entity.User;
+import com.zhangziqi.online_course_mine.repository.UserRepository;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
@@ -15,7 +18,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -33,6 +37,7 @@ import java.util.stream.Collectors;
 public class JwtTokenProvider {
 
     private final JwtConfig jwtConfig;
+    private final UserRepository userRepository;
 
     /**
      * 获取密钥
@@ -92,8 +97,16 @@ public class JwtTokenProvider {
     public JwtTokenDTO refreshToken(String refreshToken) {
         String username = getUsernameFromToken(refreshToken);
         
-        // 这里简化处理，实际应用中应从数据库或缓存获取用户角色
-        String roles = "ROLE_USER";
+        // 从数据库获取用户及其角色信息
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("用户不存在: " + username));
+        
+        // 获取用户角色作为授权
+        String roles = user.getRoles().stream()
+                .map(Role::getCode)
+                .collect(Collectors.joining(","));
+                
+        log.debug("刷新令牌时用户 {} 的角色: {}", username, roles);
 
         long now = System.currentTimeMillis();
         Date accessTokenValidity = new Date(now + jwtConfig.getAccessTokenExpiration());
@@ -131,7 +144,11 @@ public class JwtTokenProvider {
                         .collect(Collectors.toList()) :
                 java.util.Collections.emptyList();
 
-        User principal = new User(claims.getSubject(), "", authorities);
+        UserDetails principal = org.springframework.security.core.userdetails.User.builder()
+                .username(claims.getSubject())
+                .password("")
+                .authorities(authorities)
+                .build();
         return new UsernamePasswordAuthenticationToken(principal, token, authorities);
     }
 

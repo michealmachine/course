@@ -7,6 +7,7 @@ import com.zhangziqi.online_course_mine.model.dto.LoginDTO;
 import com.zhangziqi.online_course_mine.model.dto.RefreshTokenDTO;
 import com.zhangziqi.online_course_mine.model.dto.RegisterDTO;
 import com.zhangziqi.online_course_mine.model.entity.User;
+import com.zhangziqi.online_course_mine.repository.UserRepository;
 import com.zhangziqi.online_course_mine.security.jwt.JwtTokenProvider;
 import com.zhangziqi.online_course_mine.security.jwt.TokenBlacklistService;
 import com.zhangziqi.online_course_mine.service.impl.AuthServiceImpl;
@@ -19,10 +20,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.test.context.ActiveProfiles;
+
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 import static org.mockito.BDDMockito.given;
 
@@ -56,6 +61,9 @@ public class AuthServiceTest {
 
     @Mock
     private Authentication authentication;
+    
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private AuthServiceImpl authService;
@@ -64,6 +72,7 @@ public class AuthServiceTest {
     private LoginDTO loginDTO;
     private RefreshTokenDTO refreshTokenDTO;
     private JwtTokenDTO jwtTokenDTO;
+    private User testUser;
 
     @BeforeEach
     void setUp() {
@@ -94,6 +103,12 @@ public class AuthServiceTest {
                 .tokenType("Bearer")
                 .expiresIn(3600000)
                 .build();
+                
+        // 初始化测试用户
+        testUser = new User();
+        testUser.setId(1L);
+        testUser.setUsername("testuser");
+        testUser.setEmail("test@example.com");
     }
 
     @Test
@@ -166,6 +181,8 @@ public class AuthServiceTest {
         // 准备
         when(tokenProvider.validateToken(refreshTokenDTO.getRefreshToken())).thenReturn(true);
         when(tokenBlacklistService.isBlacklisted(refreshTokenDTO.getRefreshToken())).thenReturn(false);
+        when(tokenProvider.getUsernameFromToken(refreshTokenDTO.getRefreshToken())).thenReturn("testuser");
+        when(userService.getUserByUsername("testuser")).thenReturn(testUser);
         when(tokenProvider.refreshToken(refreshTokenDTO.getRefreshToken())).thenReturn(jwtTokenDTO);
 
         // 执行
@@ -177,6 +194,7 @@ public class AuthServiceTest {
         assertEquals(jwtTokenDTO.getRefreshToken(), result.getRefreshToken());
         verify(tokenProvider).validateToken(refreshTokenDTO.getRefreshToken());
         verify(tokenBlacklistService).isBlacklisted(refreshTokenDTO.getRefreshToken());
+        verify(userService).getUserByUsername("testuser");
         verify(tokenProvider).refreshToken(refreshTokenDTO.getRefreshToken());
     }
 
@@ -201,6 +219,27 @@ public class AuthServiceTest {
         assertThrows(BusinessException.class, () -> authService.refreshToken(refreshTokenDTO));
         verify(tokenProvider).validateToken(refreshTokenDTO.getRefreshToken());
         verify(tokenBlacklistService).isBlacklisted(refreshTokenDTO.getRefreshToken());
+        verify(tokenProvider, never()).refreshToken(any());
+    }
+    
+    @Test
+    void refreshTokenShouldThrowExceptionWhenUserNotFound() {
+        // 准备
+        when(tokenProvider.validateToken(refreshTokenDTO.getRefreshToken())).thenReturn(true);
+        when(tokenBlacklistService.isBlacklisted(refreshTokenDTO.getRefreshToken())).thenReturn(false);
+        when(tokenProvider.getUsernameFromToken(refreshTokenDTO.getRefreshToken())).thenReturn("testuser");
+        when(userService.getUserByUsername("testuser")).thenThrow(new UsernameNotFoundException("用户不存在: testuser"));
+
+        // 执行并验证
+        assertThrows(UsernameNotFoundException.class, () -> {
+            authService.refreshToken(refreshTokenDTO);
+        });
+
+        // 验证方法调用
+        verify(tokenProvider).validateToken(refreshTokenDTO.getRefreshToken());
+        verify(tokenBlacklistService).isBlacklisted(refreshTokenDTO.getRefreshToken());
+        verify(tokenProvider).getUsernameFromToken(refreshTokenDTO.getRefreshToken());
+        verify(userService).getUserByUsername("testuser");
         verify(tokenProvider, never()).refreshToken(any());
     }
 

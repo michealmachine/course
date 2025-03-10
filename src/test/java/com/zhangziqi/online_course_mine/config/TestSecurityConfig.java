@@ -67,7 +67,25 @@ public class TestSecurityConfig {
     @Bean
     @Primary
     public UserDetailsService userDetailsService() {
-        return mock(UserDetailsService.class);
+        // 不再使用mock实现，而是返回一个实际能查询到测试用户的UserDetailsService
+        return username -> {
+            // 为集成测试创建一个简单的UserDetails实现
+            if ("admin_test".equals(username)) {
+                return org.springframework.security.core.userdetails.User.builder()
+                    .username("admin_test")
+                    .password("$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG") // "password"的加密值
+                    .roles("ADMIN")
+                    .authorities("ROLE_ADMIN", "TEST_READ")
+                    .build();
+            } else if ("user_test".equals(username)) {
+                return org.springframework.security.core.userdetails.User.builder()
+                    .username("user_test")
+                    .password("$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG") // "password"的加密值
+                    .roles("USER")
+                    .build();
+            }
+            throw new org.springframework.security.core.userdetails.UsernameNotFoundException("用户不存在: " + username);
+        };
     }
 
     @Bean

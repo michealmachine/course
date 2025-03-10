@@ -18,6 +18,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -105,9 +106,17 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException("刷新令牌已被注销");
         }
 
+        // 获取用户名并验证用户是否存在
+        String username = tokenProvider.getUsernameFromToken(refreshToken);
+        try {
+            userService.getUserByUsername(username);
+        } catch (Exception e) {
+            throw new UsernameNotFoundException("用户不存在: " + username);
+        }
+
         // 刷新令牌
         JwtTokenDTO jwtTokenDTO = tokenProvider.refreshToken(refreshToken);
-        log.info("刷新令牌成功: {}", tokenProvider.getUsernameFromToken(refreshToken));
+        log.info("刷新令牌成功: {}", username);
         return jwtTokenDTO;
     }
 
