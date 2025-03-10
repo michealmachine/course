@@ -10,6 +10,7 @@ import com.zhangziqi.online_course_mine.model.enums.RoleEnum;
 import com.zhangziqi.online_course_mine.model.vo.UserVO;
 import com.zhangziqi.online_course_mine.repository.RoleRepository;
 import com.zhangziqi.online_course_mine.repository.UserRepository;
+import com.zhangziqi.online_course_mine.security.jwt.TokenBlacklistService;
 import com.zhangziqi.online_course_mine.service.EmailService;
 import com.zhangziqi.online_course_mine.service.MinioService;
 import com.zhangziqi.online_course_mine.service.UserService;
@@ -51,6 +52,7 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final MinioService minioService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     /**
      * 注册用户
@@ -231,7 +233,7 @@ public class UserServiceImpl implements UserService {
     public UserVO getUserById(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("用户不存在"));
-        return convertToUserVO(user);
+        return convertToUserVO(user, true);
     }
     
     /**
@@ -397,11 +399,20 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public UserVO updateUserStatus(Long id, Integer status) {
+        // 获取用户
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("用户不存在"));
+
+        // 更新状态
         user.setStatus(status);
         User savedUser = userRepository.save(user);
-        log.info("更新用户状态成功: {}, 状态: {}", savedUser.getUsername(), status);
+
+        // 如果用户被禁用，使其所有token失效
+        if (status != 1) {
+            tokenBlacklistService.invalidateUserTokens(user.getUsername());
+            log.info("用户 {} 已被禁用，所有token已失效", user.getUsername());
+        }
+
         return convertToUserVO(savedUser);
     }
     
@@ -447,13 +458,24 @@ public class UserServiceImpl implements UserService {
     }
     
     /**
-     * 转换为用户VO
+     * 转换为用户VO（不包含角色信息）
      *
      * @param user 用户实体
      * @return 用户VO
      */
     private UserVO convertToUserVO(User user) {
-        return UserVO.builder()
+        return convertToUserVO(user, false);
+    }
+
+    /**
+     * 转换为用户VO
+     *
+     * @param user 用户实体
+     * @param includeRoles 是否包含角色信息
+     * @return 用户VO
+     */
+    private UserVO convertToUserVO(User user, boolean includeRoles) {
+        UserVO.UserVOBuilder builder = UserVO.builder()
                 .id(user.getId())
                 .username(user.getUsername())
                 .email(user.getEmail())
@@ -464,9 +486,13 @@ public class UserServiceImpl implements UserService {
                 .institutionId(user.getInstitutionId())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
-                .lastLoginAt(user.getLastLoginAt())
-                .roles(user.getRoles())
-                .build();
+                .lastLoginAt(user.getLastLoginAt());
+
+        if (includeRoles) {
+            builder.roles(user.getRoles());
+        }
+
+        return builder.build();
     }
 
     /**
@@ -479,7 +505,39 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public UserVO getCurrentUser(String username) {
         User user = getUserByUsername(username);
-        return convertToUserVO(user);
+        // 创建基本的UserVO（不包含角色信息）
+        UserVO.UserVOBuilder builder = UserVO.builder()
+                .id(user.getId())
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .avatar(user.getAvatar())
+                .nickname(user.getNickname())
+                .status(user.getStatus())
+                .institutionId(user.getInstitutionId())
+                .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
+                .lastLoginAt(user.getLastLoginAt());
+
+        // 从SecurityContext获取当前用户的角色信息
+        org.springframework.security.core.Authentication authentication = 
+            org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null) {
+            // 直接从Authentication中获取角色信息
+            Set<Role> roles = authentication.getAuthorities().stream()
+                .filter(authority -> authority.getAuthority().startsWith("ROLE_"))
+                .map(authority -> {
+                    String roleName = authority.getAuthority().substring(5); // 去掉"ROLE_"前缀
+                    return Role.builder()
+                            .name(roleName)
+                            .code(roleName)
+                            .build();
+                })
+                .collect(java.util.stream.Collectors.toSet());
+            builder.roles(roles);
+        }
+
+        return builder.build();
     }
     
     /**
@@ -707,5 +765,61 @@ public class UserServiceImpl implements UserService {
                 .nickname(user.getNickname())
                 .avatar(user.getAvatar())
                 .build();
+    }
+
+    /**
+     * 更新用户角色
+     *
+     * @param userId 用户ID
+     * @param roleIds 角色ID列表
+     */
+    @Override
+    @Transactional
+    public void updateUserRoles(Long userId, Set<Long> roleIds) {
+        // 获取用户
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException("用户不存在"));
+
+        // 获取角色
+        Set<Role> roles = roleIds.stream()
+                .map(roleId -> roleRepository.findById(roleId)
+                        .orElseThrow(() -> new BusinessException("角色不存在: " + roleId)))
+                .collect(Collectors.toSet());
+
+        // 更新用户角色
+        user.setRoles(roles);
+        userRepository.save(user);
+
+        // 使该用户的所有token失效
+        tokenBlacklistService.invalidateUserTokens(user.getUsername());
+        log.info("用户 {} 的角色已更新，所有token已失效", user.getUsername());
+    }
+
+    /**
+     * 更新用户密码
+     *
+     * @param userId 用户ID
+     * @param oldPassword 旧密码
+     * @param newPassword 新密码
+     */
+    @Override
+    @Transactional
+    public void updatePassword(Long userId, String oldPassword, String newPassword) {
+        // 获取用户
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException("用户不存在"));
+
+        // 验证旧密码
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            throw new BusinessException("旧密码错误");
+        }
+
+        // 更新密码
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        // 使该用户的所有token失效
+        tokenBlacklistService.invalidateUserTokens(user.getUsername());
+        log.info("用户 {} 的密码已更新，所有token已失效", user.getUsername());
     }
 } 

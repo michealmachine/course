@@ -6,6 +6,8 @@ import com.zhangziqi.online_course_mine.model.dto.JwtTokenDTO;
 import com.zhangziqi.online_course_mine.model.dto.LoginDTO;
 import com.zhangziqi.online_course_mine.model.dto.RefreshTokenDTO;
 import com.zhangziqi.online_course_mine.model.dto.RegisterDTO;
+import com.zhangziqi.online_course_mine.model.entity.User;
+import com.zhangziqi.online_course_mine.model.vo.UserVO;
 import com.zhangziqi.online_course_mine.security.jwt.JwtTokenProvider;
 import com.zhangziqi.online_course_mine.security.jwt.TokenBlacklistService;
 import com.zhangziqi.online_course_mine.service.AuthService;
@@ -106,17 +108,9 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException("刷新令牌已被注销");
         }
 
-        // 获取用户名并验证用户是否存在
-        String username = tokenProvider.getUsernameFromToken(refreshToken);
-        try {
-            userService.getUserByUsername(username);
-        } catch (Exception e) {
-            throw new UsernameNotFoundException("用户不存在: " + username);
-        }
-
         // 刷新令牌
         JwtTokenDTO jwtTokenDTO = tokenProvider.refreshToken(refreshToken);
-        log.info("刷新令牌成功: {}", username);
+        log.info("刷新令牌成功: {}", tokenProvider.getUsernameFromToken(refreshToken));
         return jwtTokenDTO;
     }
 

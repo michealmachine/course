@@ -110,19 +110,5 @@ public class PermissionController {
         return Result.success();
     }
 
-    /**
-     * 批量删除权限
-     *
-     * @param ids 权限ID列表
-     * @return 无
-     */
-    @DeleteMapping("/batch")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "批量删除权限", description = "批量删除权限")
-    public Result<Void> batchDeletePermissions(@Parameter(description = "权限ID列表") @RequestBody List<Long> ids) {
-        log.info("批量删除权限: {}", ids);
-        permissionService.batchDeletePermissions(ids);
-        return Result.success();
-    }
+
 } 

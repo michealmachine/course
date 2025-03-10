@@ -10,6 +10,9 @@ import com.zhangziqi.online_course_mine.repository.RoleRepository;
 import com.zhangziqi.online_course_mine.service.PermissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheConfig;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -23,6 +26,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@CacheConfig(cacheNames = "permissions") // 指定缓存名称
 public class PermissionServiceImpl implements PermissionService {
 
     private final PermissionRepository permissionRepository;
@@ -35,6 +39,7 @@ public class PermissionServiceImpl implements PermissionService {
      */
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(key = "'all'") // 缓存所有权限列表
     public List<PermissionVO> getPermissionList() {
         List<Permission> permissions = permissionRepository.findAll();
         return permissions.stream()
@@ -50,6 +55,7 @@ public class PermissionServiceImpl implements PermissionService {
      */
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(key = "#id") // 缓存单个权限
     public PermissionVO getPermissionById(Long id) {
         Permission permission = permissionRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("权限不存在"));
@@ -64,6 +70,7 @@ public class PermissionServiceImpl implements PermissionService {
      */
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(key = "'code:' + #code") // 缓存根据code查询的权限
     public Permission getPermissionByCode(String code) {
         return permissionRepository.findByCode(code)
                 .orElseThrow(() -> new BusinessException("权限不存在"));
@@ -77,6 +84,7 @@ public class PermissionServiceImpl implements PermissionService {
      */
     @Override
     @Transactional
+    @CacheEvict(allEntries = true) // 清除所有权限缓存
     public PermissionVO createPermission(PermissionDTO permissionDTO) {
         // 检查权限编码是否存在
         if (permissionRepository.findByCode(permissionDTO.getCode()).isPresent()) {
@@ -114,6 +122,7 @@ public class PermissionServiceImpl implements PermissionService {
      */
     @Override
     @Transactional
+    @CacheEvict(allEntries = true) // 清除所有权限缓存
     public PermissionVO updatePermission(Long id, PermissionDTO permissionDTO) {
         Permission permission = permissionRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("权限不存在"));
@@ -169,6 +178,7 @@ public class PermissionServiceImpl implements PermissionService {
      */
     @Override
     @Transactional
+    @CacheEvict(allEntries = true) // 清除所有权限缓存
     public void deletePermission(Long id) {
         Permission permission = permissionRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("权限不存在"));
@@ -183,23 +193,6 @@ public class PermissionServiceImpl implements PermissionService {
 
         permissionRepository.delete(permission);
         log.info("删除权限成功: {}", permission.getName());
-    }
-
-    /**
-     * 批量删除权限
-     *
-     * @param ids 权限ID列表
-     */
-    @Override
-    @Transactional
-    public void batchDeletePermissions(List<Long> ids) {
-        if (ids == null || ids.isEmpty()) {
-            throw new BusinessException("权限ID列表不能为空");
-        }
-
-        for (Long id : ids) {
-            deletePermission(id);
-        }
     }
 
     /**

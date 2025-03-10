@@ -37,13 +37,11 @@ import java.util.stream.Collectors;
 public class JwtTokenProvider {
 
     private final JwtConfig jwtConfig;
-    private final UserRepository userRepository;
 
     /**
      * 获取密钥
      */
     private SecretKey getSigningKey() {
-        // 直接使用密钥字符串，不再进行Base64解码
         return Keys.hmacShaKeyFor(jwtConfig.getSecret().getBytes());
     }
 
@@ -56,28 +54,32 @@ public class JwtTokenProvider {
     public JwtTokenDTO createToken(Authentication authentication) {
         String username = authentication.getName();
         Collection<? extends GrantedAuthority> authorities = authentication.getAuthorities();
+        
+        // 只保留角色信息，不包含具体权限
         String roles = authorities.stream()
+                .filter(authority -> authority.getAuthority().startsWith("ROLE_"))
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.joining(","));
 
+        log.debug("为用户 {} 创建令牌，角色: {}", username, roles);
+        
         long now = System.currentTimeMillis();
-        Date accessTokenValidity = new Date(now + jwtConfig.getAccessTokenExpiration());
         
         // 创建访问令牌
         String accessToken = Jwts.builder()
                 .subject(username)
                 .claim("auth", roles)
                 .issuedAt(new Date(now))
-                .expiration(accessTokenValidity)
+                .expiration(new Date(now + jwtConfig.getAccessTokenExpiration()))
                 .signWith(getSigningKey())
                 .compact();
 
-        // 创建刷新令牌
-        Date refreshTokenValidity = new Date(now + jwtConfig.getRefreshTokenExpiration());
+        // 创建刷新令牌，同样包含角色信息
         String refreshToken = Jwts.builder()
                 .subject(username)
+                .claim("auth", roles)
                 .issuedAt(new Date(now))
-                .expiration(refreshTokenValidity)
+                .expiration(new Date(now + jwtConfig.getRefreshTokenExpiration()))
                 .signWith(getSigningKey())
                 .compact();
 
@@ -95,28 +97,21 @@ public class JwtTokenProvider {
      * @return JWT令牌
      */
     public JwtTokenDTO refreshToken(String refreshToken) {
-        String username = getUsernameFromToken(refreshToken);
-        
-        // 从数据库获取用户及其角色信息
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("用户不存在: " + username));
-        
-        // 获取用户角色作为授权
-        String roles = user.getRoles().stream()
-                .map(Role::getCode)
-                .collect(Collectors.joining(","));
-                
-        log.debug("刷新令牌时用户 {} 的角色: {}", username, roles);
+        // 验证token并获取信息
+        Claims claims = parseToken(refreshToken);
+        String username = claims.getSubject();
+        String roles = claims.get("auth", String.class);
+
+        log.debug("刷新令牌，用户: {}, 角色: {}", username, roles);
 
         long now = System.currentTimeMillis();
-        Date accessTokenValidity = new Date(now + jwtConfig.getAccessTokenExpiration());
         
-        // 创建新的访问令牌
+        // 使用refresh token中的信息创建新的access token
         String accessToken = Jwts.builder()
                 .subject(username)
                 .claim("auth", roles)
                 .issuedAt(new Date(now))
-                .expiration(accessTokenValidity)
+                .expiration(new Date(now + jwtConfig.getAccessTokenExpiration()))
                 .signWith(getSigningKey())
                 .compact();
 
@@ -143,6 +138,9 @@ public class JwtTokenProvider {
                         .map(SimpleGrantedAuthority::new)
                         .collect(Collectors.toList()) :
                 java.util.Collections.emptyList();
+
+        // 添加日志
+        log.debug("从token中提取角色信息: {}", authorities);
 
         UserDetails principal = org.springframework.security.core.userdetails.User.builder()
                 .username(claims.getSubject())

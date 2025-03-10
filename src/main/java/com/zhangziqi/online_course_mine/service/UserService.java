@@ -6,6 +6,7 @@ import com.zhangziqi.online_course_mine.model.dto.UserQueryDTO;
 import com.zhangziqi.online_course_mine.model.entity.User;
 import com.zhangziqi.online_course_mine.model.vo.UserVO;
 import org.springframework.data.domain.Page;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -104,16 +105,26 @@ public interface UserService {
      * @param id 用户ID
      */
     void deleteUser(Long id);
-    
+
     /**
-     * 修改用户状态
+     * 更新用户角色
+     *
+     * @param userId 用户ID
+     * @param roleIds 角色ID列表
+     */
+    @Transactional
+    void updateUserRoles(Long userId, Set<Long> roleIds);
+
+    /**
+     * 更新用户状态
      *
      * @param id 用户ID
-     * @param status 状态（0-禁用，1-正常）
+     * @param status 状态
      * @return 更新后的用户信息
      */
+    @Transactional
     UserVO updateUserStatus(Long id, Integer status);
-    
+
     /**
      * 给用户分配角色
      *
@@ -195,4 +206,14 @@ public interface UserService {
      * @return 用户基本信息
      */
     UserVO getBasicUserInfo(Long userId);
-} 
+
+    /**
+     * 更新用户密码
+     *
+     * @param userId 用户ID
+     * @param oldPassword 旧密码
+     * @param newPassword 新密码
+     */
+    @Transactional
+    void updatePassword(Long userId, String oldPassword, String newPassword);
+}

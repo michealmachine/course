@@ -53,10 +53,31 @@ api.interceptors.request.use(
   }
 );
 
+// 检查token是否需要刷新
+const shouldRefreshToken = (token: string): boolean => {
+  try {
+    // 解析token获取过期时间
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const expiresIn = payload.exp * 1000; // 转换为毫秒
+    const now = Date.now();
+    
+    // 如果token还有15分钟就过期，才刷新
+    return expiresIn - now < 15 * 60 * 1000;
+  } catch (error) {
+    console.error('解析token失败：', error);
+    return false;
+  }
+};
+
 // 响应拦截器
 api.interceptors.response.use(
   (response: AxiosResponse<ApiResponse>) => {
-    // 直接返回响应数据
+    // 检查当前token是否需要刷新
+    const token = getStorageItem('token');
+    if (token && shouldRefreshToken(token)) {
+      // 静默刷新token
+      refreshTokenSilently();
+    }
     return response;
   },
   async (error: AxiosError<ApiResponse>) => {
@@ -65,43 +86,34 @@ api.interceptors.response.use(
     
     // 检查是否为登录或注册请求
     const isAuthRequest = requestUrl.includes('/auth/login') || 
-                          requestUrl.includes('/auth/register') ||
-                          requestUrl.includes('/auth/captcha');
+                         requestUrl.includes('/auth/register') ||
+                         requestUrl.includes('/auth/captcha') ||
+                         requestUrl.includes('/auth/refresh-token');
     
-    // 处理401错误（未授权）或403错误（权限不足），但不处理认证请求
-    if ((error.response?.status === 401 || error.response?.status === 403) && 
-        !originalRequest._retry && 
-        !isAuthRequest) {
+    // 只在401错误时尝试刷新token
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
       originalRequest._retry = true;
-      console.log(`收到${error.response?.status}错误，尝试刷新令牌`);
       
       try {
         // 尝试刷新令牌
         const refreshToken = getStorageItem('refreshToken');
         
         if (refreshToken) {
-          console.log('开始刷新令牌');
+          console.log('Token过期，开始刷新');
           const response = await axios.post<ApiResponse<{ accessToken: string; refreshToken: string; tokenType: string; expiresIn: number }>>(
             `${api.defaults.baseURL}/auth/refresh-token`,
             { refreshToken }
           );
           
-          console.log('刷新令牌响应：', response);
-          
-          // 检查响应状态码
           if (response.data.code !== 200 || !response.data.data) {
-            console.error('刷新令牌失败：', response.data.message);
             throw new Error(response.data.message || '刷新令牌失败');
           }
           
           const { accessToken, refreshToken: newRefreshToken, tokenType = 'Bearer' } = response.data.data;
           
           if (!accessToken) {
-            console.error('刷新令牌失败：未获取到有效的访问令牌');
             throw new Error('刷新令牌失败：未获取到有效的访问令牌');
           }
-          
-          console.log('刷新令牌成功，新令牌：', accessToken);
           
           // 更新localStorage中的令牌
           setStorageItem('token', accessToken);
@@ -113,32 +125,21 @@ api.interceptors.response.use(
           originalRequest.headers = originalRequest.headers || {};
           originalRequest.headers.Authorization = authHeader;
           
-          console.log('使用新令牌重试原始请求');
           return api(originalRequest);
         } else {
-          console.error('刷新令牌失败：本地没有刷新令牌');
           throw new Error('会话已过期，请重新登录');
         }
       } catch (refreshError) {
-        console.error('刷新令牌出错：', refreshError);
-        
-        // 刷新令牌失败，清除本地存储的令牌
+        // 刷新失败，清除令牌并重定向到登录页
         removeStorageItem('token');
         removeStorageItem('refreshToken');
         
-        // 重定向到登录页
         if (typeof window !== 'undefined') {
-          console.log('重定向到登录页');
           window.location.href = '/login';
         }
         
         return Promise.reject(refreshError);
       }
-    }
-    
-    // 对于认证请求的错误，直接返回错误，不尝试刷新令牌
-    if (isAuthRequest) {
-      console.log('认证请求失败，不尝试刷新令牌');
     }
     
     // 构造API错误对象
@@ -151,6 +152,28 @@ api.interceptors.response.use(
     return Promise.reject(apiError);
   }
 );
+
+// 静默刷新token的函数
+const refreshTokenSilently = async () => {
+  try {
+    const refreshToken = getStorageItem('refreshToken');
+    if (!refreshToken) return;
+
+    const response = await axios.post<ApiResponse<{ accessToken: string; refreshToken: string; }>>(
+      `${api.defaults.baseURL}/auth/refresh-token`,
+      { refreshToken }
+    );
+
+    if (response.data.code === 200 && response.data.data) {
+      const { accessToken, refreshToken: newRefreshToken } = response.data.data;
+      setStorageItem('token', accessToken);
+      setStorageItem('refreshToken', newRefreshToken);
+      api.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+    }
+  } catch (error) {
+    console.error('静默刷新token失败：', error);
+  }
+};
 
 /**
  * 封装的请求函数

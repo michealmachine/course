@@ -57,11 +57,4 @@ public interface PermissionService {
      * @param id 权限ID
      */
     void deletePermission(Long id);
-
-    /**
-     * 批量删除权限
-     *
-     * @param ids 权限ID列表
-     */
-    void batchDeletePermissions(List<Long> ids);
 } 
