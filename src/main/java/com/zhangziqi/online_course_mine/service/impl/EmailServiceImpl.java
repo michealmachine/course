@@ -117,4 +117,57 @@ public class EmailServiceImpl implements EmailService {
         }
         return false;
     }
+
+    @Override
+    public void sendApplicationConfirmationEmail(String to, String applicationId, String institutionName) {
+        Context context = new Context();
+        context.setVariable("applicationId", applicationId);
+        context.setVariable("institutionName", institutionName);
+        
+        String content = templateEngine.process("email/application-confirmation", context);
+        sendHtmlMail(to, "机构入驻申请确认", content);
+    }
+
+    @Override
+    public void sendApplicationApprovedEmail(String to, String institutionName, String registerCode) {
+        Context context = new Context();
+        context.setVariable("registerCode", registerCode);
+        context.setVariable("institutionName", institutionName);
+        
+        String content = templateEngine.process("email/application-approved", context);
+        sendHtmlMail(to, "机构入驻申请已通过", content);
+    }
+
+    @Override
+    public void sendApplicationRejectedEmail(String to, String institutionName, String reason) {
+        Context context = new Context();
+        context.setVariable("institutionName", institutionName);
+        context.setVariable("reason", reason);
+        
+        String content = templateEngine.process("email/application-rejected", context);
+        sendHtmlMail(to, "机构入驻申请未通过", content);
+    }
+
+    /**
+     * 发送HTML格式邮件
+     *
+     * @param to 收件人
+     * @param subject 主题
+     * @param content HTML内容
+     */
+    private void sendHtmlMail(String to, String subject, String content) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+            helper.setFrom(emailFrom);
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(content, true);
+            mailSender.send(message);
+            log.info("HTML邮件发送成功: {}, 主题: {}", to, subject);
+        } catch (MessagingException e) {
+            log.error("HTML邮件发送失败: {}, 主题: {}", to, subject, e);
+            throw new RuntimeException("HTML邮件发送失败", e);
+        }
+    }
 } 

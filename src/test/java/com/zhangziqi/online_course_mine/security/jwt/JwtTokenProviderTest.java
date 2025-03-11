@@ -99,8 +99,6 @@ public class JwtTokenProviderTest {
         JwtTokenDTO originalTokens = tokenProvider.createToken(authentication);
         String refreshToken = originalTokens.getRefreshToken();
 
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
-
         // 执行
         JwtTokenDTO result = tokenProvider.refreshToken(refreshToken);
 
@@ -114,25 +112,23 @@ public class JwtTokenProviderTest {
         assertTrue(newAuth.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN")));
                 
-        // 验证用户仓库被调用
-        verify(userRepository).findByUsername("testuser");
+        // 不再验证用户仓库调用，因为现在直接从令牌中提取角色信息
     }
-    
+
     @Test
     void refreshTokenShouldThrowExceptionWhenUserNotFound() {
+        // 重命名测试方法，因为新逻辑不再从数据库获取用户
+        // 转为测试令牌解析异常
+        
         // 准备
-        JwtTokenDTO originalTokens = tokenProvider.createToken(authentication);
-        String refreshToken = originalTokens.getRefreshToken();
-
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.empty());
-
-        // 执行和验证
-        assertThrows(UsernameNotFoundException.class, () -> {
-            tokenProvider.refreshToken(refreshToken);
+        String invalidRefreshToken = "invalid.token.string";
+        
+        // 执行和验证 - 应该抛出JWT解析异常
+        assertThrows(io.jsonwebtoken.JwtException.class, () -> {
+            tokenProvider.refreshToken(invalidRefreshToken);
         });
         
-        // 验证用户仓库被调用
-        verify(userRepository).findByUsername("testuser");
+        // 不再验证用户仓库调用
     }
 
     @Test

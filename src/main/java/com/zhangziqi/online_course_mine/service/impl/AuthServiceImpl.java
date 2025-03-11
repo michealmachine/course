@@ -108,9 +108,13 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException("刷新令牌已被注销");
         }
 
+        // 从令牌中获取用户名
+        String username = tokenProvider.getUsernameFromToken(refreshToken);
+        log.debug("刷新令牌，用户: {}", username);
+
         // 刷新令牌
         JwtTokenDTO jwtTokenDTO = tokenProvider.refreshToken(refreshToken);
-        log.info("刷新令牌成功: {}", tokenProvider.getUsernameFromToken(refreshToken));
+        log.info("刷新令牌成功: {}", username);
         return jwtTokenDTO;
     }
 

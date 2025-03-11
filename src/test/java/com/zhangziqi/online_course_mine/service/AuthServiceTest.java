@@ -181,8 +181,6 @@ public class AuthServiceTest {
         // 准备
         when(tokenProvider.validateToken(refreshTokenDTO.getRefreshToken())).thenReturn(true);
         when(tokenBlacklistService.isBlacklisted(refreshTokenDTO.getRefreshToken())).thenReturn(false);
-        when(tokenProvider.getUsernameFromToken(refreshTokenDTO.getRefreshToken())).thenReturn("testuser");
-        when(userService.getUserByUsername("testuser")).thenReturn(testUser);
         when(tokenProvider.refreshToken(refreshTokenDTO.getRefreshToken())).thenReturn(jwtTokenDTO);
 
         // 执行
@@ -194,7 +192,6 @@ public class AuthServiceTest {
         assertEquals(jwtTokenDTO.getRefreshToken(), result.getRefreshToken());
         verify(tokenProvider).validateToken(refreshTokenDTO.getRefreshToken());
         verify(tokenBlacklistService).isBlacklisted(refreshTokenDTO.getRefreshToken());
-        verify(userService).getUserByUsername("testuser");
         verify(tokenProvider).refreshToken(refreshTokenDTO.getRefreshToken());
     }
 
@@ -222,27 +219,6 @@ public class AuthServiceTest {
         verify(tokenProvider, never()).refreshToken(any());
     }
     
-    @Test
-    void refreshTokenShouldThrowExceptionWhenUserNotFound() {
-        // 准备
-        when(tokenProvider.validateToken(refreshTokenDTO.getRefreshToken())).thenReturn(true);
-        when(tokenBlacklistService.isBlacklisted(refreshTokenDTO.getRefreshToken())).thenReturn(false);
-        when(tokenProvider.getUsernameFromToken(refreshTokenDTO.getRefreshToken())).thenReturn("testuser");
-        when(userService.getUserByUsername("testuser")).thenThrow(new UsernameNotFoundException("用户不存在: testuser"));
-
-        // 执行并验证
-        assertThrows(UsernameNotFoundException.class, () -> {
-            authService.refreshToken(refreshTokenDTO);
-        });
-
-        // 验证方法调用
-        verify(tokenProvider).validateToken(refreshTokenDTO.getRefreshToken());
-        verify(tokenBlacklistService).isBlacklisted(refreshTokenDTO.getRefreshToken());
-        verify(tokenProvider).getUsernameFromToken(refreshTokenDTO.getRefreshToken());
-        verify(userService).getUserByUsername("testuser");
-        verify(tokenProvider, never()).refreshToken(any());
-    }
-
     @Test
     void logoutShouldAddTokenToBlacklist() {
         // 准备

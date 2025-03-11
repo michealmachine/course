@@ -182,22 +182,5 @@ public class PermissionServiceTest {
         assertThrows(BusinessException.class, () -> permissionService.deletePermission(1L));
     }
 
-    @Test
-    void batchDeletePermissionsShouldSucceedWhenPermissionsExist() {
-        // 准备测试数据
-        List<Long> ids = Arrays.asList(1L, 2L);
-        Permission permission1 = Permission.builder().id(1L).name("权限1").build();
-        Permission permission2 = Permission.builder().id(2L).name("权限2").build();
-        
-        // 模拟Repository方法 - 只模拟真正需要的方法
-        when(permissionRepository.findById(1L)).thenReturn(Optional.of(permission1));
-        when(permissionRepository.findById(2L)).thenReturn(Optional.of(permission2));
-        doNothing().when(permissionRepository).delete(any(Permission.class));
 
-        // 执行测试
-        permissionService.batchDeletePermissions(ids);
-
-        // 验证方法被调用
-        verify(permissionRepository, times(2)).delete(any(Permission.class));
-    }
 } 

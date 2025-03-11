@@ -20,6 +20,7 @@ import {
   ShoppingCart,
   Menu,
   X,
+  Building2,
 } from 'lucide-react';
 
 // 侧边栏菜单项
@@ -76,6 +77,12 @@ const menuItems: MenuItem[] = [
     roles: [UserRole.ADMIN, UserRole.INSTITUTION],
   },
   {
+    title: '机构审核',
+    href: '/dashboard/institutions',
+    icon: <Building2 className="w-5 h-5" />,
+    roles: [UserRole.ADMIN, UserRole.REVIEWER],
+  },
+  {
     title: '内容审核',
     href: '/dashboard/reviews',
     icon: <FileText className="w-5 h-5" />,
@@ -106,10 +113,16 @@ export default function Sidebar() {
       // 检查用户角色数组中是否有菜单要求的角色
       return item.roles.some(requiredRole => 
         user.roles.some(userRole => {
-          // 从角色代码中提取角色名
-          const roleName = userRole.code?.replace('ROLE_', '');
-          // 比较角色是否匹配
-          return roleName === requiredRole;
+          // 从角色代码中提取角色名，考虑多种可能的格式
+          const userRoleCode = userRole.code || '';
+          const roleName = userRoleCode.replace('ROLE_', '').toUpperCase();
+          const requiredRoleUpper = requiredRole.toUpperCase();
+          
+          // 输出调试信息
+          console.log(`检查角色: 需要 ${requiredRoleUpper}, 用户有 ${roleName} (原始: ${userRoleCode})`);
+          
+          // 比较角色是否匹配（忽略大小写，去除前缀）
+          return roleName === requiredRoleUpper;
         })
       );
     }

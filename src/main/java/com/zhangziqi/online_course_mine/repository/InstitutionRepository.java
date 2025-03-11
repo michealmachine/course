@@ -28,4 +28,20 @@ public interface InstitutionRepository extends JpaRepository<Institution, Long> 
      * @return 机构列表
      */
     List<Institution> findByStatus(Integer status);
+    
+    /**
+     * 根据注册码查找机构
+     *
+     * @param registerCode 注册码
+     * @return 机构
+     */
+    Optional<Institution> findByRegisterCode(String registerCode);
+    
+    /**
+     * 检查注册码是否存在
+     *
+     * @param registerCode 注册码
+     * @return 是否存在
+     */
+    boolean existsByRegisterCode(String registerCode);
 } 

@@ -44,4 +44,31 @@ public interface EmailService {
      * @return 是否验证通过
      */
     boolean validateVerificationCode(String email, String code);
+    
+    /**
+     * 发送机构申请确认邮件
+     *
+     * @param to 收件人邮箱
+     * @param applicationId 申请ID
+     * @param institutionName 机构名称
+     */
+    void sendApplicationConfirmationEmail(String to, String applicationId, String institutionName);
+
+    /**
+     * 发送机构申请通过邮件
+     *
+     * @param to 收件人邮箱
+     * @param institutionName 机构名称
+     * @param registerCode 注册码
+     */
+    void sendApplicationApprovedEmail(String to, String institutionName, String registerCode);
+
+    /**
+     * 发送机构申请拒绝邮件
+     *
+     * @param to 收件人邮箱
+     * @param institutionName 机构名称
+     * @param reason 拒绝原因
+     */
+    void sendApplicationRejectedEmail(String to, String institutionName, String reason);
 } 

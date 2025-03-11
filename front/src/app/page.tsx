@@ -26,7 +26,26 @@ export default function HomePage() {
             </svg>
             <span className="text-xl font-semibold">在线课程平台</span>
           </div>
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
+            <nav className="hidden md:flex mr-6">
+              <ul className="flex space-x-6">
+                <li>
+                  <Link href="/courses" className="text-muted-foreground hover:text-primary">
+                    课程
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/institution" className="text-muted-foreground hover:text-primary">
+                    机构中心
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/about" className="text-muted-foreground hover:text-primary">
+                    关于我们
+                  </Link>
+                </li>
+              </ul>
+            </nav>
             <Button variant="outline" asChild>
               <Link href="/login">登录</Link>
             </Button>
@@ -44,9 +63,14 @@ export default function HomePage() {
           <p className="text-xl mb-8 max-w-2xl mx-auto">
             我们的在线课程平台提供高质量的学习内容，帮助您掌握最前沿的技能和知识
           </p>
-          <Button size="lg" asChild>
-            <Link href="/courses">浏览课程</Link>
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button size="lg" asChild>
+              <Link href="/courses">浏览课程</Link>
+            </Button>
+            <Button size="lg" variant="outline" className="bg-primary/10 text-primary-foreground hover:bg-primary/20" asChild>
+              <Link href="/institution">机构入驻</Link>
+            </Button>
+          </div>
         </div>
       </section>
 

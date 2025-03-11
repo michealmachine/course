@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>机构入驻申请确认</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .info {
+            font-size: 16px;
+            background-color: #e9ecef;
+            border-radius: 3px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .highlight {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .warning {
+            color: #dc3545;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>机构入驻申请确认</h2>
+        <p>您好！</p>
+        <p>我们已收到您的机构入驻申请，您的申请信息如下：</p>
+        <div class="info">
+            <p><strong>机构名称：</strong> <span th:text="${institutionName}">示例教育机构</span></p>
+            <p><strong>申请编号：</strong> <span class="highlight" th:text="${applicationId}">APP123456</span></p>
+            <p><strong>申请时间：</strong> <span th:text="${#temporals.format(#temporals.createNow(), 'yyyy-MM-dd HH:mm:ss')}">2023-03-15 10:30:00</span></p>
+        </div>
+        <p>我们将尽快对您的申请进行审核，请保留此申请编号以便查询申请状态。</p>
+        <p>您可以通过以下信息查询申请状态：</p>
+        <ul>
+            <li>申请编号：<span class="highlight" th:text="${applicationId}">APP123456</span></li>
+            <li>联系邮箱：您提交申请时使用的邮箱</li>
+        </ul>
+        <p class="warning">
+            注意：请勿将申请编号泄露给他人，如果这不是您的操作，请忽略此邮件。
+        </p>
+        <p>
+            感谢您对我们平台的信任与支持！<br>
+            在线课程平台团队
+        </p>
+    </div>
+</body>
+</html> 

@@ -59,7 +59,8 @@ public class JwtTokenProvider {
         String roles = authorities.stream()
                 .filter(authority -> authority.getAuthority().startsWith("ROLE_"))
                 .map(GrantedAuthority::getAuthority)
-                .collect(Collectors.joining(","));
+                .findFirst() // 只取第一个角色
+                .orElse("ROLE_USER"); // 默认为普通用户角色
 
         log.debug("为用户 {} 创建令牌，角色: {}", username, roles);
         
@@ -132,12 +133,17 @@ public class JwtTokenProvider {
         Claims claims = parseToken(token);
 
         String auth = claims.get("auth", String.class);
-        Collection<? extends GrantedAuthority> authorities = auth != null ?
-                Arrays.stream(auth.split(","))
-                        .filter(role -> !role.isEmpty())
-                        .map(SimpleGrantedAuthority::new)
-                        .collect(Collectors.toList()) :
-                java.util.Collections.emptyList();
+        Collection<? extends GrantedAuthority> authorities;
+        
+        // 确保角色正确解析，即使只有一个角色
+        if (auth != null && !auth.isEmpty()) {
+            authorities = Arrays.stream(auth.split(","))
+                    .filter(role -> !role.isEmpty())
+                    .map(SimpleGrantedAuthority::new)
+                    .collect(Collectors.toList());
+        } else {
+            authorities = java.util.Collections.emptyList();
+        }
 
         // 添加日志
         log.debug("从token中提取角色信息: {}", authorities);

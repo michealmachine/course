@@ -190,4 +190,82 @@ public class EmailServiceTest {
         Context context = contextCaptor.getValue();
         assertNotNull(context);
     }
+
+    @Test
+    public void testSendApplicationConfirmationEmail() throws MessagingException {
+        // 准备
+        String to = "test@example.com";
+        String applicationId = "APP12345678";
+        String institutionName = "测试机构";
+        String emailContent = "<div>机构入驻申请确认</div>";
+        
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(eq("email/application-confirmation"), any(Context.class))).thenReturn(emailContent);
+        
+        // 执行
+        emailService.sendApplicationConfirmationEmail(to, applicationId, institutionName);
+        
+        // 验证
+        verify(mailSender, times(1)).createMimeMessage();
+        verify(mailSender, times(1)).send(any(MimeMessage.class));
+        verify(templateEngine, times(1)).process(eq("email/application-confirmation"), any(Context.class));
+        
+        // 验证上下文参数
+        ArgumentCaptor<Context> contextCaptor = ArgumentCaptor.forClass(Context.class);
+        verify(templateEngine).process(eq("email/application-confirmation"), contextCaptor.capture());
+        Context context = contextCaptor.getValue();
+        assertNotNull(context);
+    }
+
+    @Test
+    public void testSendApplicationApprovedEmail() throws MessagingException {
+        // 准备
+        String to = "test@example.com";
+        String institutionName = "测试机构";
+        String registerCode = "ABC12345";
+        String emailContent = "<div>机构入驻申请已通过</div>";
+        
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(eq("email/application-approved"), any(Context.class))).thenReturn(emailContent);
+        
+        // 执行
+        emailService.sendApplicationApprovedEmail(to, institutionName, registerCode);
+        
+        // 验证
+        verify(mailSender, times(1)).createMimeMessage();
+        verify(mailSender, times(1)).send(any(MimeMessage.class));
+        verify(templateEngine, times(1)).process(eq("email/application-approved"), any(Context.class));
+        
+        // 验证上下文参数
+        ArgumentCaptor<Context> contextCaptor = ArgumentCaptor.forClass(Context.class);
+        verify(templateEngine).process(eq("email/application-approved"), contextCaptor.capture());
+        Context context = contextCaptor.getValue();
+        assertNotNull(context);
+    }
+
+    @Test
+    public void testSendApplicationRejectedEmail() throws MessagingException {
+        // 准备
+        String to = "test@example.com";
+        String institutionName = "测试机构";
+        String reason = "资质不符合要求";
+        String emailContent = "<div>机构入驻申请未通过</div>";
+        
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+        when(templateEngine.process(eq("email/application-rejected"), any(Context.class))).thenReturn(emailContent);
+        
+        // 执行
+        emailService.sendApplicationRejectedEmail(to, institutionName, reason);
+        
+        // 验证
+        verify(mailSender, times(1)).createMimeMessage();
+        verify(mailSender, times(1)).send(any(MimeMessage.class));
+        verify(templateEngine, times(1)).process(eq("email/application-rejected"), any(Context.class));
+        
+        // 验证上下文参数
+        ArgumentCaptor<Context> contextCaptor = ArgumentCaptor.forClass(Context.class);
+        verify(templateEngine).process(eq("email/application-rejected"), contextCaptor.capture());
+        Context context = contextCaptor.getValue();
+        assertNotNull(context);
+    }
 } 

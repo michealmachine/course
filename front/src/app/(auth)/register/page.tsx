@@ -347,13 +347,17 @@ export default function RegisterPage() {
           </TabsContent>
         </Tabs>
       </CardContent>
-      <CardFooter className="flex justify-center">
-        <p className="text-sm">
-          已有账号？{' '}
-          <Link href="/login" className="text-primary hover:underline">
-            登录
-          </Link>
-        </p>
+      <CardFooter className="flex flex-col items-center justify-center space-y-4">
+        <div className="text-sm text-muted-foreground">
+          已有账号？ <Link href="/login" className="text-primary hover:underline">立即登录</Link>
+        </div>
+        
+        <div className="w-full border-t pt-4">
+          <div className="text-sm text-center">
+            如需创建机构账号或申请机构入驻，请前往 
+            <Link href="/institution" className="text-primary hover:underline">机构中心</Link>
+          </div>
+        </div>
       </CardFooter>
     </Card>
   );

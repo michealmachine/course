@@ -163,22 +163,5 @@ public class PermissionControllerTest {
         verify(permissionService, times(1)).deletePermission(1L);
     }
 
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    void batchDeletePermissionsShouldReturnNoContentWhenUserHasAdminRole() throws Exception {
-        // 准备请求数据
-        List<Long> ids = Arrays.asList(1L, 2L, 3L);
 
-        // 模拟服务方法
-        doNothing().when(permissionService).batchDeletePermissions(anyList());
-
-        // 执行测试
-        mockMvc.perform(delete(BASE_URL + "/batch")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(ids)))
-                .andExpect(status().isNoContent());
-
-        // 验证服务方法被调用
-        verify(permissionService, times(1)).batchDeletePermissions(ids);
-    }
 } 

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>机构入驻申请已通过</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .code {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+            letter-spacing: 2px;
+            text-align: center;
+            padding: 10px;
+            background-color: #e9ecef;
+            border-radius: 3px;
+            margin: 20px 0;
+        }
+        .important {
+            font-weight: bold;
+            color: #28a745;
+        }
+        .warning {
+            color: #dc3545;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>机构入驻申请已通过</h2>
+        <p>尊敬的用户，</p>
+        <p>恭喜您！您的机构 <span class="important" th:text="${institutionName}">示例教育机构</span> 入驻申请已通过审核。</p>
+        <p>您的机构注册码如下：</p>
+        <div class="code" th:text="${registerCode}">ABC12345</div>
+        <p><strong>请妥善保管此注册码，您可以将此注册码分享给贵机构的成员。他们可以使用此注册码注册成为机构用户。</strong></p>
+        <p>机构用户注册时：</p>
+        <ol>
+            <li>访问注册页面选择"机构用户注册"</li>
+            <li>填写个人信息及此注册码</li>
+            <li>完成验证后即可成为贵机构的用户</li>
+        </ol>
+        <p class="warning">
+            注意：请仅将注册码分享给您的机构成员，避免外泄导致非授权人员加入您的机构。
+        </p>
+        <p>
+            如有任何问题，请随时联系我们的客服团队。<br>
+            祝您使用愉快！<br>
+            在线课程平台团队
+        </p>
+    </div>
+</body>
+</html> 
