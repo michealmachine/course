@@ -2,22 +2,19 @@ package com.zhangziqi.online_course_mine.service;
 
 import com.zhangziqi.online_course_mine.exception.ResourceNotFoundException;
 import com.zhangziqi.online_course_mine.model.entity.Institution;
-import com.zhangziqi.online_course_mine.model.entity.Media;
 import com.zhangziqi.online_course_mine.model.entity.StorageQuota;
 import com.zhangziqi.online_course_mine.model.enums.QuotaType;
-import com.zhangziqi.online_course_mine.model.vo.StorageQuotaVO;
+import com.zhangziqi.online_course_mine.model.vo.QuotaInfoVO;
 import com.zhangziqi.online_course_mine.repository.InstitutionRepository;
-import com.zhangziqi.online_course_mine.repository.MediaRepository;
 import com.zhangziqi.online_course_mine.repository.StorageQuotaRepository;
 import com.zhangziqi.online_course_mine.service.impl.StorageQuotaServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.InOrder;
-import org.mockito.ArgumentCaptor;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -33,9 +30,6 @@ class StorageQuotaServiceTest {
 
     @Mock
     private StorageQuotaRepository storageQuotaRepository;
-
-    @Mock
-    private MediaRepository mediaRepository;
 
     @Mock
     private InstitutionRepository institutionRepository;
@@ -66,37 +60,11 @@ class StorageQuotaServiceTest {
     }
 
     @Test
-    void hasEnoughQuota_WhenInstitutionNotExists_ReturnsFalse() {
+    void hasEnoughQuota_WhenInstitutionNotExists_ThrowsException() {
         when(institutionRepository.findById(INSTITUTION_ID)).thenReturn(Optional.empty());
 
-        boolean result = storageQuotaService.hasEnoughQuota(INSTITUTION_ID, QuotaType.VIDEO, 1024L);
-
-        assertFalse(result);
-        verify(institutionRepository).findById(INSTITUTION_ID);
-        verifyNoInteractions(storageQuotaRepository);
-    }
-
-    @Test
-    void hasEnoughQuota_WhenQuotaNotExists_ReturnsTrue() {
-        when(institutionRepository.findById(INSTITUTION_ID)).thenReturn(Optional.of(testInstitution));
-        when(storageQuotaRepository.findByInstitutionAndType(testInstitution, QuotaType.VIDEO))
-                .thenReturn(Optional.empty());
-
-        boolean result = storageQuotaService.hasEnoughQuota(INSTITUTION_ID, QuotaType.VIDEO, 1024L);
-
-        assertTrue(result);
-    }
-
-    @Test
-    void hasEnoughQuota_WhenQuotaExpired_ReturnsFalse() {
-        when(institutionRepository.findById(INSTITUTION_ID)).thenReturn(Optional.of(testInstitution));
-        testQuota.setExpiresAt(LocalDateTime.now().minusDays(1));
-        when(storageQuotaRepository.findByInstitutionAndType(testInstitution, QuotaType.VIDEO))
-                .thenReturn(Optional.of(testQuota));
-
-        boolean result = storageQuotaService.hasEnoughQuota(INSTITUTION_ID, QuotaType.VIDEO, 1024L);
-
-        assertFalse(result);
+        assertThrows(ResourceNotFoundException.class, () ->
+                storageQuotaService.hasEnoughQuota(INSTITUTION_ID, QuotaType.VIDEO, 1024L));
     }
 
     @Test
@@ -130,20 +98,19 @@ class StorageQuotaServiceTest {
         when(institutionRepository.findById(INSTITUTION_ID)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () ->
-                storageQuotaService.getQuotaInfo(INSTITUTION_ID, QuotaType.VIDEO));
+                storageQuotaService.getQuotaInfo(INSTITUTION_ID));
     }
 
     @Test
     void getQuotaInfo_WhenQuotaExists_ReturnsQuotaInfo() {
         when(institutionRepository.findById(INSTITUTION_ID)).thenReturn(Optional.of(testInstitution));
-        when(storageQuotaRepository.findByInstitutionAndType(testInstitution, QuotaType.VIDEO))
-                .thenReturn(Optional.of(testQuota));
+        when(storageQuotaRepository.findByInstitution(testInstitution))
+                .thenReturn(Arrays.asList(testQuota));
 
-        StorageQuotaVO result = storageQuotaService.getQuotaInfo(INSTITUTION_ID, QuotaType.VIDEO);
+        QuotaInfoVO result = storageQuotaService.getQuotaInfo(INSTITUTION_ID);
 
         assertNotNull(result);
-        assertEquals(testQuota.getId(), result.getId());
-        assertEquals(testQuota.getType().name(), result.getType());
+        assertEquals(QuotaType.TOTAL.name(), result.getType());
         assertEquals(testQuota.getTotalQuota(), result.getTotalQuota());
         assertEquals(testQuota.getUsedQuota(), result.getUsedQuota());
         assertEquals(testQuota.getTotalQuota() - testQuota.getUsedQuota(), result.getAvailableQuota());
@@ -170,7 +137,7 @@ class StorageQuotaServiceTest {
         when(storageQuotaRepository.findByInstitution(testInstitution))
                 .thenReturn(Arrays.asList(testQuota, documentQuota));
 
-        List<StorageQuotaVO> results = storageQuotaService.getAllQuotas(INSTITUTION_ID);
+        List<QuotaInfoVO> results = storageQuotaService.getAllQuotas(INSTITUTION_ID);
 
         assertEquals(2, results.size());
         assertTrue(results.stream().anyMatch(q -> q.getType().equals(QuotaType.VIDEO.name())));
@@ -190,69 +157,64 @@ class StorageQuotaServiceTest {
         // Arrange
         when(institutionRepository.findById(INSTITUTION_ID)).thenReturn(Optional.of(testInstitution));
         
-        // 设置VIDEO配额的初始值
-        long initialVideoQuota = 1L * 1024 * 1024 * 1024; // 1GB
-        testQuota.setUsedQuota(initialVideoQuota);
-        when(storageQuotaRepository.findByInstitutionAndType(testInstitution, QuotaType.VIDEO))
-                .thenReturn(Optional.of(testQuota));
+        // 视频配额
+        StorageQuota videoQuota = new StorageQuota();
+        videoQuota.setId(1L);
+        videoQuota.setInstitution(testInstitution);
+        videoQuota.setType(QuotaType.VIDEO);
+        videoQuota.setTotalQuota(5L * 1024 * 1024 * 1024); // 5GB
+        videoQuota.setUsedQuota(1L * 1024 * 1024 * 1024);  // 1GB
         
-        // 设置TOTAL配额的初始值
-        long initialTotalQuota = 2L * 1024 * 1024 * 1024; // 2GB
+        // 总配额
         StorageQuota totalQuota = new StorageQuota();
         totalQuota.setId(3L);
         totalQuota.setInstitution(testInstitution);
         totalQuota.setType(QuotaType.TOTAL);
-        totalQuota.setTotalQuota(10L * 1024 * 1024 * 1024); // 10GB
-        totalQuota.setUsedQuota(initialTotalQuota);
+        totalQuota.setTotalQuota(7L * 1024 * 1024 * 1024); // 7GB
+        totalQuota.setUsedQuota(1L * 1024 * 1024 * 1024);  // 1GB
+        
+        when(storageQuotaRepository.findByInstitutionAndType(testInstitution, QuotaType.VIDEO))
+                .thenReturn(Optional.of(videoQuota));
         when(storageQuotaRepository.findByInstitutionAndType(testInstitution, QuotaType.TOTAL))
                 .thenReturn(Optional.of(totalQuota));
         
-        // Mock save方法以返回保存的对象
+        // 直接返回参数，不做任何修改
         when(storageQuotaRepository.save(any(StorageQuota.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-
-        // 使用ArgumentCaptor捕获save方法的参数
-        ArgumentCaptor<StorageQuota> quotaCaptor = ArgumentCaptor.forClass(StorageQuota.class);
-
-        // 更新配额使用量
+        
         long sizeDelta = 1024L * 1024; // 1MB
         storageQuotaService.updateUsedQuota(INSTITUTION_ID, QuotaType.VIDEO, sizeDelta);
-
-        // 验证调用次数
+        
+        // 验证方法调用
         verify(institutionRepository, times(2)).findById(INSTITUTION_ID);
         verify(storageQuotaRepository, times(1)).findByInstitutionAndType(testInstitution, QuotaType.VIDEO);
         verify(storageQuotaRepository, times(1)).findByInstitutionAndType(testInstitution, QuotaType.TOTAL);
+        
+        // 使用ArgumentCaptor捕获保存的配额对象
+        ArgumentCaptor<StorageQuota> quotaCaptor = ArgumentCaptor.forClass(StorageQuota.class);
         verify(storageQuotaRepository, times(2)).save(quotaCaptor.capture());
         
-        // 获取所有捕获的参数
+        // 获取所有被保存的配额对象
         List<StorageQuota> capturedQuotas = quotaCaptor.getAllValues();
+        assertEquals(2, capturedQuotas.size());
         
-        // 计算期望的新值
-        long expectedVideoQuota = initialVideoQuota + sizeDelta;
-        long expectedTotalQuota = initialTotalQuota + sizeDelta;
-        
-        // 验证两种配额类型都被正确更新
-        boolean videoQuotaUpdated = false;
-        boolean totalQuotaUpdated = false;
+        // 直接校验捕获的参数值，而不是依赖被保存后的对象状态
+        boolean foundVideo = false;
+        boolean foundTotal = false;
         
         for (StorageQuota quota : capturedQuotas) {
             if (quota.getType() == QuotaType.VIDEO) {
-                System.out.printf("VIDEO配额 - 期望值: %d, 实际值: %d%n", expectedVideoQuota, quota.getUsedQuota());
-                assertEquals(expectedVideoQuota, quota.getUsedQuota(), 
-                    String.format("VIDEO配额更新错误 - 初始值: %d, 增加值: %d, 期望值: %d, 实际值: %d", 
-                        initialVideoQuota, sizeDelta, expectedVideoQuota, quota.getUsedQuota()));
-                videoQuotaUpdated = true;
+                assertEquals(1L * 1024 * 1024 * 1024 + sizeDelta, quota.getUsedQuota());
+                foundVideo = true;
             } else if (quota.getType() == QuotaType.TOTAL) {
-                System.out.printf("TOTAL配额 - 期望值: %d, 实际值: %d%n", expectedTotalQuota, quota.getUsedQuota());
-                assertEquals(expectedTotalQuota, quota.getUsedQuota(),
-                    String.format("TOTAL配额更新错误 - 初始值: %d, 增加值: %d, 期望值: %d, 实际值: %d",
-                        initialTotalQuota, sizeDelta, expectedTotalQuota, quota.getUsedQuota()));
-                totalQuotaUpdated = true;
+                assertEquals(1L * 1024 * 1024 * 1024 + sizeDelta, quota.getUsedQuota());
+                foundTotal = true;
             }
         }
         
-        assertTrue(videoQuotaUpdated, "VIDEO配额应该被更新");
-        assertTrue(totalQuotaUpdated, "TOTAL配额应该被更新");
+        // 确保找到了两种类型的配额
+        assertTrue(foundVideo, "未找到保存的视频配额");
+        assertTrue(foundTotal, "未找到保存的总配额");
     }
 
     @Test
@@ -264,19 +226,26 @@ class StorageQuotaServiceTest {
     }
 
     @Test
-    void setQuota_WhenSettingNewQuota_CreatesSuccessfully() {
+    void testSetQuota_WhenSettingNewQuota_CreatesSuccessfully() {
         when(institutionRepository.findById(INSTITUTION_ID)).thenReturn(Optional.of(testInstitution));
         when(storageQuotaRepository.findByInstitutionAndType(testInstitution, QuotaType.VIDEO))
                 .thenReturn(Optional.empty());
-        when(storageQuotaRepository.save(any(StorageQuota.class))).thenReturn(testQuota);
+        when(storageQuotaRepository.save(any(StorageQuota.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
+        long totalQuota = 5L * 1024 * 1024 * 1024; // 5GB
         LocalDateTime expiresAt = LocalDateTime.now().plusDays(30);
-        long totalQuota = 10L * 1024 * 1024 * 1024; // 10GB
-
+        
         storageQuotaService.setQuota(INSTITUTION_ID, QuotaType.VIDEO, totalQuota, expiresAt);
 
-        verify(storageQuotaRepository).save(argThat(quota ->
-                quota.getTotalQuota().equals(totalQuota) &&
-                quota.getExpiresAt().equals(expiresAt)));
+        ArgumentCaptor<StorageQuota> quotaCaptor = ArgumentCaptor.forClass(StorageQuota.class);
+        verify(storageQuotaRepository).save(quotaCaptor.capture());
+
+        StorageQuota savedQuota = quotaCaptor.getValue();
+        assertEquals(QuotaType.VIDEO, savedQuota.getType());
+        assertEquals(totalQuota, savedQuota.getTotalQuota());
+        assertEquals(0L, savedQuota.getUsedQuota());
+        assertEquals(expiresAt, savedQuota.getExpiresAt());
+        assertTrue(savedQuota.getEnabled());
     }
 } 

@@ -15,6 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import institutionService from "@/services/institution";  // 导入机构服务
+import { InstitutionApplicationResponse } from "@/types/institution"; // 导入类型
 
 // 定义表单验证Schema
 const querySchema = z.object({
@@ -23,30 +24,20 @@ const querySchema = z.object({
 });
 
 // 定义申请状态类型
-const statusMap = {
+type ApplicationStatus = 0 | 1 | 2;
+
+// 定义申请状态映射
+const statusMap: Record<ApplicationStatus, { label: string; color: string }> = {
   0: { label: "待审核", color: "bg-yellow-100 text-yellow-800 border-yellow-200" },
   1: { label: "已通过", color: "bg-green-100 text-green-800 border-green-200" },
   2: { label: "已拒绝", color: "bg-red-100 text-red-800 border-red-200" },
 };
 
-// 模拟申请数据类型
-interface ApplicationData {
-  applicationId: string;
-  name: string;
-  contactPerson: string;
-  contactEmail: string;
-  contactPhone: string | null;
-  status: 0 | 1 | 2;
-  createdAt: string;
-  reviewComment?: string;
-  reviewedAt?: string;
-}
-
 export default function InstitutionStatusPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [application, setApplication] = useState<ApplicationData | null>(null);
+  const [application, setApplication] = useState<InstitutionApplicationResponse | null>(null);
   const [isSearch, setIsSearch] = useState<boolean>(false);
   
   // 从URL参数获取
@@ -91,8 +82,28 @@ export default function InstitutionStatusPage() {
       }
     } catch (error: any) {
       console.error("查询失败:", error);
-      toast.error(error.message || "查询失败，请稍后重试");
+      
+      // 更全面的错误处理
       setApplication(null);
+      
+      // 检查是否有响应状态码
+      const statusCode = error?.response?.status;
+      
+      if (statusCode === 404) {
+        toast.info("未找到相关申请记录，可能原因：1.申请已通过并处理完成 2.申请编号或邮箱输入错误");
+      } else if (statusCode === 403) {
+        toast.error("无权访问该申请记录，请确认信息是否正确");
+      } else {
+        // 通用错误处理 - 提供更友好的提示
+        toast.info("无法查询到申请状态", {
+          description: "可能的原因: 1.申请已通过审核 2.申请信息输入有误 3.网络连接问题",
+          action: {
+            label: "了解更多",
+            onClick: () => window.open('/help/institution-application', '_blank')
+          },
+          duration: 6000
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -165,8 +176,8 @@ export default function InstitutionStatusPage() {
               <div className="mt-8 space-y-6 border border-slate-200 dark:border-slate-700 rounded-lg p-6">
                 <div className="flex justify-between items-center">
                   <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">{application.name}</h3>
-                  <Badge className={`${statusMap[application.status].color} border`}>
-                    {statusMap[application.status].label}
+                  <Badge className={`${statusMap[application.status as ApplicationStatus].color} border`}>
+                    {statusMap[application.status as ApplicationStatus].label}
                   </Badge>
                 </div>
                 
@@ -233,9 +244,28 @@ export default function InstitutionStatusPage() {
             )}
             
             {!isLoading && isSearch && !application && (
-              <div className="mt-8 bg-red-50 dark:bg-red-900/20 p-4 rounded-md border border-red-200 dark:border-red-900">
-                <p className="font-medium text-red-800 dark:text-red-300">未找到申请记录</p>
-                <p className="text-red-700 dark:text-red-400 mt-1 text-sm">请检查申请ID和邮箱是否正确，或联系客服寻求帮助。</p>
+              <div className="mt-8 bg-blue-50 dark:bg-blue-900/20 p-6 rounded-md border border-blue-200 dark:border-blue-900">
+                <h3 className="font-medium text-blue-800 dark:text-blue-300 text-lg mb-2">申请状态查询结果</h3>
+                <p className="text-blue-700 dark:text-blue-400 mb-4">未能查询到相关申请记录，请检查以下可能原因：</p>
+                <ul className="list-disc pl-5 mt-2 text-blue-700 dark:text-blue-400 text-sm space-y-2">
+                  <li>申请ID或联系邮箱输入错误，请仔细核对</li>
+                  <li><strong>申请已通过审核并处理完成</strong> - 已通过审核的申请可能在系统中被标记为完成状态</li>
+                  <li>申请记录已过期或被删除</li>
+                </ul>
+                <div className="mt-5 bg-white dark:bg-blue-950/50 p-4 rounded border border-blue-100 dark:border-blue-800">
+                  <p className="text-sm text-slate-600 dark:text-slate-300 font-medium">您可以尝试：</p>
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    <Button asChild size="sm" variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-900/30">
+                      <Link href="/institution/apply">重新申请</Link>
+                    </Button>
+                    <Button asChild size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
+                      <Link href="/institution/register">前往注册</Link>
+                    </Button>
+                    <Button asChild size="sm" variant="ghost" className="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200">
+                      <Link href="/help/institution-application">查看帮助</Link>
+                    </Button>
+                  </div>
+                </div>
               </div>
             )}
           </CardContent>

@@ -14,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * 用户详情服务实现
@@ -36,7 +35,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        log.debug("根据用户名查询用户: {}", username);
+        log.debug("开始加载用户: {}", username);
 
         // 查询用户
         User user = userRepository.findByUsername(username)
@@ -56,11 +55,6 @@ public class UserDetailsServiceImpl implements UserDetailsService {
             Role role = user.getRoles().iterator().next();
             String roleCode = role.getCode();
             
-            // 确保角色以ROLE_开头
-            if (!roleCode.startsWith("ROLE_")) {
-                roleCode = "ROLE_" + roleCode;
-            }
-            
             // 添加角色
             authorities.add(new SimpleGrantedAuthority(roleCode));
             
@@ -74,15 +68,15 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
         log.debug("用户 '{}' 拥有的权限: {}", username, authorities);
         
-        // 构建UserDetails对象
+        // 构建标准的Spring Security User对象，只使用标准属性
         return org.springframework.security.core.userdetails.User.builder()
                 .username(user.getUsername())
                 .password(user.getPassword())
+                .authorities(authorities)
+                .accountExpired(false)
                 .accountLocked(false)
                 .credentialsExpired(false)
-                .disabled(false)
-                .accountExpired(false)
-                .authorities(authorities)
+                .disabled(user.getStatus() != 1)
                 .build();
     }
 } 

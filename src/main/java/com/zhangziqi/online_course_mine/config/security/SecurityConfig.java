@@ -47,7 +47,8 @@ public class SecurityConfig {
             // 授权请求配置
             .authorizeHttpRequests(auth -> auth
                 // 公开接口
-                .requestMatchers("/api/auth/**", "/api/public/**", "/h2-console/**").permitAll()
+                .requestMatchers("/api/auth/**", "/api/public/**", "/api/institutions/apply", 
+                                 "/api/institutions/application-status", "/h2-console/**").permitAll()
                 // Swagger相关接口
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**").permitAll()
                 // 其他所有请求需要认证

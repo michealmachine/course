@@ -39,6 +39,11 @@ public class StorageQuota {
     private Long usedQuota;
     
     /**
+     * 存储空间是否启用
+     */
+    private Boolean enabled;
+    
+    /**
      * 所属机构
      */
     @ManyToOne(fetch = FetchType.LAZY)

@@ -1,7 +1,7 @@
 package com.zhangziqi.online_course_mine.model.enums;
 
 /**
- * 存储配额类型枚举
+ * 配额类型枚举
  */
 public enum QuotaType {
     /**

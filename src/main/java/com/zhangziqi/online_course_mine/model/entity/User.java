@@ -37,6 +37,12 @@ public class User extends BaseEntity {
     private String password;
 
     /**
+     * 姓名
+     */
+    @Column(length = 50)
+    private String name;
+
+    /**
      * 邮箱
      */
     @Column(unique = true)
@@ -106,6 +112,13 @@ public class User extends BaseEntity {
         } else {
             this.institution = null;
         }
+    }
+
+    /**
+     * 判断用户是否启用
+     */
+    public boolean getEnabled() {
+        return status != null && status == 1;
     }
 
     /**

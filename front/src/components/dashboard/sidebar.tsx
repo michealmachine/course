@@ -21,6 +21,9 @@ import {
   Menu,
   X,
   Building2,
+  HardDrive,
+  Film,
+  Database
 } from 'lucide-react';
 
 // 侧边栏菜单项
@@ -51,6 +54,18 @@ const menuItems: MenuItem[] = [
     title: '我的订单',
     href: '/dashboard/orders',
     icon: <ShoppingCart className="w-5 h-5" />,
+  },
+  {
+    title: '资源管理',
+    href: '/dashboard/media',
+    icon: <Film className="w-5 h-5" />,
+    roles: [UserRole.INSTITUTION],
+  },
+  {
+    title: '存储配额',
+    href: '/dashboard/storage',
+    icon: <Database className="w-5 h-5" />,
+    roles: [UserRole.INSTITUTION],
   },
   {
     title: '用户管理',
