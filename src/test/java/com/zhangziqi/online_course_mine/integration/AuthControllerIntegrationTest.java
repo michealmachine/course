@@ -189,9 +189,8 @@ public class AuthControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registerDTO)))
                 .andDo(MockMvcResultHandlers.print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(500))
-                .andExpect(jsonPath("$.message").value("邮箱验证码错误或已过期"));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("邮箱验证码错误或已过期"));
 
         verify(emailService, never()).validateVerificationCode(eq("test@example.com"), eq("123456"));
         verify(authService).register(any(RegisterDTO.class));

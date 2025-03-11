@@ -3,6 +3,7 @@ package com.zhangziqi.online_course_mine.exception;
 import com.zhangziqi.online_course_mine.model.vo.Result;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
@@ -13,11 +14,13 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 全局异常处理
+ * 全局异常处理器
  */
 @Slf4j
 @RestControllerAdvice
@@ -27,9 +30,11 @@ public class GlobalExceptionHandler {
      * 处理业务异常
      */
     @ExceptionHandler(BusinessException.class)
-    public Result<Void> handleBusinessException(BusinessException e) {
+    public ResponseEntity<Map<String, String>> handleBusinessException(BusinessException e) {
         log.error("业务异常: {}", e.getMessage());
-        return Result.fail(e.getCode(), e.getMessage());
+        Map<String, String> response = new HashMap<>();
+        response.put("error", e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
     /**
@@ -79,5 +84,21 @@ public class GlobalExceptionHandler {
     public Result<Void> handleException(Exception e) {
         log.error("系统异常", e);
         return Result.fail(500, "系统异常，请联系管理员");
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleResourceNotFoundException(ResourceNotFoundException e) {
+        log.error("资源未找到: {}", e.getMessage());
+        Map<String, String> response = new HashMap<>();
+        response.put("error", e.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<Map<String, String>> handleBadCredentialsException(BadCredentialsException e) {
+        log.error("认证失败: {}", e.getMessage());
+        Map<String, String> response = new HashMap<>();
+        response.put("error", "用户名或密码错误");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
     }
 } 

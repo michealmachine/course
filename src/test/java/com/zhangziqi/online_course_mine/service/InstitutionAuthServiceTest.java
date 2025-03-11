@@ -25,6 +25,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+
 @ActiveProfiles("test")
 @ExtendWith(MockitoExtension.class)
 class InstitutionAuthServiceTest {
@@ -49,7 +50,6 @@ class InstitutionAuthServiceTest {
 
     private InstitutionRegisterDTO registerDTO;
     private Institution institution;
-    private Role userRole;
     private Role institutionRole;
 
     @BeforeEach
@@ -61,9 +61,6 @@ class InstitutionAuthServiceTest {
         registerDTO.setEmail("user@example.com");
         registerDTO.setPhone("13800138000");
         registerDTO.setInstitutionCode("ABC12345");
-        registerDTO.setCaptchaKey("captcha_key");
-        registerDTO.setCaptchaCode("1234");
-        registerDTO.setEmailCode("123456");
 
         // 设置机构
         institution = Institution.builder()
@@ -80,13 +77,7 @@ class InstitutionAuthServiceTest {
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        // 设置角色
-        userRole = Role.builder()
-                .id(1L)
-                .name("普通用户")
-                .code(RoleEnum.USER.getCode())
-                .build();
-
+        // 设置机构角色
         institutionRole = Role.builder()
                 .id(2L)
                 .name("机构用户")
@@ -101,7 +92,6 @@ class InstitutionAuthServiceTest {
         when(userRepository.existsByUsername(anyString())).thenReturn(false);
         when(userRepository.existsByEmail(anyString())).thenReturn(false);
         when(passwordEncoder.encode(anyString())).thenReturn("encoded_password");
-        when(roleRepository.findByCode(RoleEnum.USER.getCode())).thenReturn(Optional.of(userRole));
         when(roleRepository.findByCode(RoleEnum.INSTITUTION.getCode())).thenReturn(Optional.of(institutionRole));
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -109,12 +99,11 @@ class InstitutionAuthServiceTest {
         institutionAuthService.registerWithInstitutionCode(registerDTO);
 
         // Assert
-        verify(institutionRepository, times(1)).findByRegisterCode(registerDTO.getInstitutionCode());
-        verify(userRepository, times(1)).existsByUsername(registerDTO.getUsername());
-        verify(userRepository, times(1)).existsByEmail(registerDTO.getEmail());
-        verify(roleRepository, times(1)).findByCode(RoleEnum.USER.getCode());
-        verify(roleRepository, times(1)).findByCode(RoleEnum.INSTITUTION.getCode());
-        verify(userRepository, times(1)).save(any(User.class));
+        verify(institutionRepository).findByRegisterCode(registerDTO.getInstitutionCode());
+        verify(userRepository).existsByUsername(registerDTO.getUsername());
+        verify(userRepository).existsByEmail(registerDTO.getEmail());
+        verify(roleRepository).findByCode(RoleEnum.INSTITUTION.getCode());
+        verify(userRepository).save(any(User.class));
     }
 
     @Test
@@ -163,7 +152,7 @@ class InstitutionAuthServiceTest {
         when(institutionRepository.findByRegisterCode(anyString())).thenReturn(Optional.of(institution));
         when(userRepository.existsByUsername(anyString())).thenReturn(false);
         when(userRepository.existsByEmail(anyString())).thenReturn(false);
-        when(roleRepository.findByCode(RoleEnum.USER.getCode())).thenReturn(Optional.empty());
+        when(roleRepository.findByCode(anyString())).thenReturn(Optional.empty());
 
         // Act & Assert
         assertThrows(BusinessException.class, () -> institutionAuthService.registerWithInstitutionCode(registerDTO));

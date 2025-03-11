@@ -67,9 +67,11 @@ public class User extends BaseEntity {
     private Integer status = 1;
 
     /**
-     * 机构ID（仅机构用户）
+     * 所属机构（仅机构用户）
      */
-    private Long institutionId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "institution_id")
+    private Institution institution;
 
     /**
      * 最后登录时间
@@ -87,4 +89,37 @@ public class User extends BaseEntity {
     )
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
+
+    /**
+     * 获取机构ID
+     */
+    public Long getInstitutionId() {
+        return institution != null ? institution.getId() : null;
+    }
+
+    /**
+     * 设置机构ID
+     */
+    public void setInstitutionId(Long institutionId) {
+        if (institutionId != null) {
+            this.institution = Institution.builder().id(institutionId).build();
+        } else {
+            this.institution = null;
+        }
+    }
+
+    /**
+     * 用于Builder模式的机构ID设置
+     */
+    public abstract static class UserBuilder<C extends User, B extends UserBuilder<C, B>> extends BaseEntity.BaseEntityBuilder<C, B> {
+        /**
+         * 设置机构ID
+         */
+        public B institutionId(Long institutionId) {
+            if (institutionId != null) {
+                this.institution(Institution.builder().id(institutionId).build());
+            }
+            return self();
+        }
+    }
 } 

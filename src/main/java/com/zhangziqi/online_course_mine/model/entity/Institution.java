@@ -1,13 +1,14 @@
 package com.zhangziqi.online_course_mine.model.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 机构实体类
@@ -71,4 +72,18 @@ public class Institution extends BaseEntity {
      */
     @Column(length = 255)
     private String address;
+    
+    /**
+     * 机构媒体资源
+     */
+    @OneToMany(mappedBy = "institution", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Media> mediaList = new ArrayList<>();
+    
+    /**
+     * 机构存储配额
+     */
+    @OneToMany(mappedBy = "institution", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<StorageQuota> quotas = new ArrayList<>();
 } 

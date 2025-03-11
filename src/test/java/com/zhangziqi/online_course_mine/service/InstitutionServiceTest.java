@@ -6,6 +6,7 @@ import com.zhangziqi.online_course_mine.model.dto.InstitutionApplicationQueryDTO
 import com.zhangziqi.online_course_mine.model.entity.Institution;
 import com.zhangziqi.online_course_mine.model.entity.InstitutionApplication;
 import com.zhangziqi.online_course_mine.model.entity.User;
+import com.zhangziqi.online_course_mine.model.enums.QuotaType;
 import com.zhangziqi.online_course_mine.model.vo.InstitutionApplicationVO;
 import com.zhangziqi.online_course_mine.model.vo.InstitutionVO;
 import com.zhangziqi.online_course_mine.repository.InstitutionApplicationRepository;
@@ -30,6 +31,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+
 @ActiveProfiles("test")
 @ExtendWith(MockitoExtension.class)
 class InstitutionServiceTest {
@@ -45,6 +47,9 @@ class InstitutionServiceTest {
 
     @Mock
     private EmailService emailService;
+    
+    @Mock
+    private StorageQuotaService storageQuotaService;
 
     @InjectMocks
     private InstitutionServiceImpl institutionService;
@@ -198,6 +203,7 @@ class InstitutionServiceTest {
         when(institutionRepository.save(any(Institution.class))).thenReturn(institution);
         when(applicationRepository.save(any(InstitutionApplication.class))).thenReturn(application);
         doNothing().when(emailService).sendApplicationApprovedEmail(anyString(), anyString(), anyString());
+        doNothing().when(storageQuotaService).setQuota(anyLong(), any(QuotaType.class), anyLong(), any());
 
         // Act
         InstitutionVO result = institutionService.approveApplication(1L, "admin");
@@ -206,6 +212,27 @@ class InstitutionServiceTest {
         assertNotNull(result);
         assertEquals(institution.getId(), result.getId());
         assertEquals(institution.getName(), result.getName());
+        
+        // 验证存储配额初始化
+        verify(storageQuotaService, times(1)).setQuota(
+                eq(institution.getId()),
+                eq(QuotaType.VIDEO),
+                eq(5L * 1024 * 1024 * 1024),
+                isNull()
+        );
+        verify(storageQuotaService, times(1)).setQuota(
+                eq(institution.getId()),
+                eq(QuotaType.DOCUMENT),
+                eq(2L * 1024 * 1024 * 1024),
+                isNull()
+        );
+        verify(storageQuotaService, times(1)).setQuota(
+                eq(institution.getId()),
+                eq(QuotaType.TOTAL),
+                eq(10L * 1024 * 1024 * 1024),
+                isNull()
+        );
+        
         verify(emailService, times(1)).sendApplicationApprovedEmail(anyString(), anyString(), anyString());
     }
 
@@ -265,5 +292,21 @@ class InstitutionServiceTest {
 
         // Act & Assert
         assertThrows(BusinessException.class, () -> institutionService.getInstitutionRegisterCode("admin"));
+    }
+
+    @Test
+    void approveApplication_ShouldRollbackOnQuotaError() {
+        // Arrange
+        when(applicationRepository.findById(anyLong())).thenReturn(Optional.of(application));
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(user));
+        when(institutionRepository.save(any(Institution.class))).thenReturn(institution);
+        doThrow(new RuntimeException("配额设置失败")).when(storageQuotaService)
+                .setQuota(anyLong(), any(QuotaType.class), anyLong(), any());
+
+        // Act & Assert
+        assertThrows(RuntimeException.class, () -> institutionService.approveApplication(1L, "admin"));
+        
+        // 验证事务回滚
+        verify(emailService, never()).sendApplicationApprovedEmail(anyString(), anyString(), anyString());
     }
 } 

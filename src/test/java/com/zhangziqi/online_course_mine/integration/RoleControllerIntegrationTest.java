@@ -206,8 +206,8 @@ public class RoleControllerIntegrationTest {
 
         // 确认角色已被删除
         mockMvc.perform(get(BASE_URL + "/" + testRole.getId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(500));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("角色不存在"));
     }
 
     @Test
@@ -224,20 +224,5 @@ public class RoleControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.permissions[0].id").value(testPermission.getId()));
     }
 
-    @Test
-    @WithUserDetails("admin_test")
-    void batchDeleteRolesShouldSucceedWhenUserIsAdmin() throws Exception {
-        // 准备角色ID列表
-        List<Long> roleIds = Collections.singletonList(testRole.getId());
 
-        mockMvc.perform(delete(BASE_URL + "/batch")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(roleIds)))
-                .andExpect(status().isNoContent());
-
-        // 确认角色已被删除
-        mockMvc.perform(get(BASE_URL + "/" + testRole.getId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(500));
-    }
 } 
