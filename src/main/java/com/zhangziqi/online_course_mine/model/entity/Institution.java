@@ -86,4 +86,11 @@ public class Institution extends BaseEntity {
     @OneToMany(mappedBy = "institution", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<StorageQuota> quotas = new ArrayList<>();
+    
+    /**
+     * 机构课程列表
+     */
+    @OneToMany(mappedBy = "institution", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Course> courses = new ArrayList<>();
 } 

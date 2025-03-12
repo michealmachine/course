@@ -68,6 +68,12 @@ const menuItems: MenuItem[] = [
     roles: [UserRole.INSTITUTION],
   },
   {
+    title: '课程元数据',
+    href: '/dashboard/course-metadata',
+    icon: <BookOpen className="w-5 h-5" />,
+    roles: [UserRole.ADMIN, UserRole.REVIEWER],
+  },
+  {
     title: '用户管理',
     href: '/dashboard/users',
     icon: <Users className="w-5 h-5" />,

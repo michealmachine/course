@@ -30,11 +30,26 @@ public class GlobalExceptionHandler {
      * 处理业务异常
      */
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<Map<String, String>> handleBusinessException(BusinessException e) {
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result<Void> handleBusinessException(BusinessException e) {
         log.error("业务异常: {}", e.getMessage());
-        Map<String, String> response = new HashMap<>();
-        response.put("error", e.getMessage());
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return Result.fail(e.getCode(), e.getMessage());
+    }
+    
+    /**
+     * 处理服务层异常
+     */
+    @ExceptionHandler(ServiceException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result<Void> handleServiceException(ServiceException e) {
+        log.error("服务层异常: {}", e.getMessage());
+        int code;
+        try {
+            code = Integer.parseInt(e.getCode());
+        } catch (NumberFormatException ex) {
+            code = 400; // 默认使用HTTP 400状态码
+        }
+        return Result.fail(code, e.getMessage());
     }
 
     /**
@@ -86,19 +101,23 @@ public class GlobalExceptionHandler {
         return Result.fail(500, "系统异常，请联系管理员");
     }
 
+    /**
+     * 处理资源未找到异常
+     */
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<Map<String, String>> handleResourceNotFoundException(ResourceNotFoundException e) {
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public Result<Void> handleResourceNotFoundException(ResourceNotFoundException e) {
         log.error("资源未找到: {}", e.getMessage());
-        Map<String, String> response = new HashMap<>();
-        response.put("error", e.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        return Result.fail(404, e.getMessage());
     }
 
+    /**
+     * 处理凭证错误异常
+     */
     @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<Map<String, String>> handleBadCredentialsException(BadCredentialsException e) {
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public Result<Void> handleBadCredentialsException(BadCredentialsException e) {
         log.error("认证失败: {}", e.getMessage());
-        Map<String, String> response = new HashMap<>();
-        response.put("error", "用户名或密码错误");
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        return Result.fail(401, "用户名或密码错误");
     }
 } 
