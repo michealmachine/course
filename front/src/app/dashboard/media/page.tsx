@@ -172,7 +172,7 @@ export default function MediaPage() {
               setMediaList(matchingItems);
               setTotalItems(matchingItems.length);
               updateTypeStats(matchingItems, matchingItems.length);
-              setIsLoading(false);
+      setIsLoading(false);
               return;
             }
             
@@ -195,6 +195,14 @@ export default function MediaPage() {
         setMediaList(items);
         setTotalItems(total);
         updateTypeStats(items, total);
+        
+        // 为文档和其他媒体类型预加载访问URL
+        items.forEach(item => {
+          if ((item.type === MediaType.VIDEO || 
+               item.type === MediaType.IMAGE) && !item.accessUrl) {
+            preloadMediaAccessUrl(item.id);
+          }
+        });
       } else {
         console.warn('获取媒体列表返回无数据');
         setMediaList([]);
@@ -207,6 +215,24 @@ export default function MediaPage() {
       setTotalItems(0);
     } finally {
       setIsLoading(false);
+    }
+  };
+  
+  // 预加载媒体访问URL
+  const preloadMediaAccessUrl = async (mediaId: number) => {
+    try {
+      const response = await mediaService.getMediaAccessUrl(mediaId);
+      if (response && response.data && response.data.accessUrl) {
+        console.log(`预加载媒体(ID:${mediaId})访问URL成功`);
+        // 更新mediaList中对应项的accessUrl
+        setMediaList(prev => 
+          prev.map(item => 
+            item.id === mediaId ? { ...item, accessUrl: response.data.accessUrl } : item
+          )
+        );
+      }
+    } catch (error) {
+      console.error(`预加载媒体(ID:${mediaId})访问URL失败:`, error);
     }
   };
   
@@ -283,7 +309,7 @@ export default function MediaPage() {
                 <Video className="h-12 w-12 text-blue-600 dark:text-blue-400" />
               </div>
             </div>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4">
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4 z-10">
               <Button 
                 variant="secondary" 
                 size="sm"
@@ -304,7 +330,7 @@ export default function MediaPage() {
             <div className="bg-purple-100 dark:bg-purple-900/30 rounded-full p-4">
               <Image className="h-12 w-12 text-purple-600 dark:text-purple-400" />
             </div>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4">
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4 z-10">
               <Button 
                 variant="secondary" 
                 size="sm"
@@ -321,11 +347,11 @@ export default function MediaPage() {
         );
       case MediaType.AUDIO:
         return (
-          <div className="w-full aspect-video bg-green-50 dark:bg-green-950/20 rounded-t-lg flex items-center justify-center">
+          <div className="relative w-full aspect-video bg-green-50 dark:bg-green-950/20 rounded-t-lg flex items-center justify-center">
             <div className="bg-green-100 dark:bg-green-900/30 rounded-full p-4">
               <Music className="h-12 w-12 text-green-600 dark:text-green-400" />
             </div>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4">
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4 z-10">
               <Button 
                 variant="secondary" 
                 size="sm"
@@ -342,11 +368,11 @@ export default function MediaPage() {
         );
       case MediaType.DOCUMENT:
         return (
-          <div className="w-full aspect-video bg-orange-50 dark:bg-orange-950/20 rounded-t-lg flex items-center justify-center">
+          <div className="relative w-full aspect-video bg-orange-50 dark:bg-orange-950/20 rounded-t-lg flex items-center justify-center overflow-hidden">
             <div className="bg-orange-100 dark:bg-orange-900/30 rounded-full p-4">
               <FileText className="h-12 w-12 text-orange-600 dark:text-orange-400" />
             </div>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4">
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4 z-10">
               <Button 
                 variant="secondary" 
                 size="sm"
@@ -363,11 +389,11 @@ export default function MediaPage() {
         );
       case MediaType.OTHER:
         return (
-          <div className="w-full aspect-video bg-gray-50 dark:bg-gray-800/50 rounded-t-lg flex items-center justify-center">
+          <div className="relative w-full aspect-video bg-gray-50 dark:bg-gray-800/50 rounded-t-lg flex items-center justify-center">
             <div className="bg-gray-100 dark:bg-gray-700 rounded-full p-4">
               <File className="h-12 w-12 text-gray-600 dark:text-gray-400" />
             </div>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4">
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4 z-10">
               <Button 
                 variant="secondary" 
                 size="sm"
@@ -385,11 +411,11 @@ export default function MediaPage() {
       default:
         // 未知类型
         return (
-          <div className="w-full aspect-video bg-slate-50 dark:bg-slate-800/50 rounded-t-lg flex items-center justify-center">
+          <div className="relative w-full aspect-video bg-slate-50 dark:bg-slate-800/50 rounded-t-lg flex items-center justify-center">
             <div className="bg-slate-100 dark:bg-slate-700 rounded-full p-4">
               <File className="h-12 w-12 text-slate-600 dark:text-slate-400" />
             </div>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4">
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4 z-10">
               <Button 
                 variant="secondary" 
                 size="sm"
@@ -701,7 +727,7 @@ export default function MediaPage() {
     }
     return `管理您的${getMediaTypeName(activeTab)}资源${totalItems > 0 ? `，共 ${totalItems} 项` : ''}`;
   };
-
+  
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -861,7 +887,7 @@ export default function MediaPage() {
                 </span>
               }
             </TabsTrigger>
-          </TabsList>
+        </TabsList>
           
           {!isLoading && activeTab !== 'all' && (
             <p className="text-sm text-muted-foreground">
@@ -906,11 +932,13 @@ export default function MediaPage() {
                 {mediaList.map((media) => (
                   <Card 
                     key={media.id} 
-                    className="overflow-hidden group hover:border-primary/50 transition-all duration-200 hover:shadow-md"
+                    className="overflow-hidden group hover:border-primary/50 transition-all duration-200 hover:shadow-md h-full"
                     onClick={() => router.push(`/dashboard/media/${media.id}`)}
                   >
                     {/* 媒体预览区域 */}
-                    {getMediaPreview(media)}
+                    <div className="media-preview-container relative">
+                      {getMediaPreview(media)}
+                    </div>
                     
                     <CardHeader className="p-4 pb-0">
                       <div className="flex items-start justify-between">
@@ -935,8 +963,8 @@ export default function MediaPage() {
                                 // 打开确认对话框
                                 if (confirm('确定要删除这个文件吗？此操作无法撤销。')) {
                                   mediaService.deleteMedia(media.id).then(() => {
-                                    toast.success('删除成功');
-                                    fetchMediaList();
+                                toast.success('删除成功');
+                                fetchMediaList();
                                   });
                                 }
                               } catch (error) {

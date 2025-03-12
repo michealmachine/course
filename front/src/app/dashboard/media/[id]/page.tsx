@@ -455,7 +455,7 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
           
           <CardContent>
             {/* 预览区域 */}
-            <div className="aspect-video bg-slate-100 dark:bg-slate-900 rounded-lg mb-4 flex items-center justify-center">
+            <div className="aspect-video bg-slate-100 dark:bg-slate-900 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
               {media.type === MEDIA_TYPES.VIDEO && media.accessUrl ? (
                 <video
                   key={media.accessUrl}
@@ -496,17 +496,30 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
                     toast.error('图片加载失败，请刷新页面重试');
                   }}
                 />
+              ) : media.type === MEDIA_TYPES.DOCUMENT && media.accessUrl ? (
+                <iframe 
+                  key={media.accessUrl}
+                  src={media.accessUrl} 
+                  className="w-full h-full border-0"
+                  title={media.title}
+                  loading="lazy"
+                  sandbox="allow-scripts allow-same-origin"
+                  onError={(e) => {
+                    console.error('文档加载错误:', e);
+                    toast.error('文档加载失败，请刷新页面重试');
+                  }}
+                />
               ) : (
                 <div className="text-center">
                   {getMediaIcon(media.type)}
                   <p className="text-sm text-muted-foreground mt-2">
                     {media.type === MEDIA_TYPES.DOCUMENT 
-                      ? '文档预览暂不可用' 
+                      ? '正在加载文档预览...' 
                       : media.type === MEDIA_TYPES.VIDEO || media.type === MEDIA_TYPES.AUDIO || media.type === MEDIA_TYPES.IMAGE
                         ? '正在加载预览...' 
                         : '预览不可用'}
                   </p>
-                  {(media.type === MEDIA_TYPES.VIDEO || media.type === MEDIA_TYPES.AUDIO || media.type === MEDIA_TYPES.IMAGE) && !media.accessUrl && (
+                  {(media.type === MEDIA_TYPES.VIDEO || media.type === MEDIA_TYPES.AUDIO || media.type === MEDIA_TYPES.IMAGE || media.type === MEDIA_TYPES.DOCUMENT) && !media.accessUrl && (
                     <Button 
                       variant="outline" 
                       size="sm" 
