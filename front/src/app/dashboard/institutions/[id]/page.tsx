@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { ArrowLeft, Building2, Check, X } from 'lucide-react';
+import React from 'react';
 
 import {
   Card,
@@ -38,7 +39,8 @@ interface PageParams {
 
 export default function InstitutionDetailPage({ params }: PageParams) {
   const router = useRouter();
-  const id = parseInt(params.id);
+  const unwrappedParams = React.use(params as any) as { id: string };
+  const id = parseInt(unwrappedParams.id);
   
   const [application, setApplication] = useState<InstitutionApplicationResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);

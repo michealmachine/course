@@ -249,9 +249,14 @@ export function CategoryManagement() {
         toast.success('分类创建成功');
       }
       
-      // 刷新列表
-      loadCategories(currentPage);
+      // 先关闭对话框，再刷新列表，避免组件卸载后状态更新导致DOM错误
       setIsDialogOpen(false);
+      // 使用setTimeout确保对话框关闭动画完成后再刷新数据
+      setTimeout(() => {
+        loadCategories(currentPage);
+        // 同时刷新分类树
+        loadCategoryTree();
+      }, 300);
     } catch (error) {
       toast.error(editingCategory ? '更新分类失败' : '创建分类失败');
       console.error(editingCategory ? '更新分类失败:' : '创建分类失败:', error);
@@ -300,24 +305,20 @@ export function CategoryManagement() {
   };
 
   return (
-    <div className="space-y-4">
+    <div id="category-management-container" className="space-y-4">
       {/* 搜索和添加区域 */}
       <div className="flex justify-between items-center">
-        <div className="flex space-x-2">
-          {viewMode === 'list' && (
-            <>
-              <Input
-                placeholder="搜索分类名称或编码"
-                value={searchKeyword}
-                onChange={(e) => setSearchKeyword(e.target.value)}
-                className="w-[300px]"
-              />
-              <Button variant="outline" onClick={handleSearch}>
-                <Search className="h-4 w-4 mr-2" />
-                搜索
-              </Button>
-            </>
-          )}
+        <div className="flex">
+          <Input
+            placeholder="搜索分类名称或编码"
+            value={searchKeyword}
+            onChange={(e) => setSearchKeyword(e.target.value)}
+            className="w-80 mr-2"
+          />
+          <Button variant="outline" onClick={handleSearch}>
+            <Search className="h-4 w-4 mr-2" />
+            搜索
+          </Button>
         </div>
         <div className="flex space-x-2">
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'list' | 'tree')}>
@@ -332,8 +333,8 @@ export function CategoryManagement() {
           </Button>
         </div>
       </div>
-
-      {/* 视图内容 */}
+      
+      {/* 列表或树形视图 */}
       {viewMode === 'list' ? (
         <>
           {/* 分类列表表格 */}
