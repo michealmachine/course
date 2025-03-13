@@ -431,39 +431,7 @@ public class MediaServiceImpl implements MediaService {
     }
     
     /**
-     * 构建上传状态VO
-     * 
-     * @param statusInfo 上传状态信息
-     * @return 上传状态VO
-     */
-    private UploadStatusVO buildUploadStatusVO(UploadStatusInfo statusInfo) {
-        // 计算进度百分比
-        double progressPercentage = 0.0;
-        if (statusInfo.getTotalParts() > 0) {
-            progressPercentage = (double) statusInfo.getCompletedParts().size() / statusInfo.getTotalParts() * 100;
-        }
-        
-        // 获取已完成的分片编号
-        List<Integer> completedPartNumbers = statusInfo.getCompletedParts().stream()
-                .map(UploadStatusInfo.PartInfo::getPartNumber)
-                .collect(Collectors.toList());
-        
-        // 构建返回结果
-        return UploadStatusVO.builder()
-                .mediaId(statusInfo.getMediaId())
-                .status(statusInfo.getStatus().name())
-                .totalParts(statusInfo.getTotalParts())
-                .completedParts(statusInfo.getCompletedParts().size())
-                .progressPercentage(progressPercentage)
-                .completedPartNumbers(completedPartNumbers)
-                .initiatedAt(statusInfo.getInitiatedAt())
-                .lastUpdatedAt(statusInfo.getLastUpdatedAt())
-                .expiresAt(statusInfo.getExpiresAt())
-                .build();
-    }
-    
-    /**
-     * 将Media实体转换为VO
+     * 构建MediaVO
      * 
      * @param media 媒体实体
      * @param accessUrl 访问URL（可选）

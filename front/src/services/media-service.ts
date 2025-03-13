@@ -142,18 +142,6 @@ export interface MediaService {
   cancelUpload(mediaId: number): Promise<Result<void>>;
 
   /**
-   * 获取上传状态
-   * @param mediaId 媒体ID
-   */
-  getUploadStatus(mediaId: number): Promise<Result<UploadStatusVO>>;
-
-  /**
-   * 继续上传
-   * @param mediaId 媒体ID
-   */
-  resumeUpload(mediaId: number): Promise<Result<UploadInitiationVO>>;
-
-  /**
    * 获取媒体访问URL
    * @param mediaId 媒体ID
    * @param expirationMinutes URL有效期（分钟）
@@ -197,14 +185,6 @@ class MediaServiceImpl implements MediaService {
 
   async cancelUpload(mediaId: number): Promise<Result<void>> {
     return http.delete(`/api/media/${mediaId}/cancel`);
-  }
-
-  async getUploadStatus(mediaId: number): Promise<Result<UploadStatusVO>> {
-    return http.get(`/api/media/upload-status/${mediaId}`);
-  }
-
-  async resumeUpload(mediaId: number): Promise<Result<UploadInitiationVO>> {
-    return http.get(`/api/media/${mediaId}/resume`);
   }
 
   async getMediaAccessUrl(mediaId: number, expirationMinutes?: number): Promise<Result<MediaAccessUrlVO>> {

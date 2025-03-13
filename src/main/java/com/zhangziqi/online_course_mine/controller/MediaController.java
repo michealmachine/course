@@ -1,9 +1,7 @@
 package com.zhangziqi.online_course_mine.controller;
 
 import com.zhangziqi.online_course_mine.model.dto.media.MediaUploadInitDTO;
-import com.zhangziqi.online_course_mine.model.dto.media.PartCompletionDTO;
 import com.zhangziqi.online_course_mine.model.dto.media.UploadInitiationVO;
-import com.zhangziqi.online_course_mine.model.dto.media.UploadStatusVO;
 import com.zhangziqi.online_course_mine.model.dto.media.CompleteUploadDTO;
 import com.zhangziqi.online_course_mine.model.vo.MediaVO;
 import com.zhangziqi.online_course_mine.model.vo.QuotaInfoVO;

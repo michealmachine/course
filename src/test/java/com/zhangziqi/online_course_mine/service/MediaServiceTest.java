@@ -12,6 +12,7 @@ import com.zhangziqi.online_course_mine.repository.MediaRepository;
 import com.zhangziqi.online_course_mine.service.impl.MediaServiceImpl;
 import com.zhangziqi.online_course_mine.service.impl.S3MultipartUploadManager;
 import com.zhangziqi.online_course_mine.service.impl.UploadStatusService;
+import com.zhangziqi.online_course_mine.service.MinioService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,6 +51,9 @@ public class MediaServiceTest {
 
     @Mock
     private UploadStatusService uploadStatusService;
+
+    @Mock
+    private MinioService minioService;
 
     @InjectMocks
     private MediaServiceImpl mediaService;
@@ -146,62 +150,33 @@ public class MediaServiceTest {
     }
 
     @Test
-    void testGetUploadStatus() {
-        // Mock 方法调用
-        when(institutionRepository.findById(institutionId)).thenReturn(Optional.of(institution));
-        when(mediaRepository.findByIdAndInstitution(mediaId, institution)).thenReturn(Optional.of(media));
-        when(uploadStatusService.getUploadStatus(mediaId)).thenReturn(uploadStatusInfo);
-
-        // 执行测试
-        UploadStatusVO result = mediaService.getUploadStatus(mediaId, institutionId);
-
-        // 验证结果
-        assertNotNull(result);
-        assertEquals(mediaId, result.getMediaId());
-        assertEquals(MediaStatus.UPLOADING.name(), result.getStatus());
-        assertEquals(5, result.getTotalParts());
-        assertEquals(0, result.getCompletedParts());
-        assertEquals(0.0, result.getProgressPercentage());
-    }
-
-    @Test
-    void testNotifyPartCompleted() {
-        // 准备测试数据
-        PartCompletionDTO dto = new PartCompletionDTO(1, "test-etag");
-        uploadStatusInfo.getCompletedParts().add(new UploadStatusInfo.PartInfo(1, "test-etag"));
-
-        // Mock 方法调用
-        when(institutionRepository.findById(institutionId)).thenReturn(Optional.of(institution));
-        when(mediaRepository.findByIdAndInstitution(mediaId, institution)).thenReturn(Optional.of(media));
-        when(uploadStatusService.updatePartInfo(eq(mediaId), any(UploadStatusInfo.PartInfo.class)))
-                .thenReturn(uploadStatusInfo);
-
-        // 执行测试
-        UploadStatusVO result = mediaService.notifyPartCompleted(mediaId, dto, institutionId);
-
-        // 验证结果
-        assertNotNull(result);
-        assertEquals(mediaId, result.getMediaId());
-        assertEquals(1, result.getCompletedParts());
-    }
-
-    @Test
     void testCompleteUpload() {
         // 准备测试数据
         for (int i = 1; i <= 5; i++) {
             uploadStatusInfo.getCompletedParts().add(new UploadStatusInfo.PartInfo(i, "test-etag-" + i));
         }
+        
+        CompleteUploadDTO dto = new CompleteUploadDTO();
+        dto.setUploadId("test-upload-id");
+        // 创建完成分片列表
+        List<CompleteUploadDTO.PartInfo> completedParts = new ArrayList<>();
+        for (int i = 1; i <= 5; i++) {
+            CompleteUploadDTO.PartInfo partInfo = new CompleteUploadDTO.PartInfo();
+            partInfo.setPartNumber(i);
+            partInfo.setETag("test-etag-" + i);
+            completedParts.add(partInfo);
+        }
+        dto.setCompletedParts(completedParts);
 
         // Mock 方法调用
         when(institutionRepository.findById(institutionId)).thenReturn(Optional.of(institution));
         when(mediaRepository.findByIdAndInstitution(mediaId, institution)).thenReturn(Optional.of(media));
-        when(uploadStatusService.getUploadStatus(mediaId)).thenReturn(uploadStatusInfo);
         when(s3UploadManager.completeMultipartUpload(anyString(), anyString(), anyList()))
                 .thenReturn(CompleteMultipartUploadResponse.builder().build());
         when(mediaRepository.save(any(Media.class))).thenReturn(media);
 
         // 执行测试
-        MediaVO result = mediaService.completeUpload(mediaId, institutionId);
+        MediaVO result = mediaService.completeUpload(mediaId, institutionId, dto);
 
         // 验证结果
         assertNotNull(result);
@@ -210,7 +185,7 @@ public class MediaServiceTest {
 
         // 验证调用
         verify(mediaRepository).save(any(Media.class));
-        verify(uploadStatusService).saveUploadStatus(any(UploadStatusInfo.class));
+        verify(uploadStatusService).deleteUploadStatus(mediaId);
     }
 
     @Test
@@ -254,21 +229,38 @@ public class MediaServiceTest {
     }
 
     @Test
-    void testResumeUpload() {
+    void testCancelUpload() {
         // Mock 方法调用
         when(institutionRepository.findById(institutionId)).thenReturn(Optional.of(institution));
         when(mediaRepository.findByIdAndInstitution(mediaId, institution)).thenReturn(Optional.of(media));
-        when(uploadStatusService.getUploadStatus(mediaId)).thenReturn(uploadStatusInfo);
-        when(s3UploadManager.generatePresignedUrlForPart(anyString(), anyString(), anyInt()))
-                .thenReturn("https://test-presigned-url.com");
-
+        when(uploadStatusService.getUploadStatusOrNull(mediaId)).thenReturn(uploadStatusInfo);
+        
         // 执行测试
-        UploadInitiationVO result = mediaService.resumeUpload(mediaId, institutionId);
+        mediaService.cancelUpload(mediaId, institutionId);
+        
+        // 验证调用
+        verify(s3UploadManager).abortMultipartUpload(anyString(), anyString());
+        verify(uploadStatusService).deleteUploadStatus(mediaId);
+        verify(storageQuotaService).updateUsedQuota(eq(institutionId), any(QuotaType.class), eq(-media.getSize()));
+        verify(mediaRepository).delete(media);
+    }
 
-        // 验证结果
-        assertNotNull(result);
-        assertEquals(mediaId, result.getMediaId());
-        assertEquals(5, result.getTotalParts());
-        assertEquals(5, result.getPresignedUrls().size());
+    @Test
+    void testDeleteMedia() {
+        // 准备测试数据
+        media.setStatus(MediaStatus.COMPLETED);
+        
+        // Mock 方法调用
+        when(institutionRepository.findById(institutionId)).thenReturn(Optional.of(institution));
+        when(mediaRepository.findByIdAndInstitution(mediaId, institution)).thenReturn(Optional.of(media));
+        when(minioService.deleteFile(anyString())).thenReturn(true);
+        
+        // 执行测试
+        mediaService.deleteMedia(mediaId, institutionId);
+        
+        // 验证调用
+        verify(minioService).deleteFile(media.getStoragePath());
+        verify(storageQuotaService).updateUsedQuota(eq(institutionId), any(QuotaType.class), eq(-media.getSize()));
+        verify(mediaRepository).delete(media);
     }
 } 
