@@ -2,6 +2,7 @@ package com.zhangziqi.online_course_mine.model.entity;
 
 import com.zhangziqi.online_course_mine.model.enums.CourseStatus;
 import com.zhangziqi.online_course_mine.model.enums.CourseVersion;
+import com.zhangziqi.online_course_mine.model.enums.CoursePaymentType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -10,6 +11,7 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -110,6 +112,51 @@ public class Course extends BaseEntity {
     private Integer versionType = CourseVersion.DRAFT.getValue();
 
     /**
+     * 支付类型（免费/付费）
+     */
+    @Builder.Default
+    private Integer paymentType = CoursePaymentType.FREE.getValue();
+
+    /**
+     * 课程价格
+     */
+    @Column(precision = 10, scale = 2)
+    private BigDecimal price;
+
+    /**
+     * 折扣价格
+     */
+    @Column(precision = 10, scale = 2)
+    private BigDecimal discountPrice;
+
+    /**
+     * 难度级别 (1-初级, 2-中级, 3-高级)
+     */
+    private Integer difficulty;
+
+    /**
+     * 总课时数
+     */
+    private Integer totalLessons;
+
+    /**
+     * 总时长(分钟)
+     */
+    private Integer totalDuration;
+
+    /**
+     * 适合人群
+     */
+    @Column(length = 1000)
+    private String targetAudience;
+
+    /**
+     * 学习目标
+     */
+    @Column(length = 1000)
+    private String learningObjectives;
+
+    /**
      * 课程分类
      */
     @ManyToOne(fetch = FetchType.LAZY)
@@ -188,5 +235,20 @@ public class Course extends BaseEntity {
      */
     public void setVersionTypeEnum(CourseVersion versionType) {
         this.versionType = versionType != null ? versionType.getValue() : null;
+    }
+    
+    /**
+     * 获取支付类型枚举
+     */
+    @Transient
+    public CoursePaymentType getPaymentTypeEnum() {
+        return CoursePaymentType.getByValue(this.paymentType);
+    }
+    
+    /**
+     * 设置支付类型枚举
+     */
+    public void setPaymentTypeEnum(CoursePaymentType paymentType) {
+        this.paymentType = paymentType != null ? paymentType.getValue() : null;
     }
 } 

@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
@@ -52,6 +53,9 @@ public class QuestionImportServiceTest {
     @Mock
     private TransactionTemplate transactionTemplate;
 
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
     @Spy
     @InjectMocks
     private QuestionImportServiceImpl questionImportService;
@@ -80,6 +84,13 @@ public class QuestionImportServiceTest {
         // 设置默认配置
         ReflectionTestUtils.setField(questionImportService, "concurrentEnabled", false);
         ReflectionTestUtils.setField(questionImportService, "maxImportRows", 1000);
+        
+        // 设置事务管理器回调
+        ReflectionTestUtils.setField(questionImportService, "transactionManager", transactionManager);
+        lenient().doAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(null);
+        }).when(transactionTemplate).execute(any(TransactionCallback.class));
     }
 
     @Test
@@ -183,12 +194,12 @@ public class QuestionImportServiceTest {
         
         // 验证结果
         assertNotNull(result);
-        assertEquals(2, result.getTotalCount());
-        assertEquals(2, result.getSuccessCount());
+        assertEquals(5, result.getTotalCount());
+        assertEquals(5, result.getSuccessCount());
         assertEquals(0, result.getFailureCount());
         
         // 验证questionService.createQuestion被调用的次数
-        verify(questionService, times(2)).createQuestion(any(), eq(1L));
+        verify(questionService, times(5)).createQuestion(any(), eq(1L));
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.zhangziqi.online_course_mine.model.entity;
 
+import com.zhangziqi.online_course_mine.model.enums.ChapterAccessType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -41,6 +42,17 @@ public class Chapter extends BaseEntity {
     private Integer orderIndex;
 
     /**
+     * 访问类型 (FREE_TRIAL/PAID_ONLY)
+     */
+    @Builder.Default
+    private Integer accessType = ChapterAccessType.PAID_ONLY.getValue();
+
+    /**
+     * 学习时长估计(分钟)
+     */
+    private Integer estimatedMinutes;
+
+    /**
      * 所属课程
      */
     @ManyToOne(fetch = FetchType.LAZY)
@@ -71,5 +83,20 @@ public class Chapter extends BaseEntity {
         } else {
             this.course = null;
         }
+    }
+    
+    /**
+     * 获取访问类型枚举
+     */
+    @Transient
+    public ChapterAccessType getAccessTypeEnum() {
+        return ChapterAccessType.getByValue(this.accessType);
+    }
+    
+    /**
+     * 设置访问类型枚举
+     */
+    public void setAccessTypeEnum(ChapterAccessType accessType) {
+        this.accessType = accessType != null ? accessType.getValue() : null;
     }
 } 
