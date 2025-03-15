@@ -94,6 +94,7 @@ public class TagController {
      */
     @GetMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ADMIN', 'REVIEWER', 'INSTITUTION')")
     @Operation(summary = "获取标签详情", description = "根据ID获取标签详情")
     public Result<TagVO> getTag(@Parameter(description = "标签ID") @PathVariable("id") Long id) {
         log.info("获取标签详情: id={}", id);
@@ -109,6 +110,7 @@ public class TagController {
      */
     @GetMapping("/name/{name}")
     @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ADMIN', 'REVIEWER', 'INSTITUTION')")
     @Operation(summary = "根据名称获取标签", description = "根据名称获取标签详情")
     public Result<TagVO> getTagByName(@Parameter(description = "标签名称") @PathVariable("name") String name) {
         log.info("根据名称获取标签: name={}", name);
@@ -125,6 +127,7 @@ public class TagController {
      */
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ADMIN', 'REVIEWER', 'INSTITUTION')")
     @Operation(summary = "分页查询标签", description = "分页获取标签列表，支持关键词搜索")
     public Result<Page<TagVO>> listTags(
             @Parameter(description = "搜索关键词") @RequestParam(required = false) String keyword,
@@ -142,6 +145,7 @@ public class TagController {
      */
     @GetMapping("/popular")
     @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ADMIN', 'REVIEWER', 'INSTITUTION')")
     @Operation(summary = "获取热门标签", description = "获取使用最多的标签列表")
     public Result<List<TagVO>> getPopularTags(
             @Parameter(description = "数量限制") @RequestParam(defaultValue = "10") int limit) {

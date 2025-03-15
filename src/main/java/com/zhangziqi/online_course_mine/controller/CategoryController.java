@@ -95,6 +95,7 @@ public class CategoryController {
      */
     @GetMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ADMIN', 'REVIEWER', 'INSTITUTION')")
     @Operation(summary = "获取分类详情", description = "根据ID获取分类详情")
     public Result<CategoryVO> getCategory(@Parameter(description = "分类ID") @PathVariable("id") Long id) {
         log.info("获取分类详情: id={}", id);
@@ -110,6 +111,7 @@ public class CategoryController {
      */
     @GetMapping("/code/{code}")
     @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ADMIN', 'REVIEWER', 'INSTITUTION')")
     @Operation(summary = "根据编码获取分类", description = "根据编码获取分类详情")
     public Result<CategoryVO> getCategoryByCode(@Parameter(description = "分类编码") @PathVariable("code") String code) {
         log.info("根据编码获取分类: code={}", code);
@@ -126,6 +128,7 @@ public class CategoryController {
      */
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ADMIN', 'REVIEWER', 'INSTITUTION')")
     @Operation(summary = "分页查询分类", description = "分页获取分类列表，支持关键词搜索")
     public Result<Page<CategoryVO>> listCategories(
             @Parameter(description = "搜索关键词") @RequestParam(required = false) String keyword,
@@ -142,6 +145,7 @@ public class CategoryController {
      */
     @GetMapping("/roots")
     @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ADMIN', 'REVIEWER', 'INSTITUTION')")
     @Operation(summary = "获取根分类", description = "获取所有顶级分类")
     public Result<List<CategoryVO>> listRootCategories() {
         log.info("获取所有根分类");
@@ -157,6 +161,7 @@ public class CategoryController {
      */
     @GetMapping("/children/{parentId}")
     @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ADMIN', 'REVIEWER', 'INSTITUTION')")
     @Operation(summary = "获取子分类", description = "获取指定父分类下的所有子分类")
     public Result<List<CategoryVO>> listChildCategories(
             @Parameter(description = "父分类ID") @PathVariable("parentId") Long parentId) {
@@ -172,6 +177,7 @@ public class CategoryController {
      */
     @GetMapping("/tree")
     @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ADMIN', 'REVIEWER', 'INSTITUTION')")
     @Operation(summary = "获取分类树", description = "获取完整的分类树结构")
     public Result<List<CategoryTreeVO>> getCategoryTree() {
         log.info("获取分类树");

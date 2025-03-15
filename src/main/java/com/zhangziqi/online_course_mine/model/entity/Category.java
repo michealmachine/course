@@ -1,5 +1,6 @@
 package com.zhangziqi.online_course_mine.model.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -80,6 +81,7 @@ public class Category extends BaseEntity {
     /**
      * 关联的课程
      */
+    @JsonIgnore
     @OneToMany(mappedBy = "category")
     @Builder.Default
     private List<Course> courses = new ArrayList<>();

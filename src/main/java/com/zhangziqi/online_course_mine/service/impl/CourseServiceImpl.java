@@ -16,6 +16,7 @@ import com.zhangziqi.online_course_mine.repository.CourseRepository;
 import com.zhangziqi.online_course_mine.repository.InstitutionRepository;
 import com.zhangziqi.online_course_mine.repository.TagRepository;
 import com.zhangziqi.online_course_mine.service.CourseService;
+import com.zhangziqi.online_course_mine.service.MinioService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -24,12 +25,15 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.io.IOException;
+import java.util.UUID;
 
 /**
  * 课程服务实现类
@@ -44,6 +48,7 @@ public class CourseServiceImpl implements CourseService {
     private final CategoryRepository categoryRepository;
     private final TagRepository tagRepository;
     private final StringRedisTemplate redisTemplate;
+    private final MinioService minioService;
     
     // 预览URL有效期（分钟）
     private static final long PREVIEW_URL_EXPIRATION_MINUTES = 60;
@@ -54,10 +59,10 @@ public class CourseServiceImpl implements CourseService {
     
     @Override
     @Transactional
-    public Course createCourse(CourseCreateDTO dto, Long creatorId) {
+    public Course createCourse(CourseCreateDTO dto, Long creatorId, Long institutionId) {
         // 验证机构是否存在
-        Institution institution = institutionRepository.findById(dto.getInstitutionId())
-                .orElseThrow(() -> new ResourceNotFoundException("机构不存在，ID: " + dto.getInstitutionId()));
+        Institution institution = institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new ResourceNotFoundException("机构不存在，ID: " + institutionId));
         
         // 验证分类是否存在（如果指定了分类）
         Category category = null;
@@ -73,6 +78,12 @@ public class CourseServiceImpl implements CourseService {
                     .map(tagId -> tagRepository.findById(tagId)
                             .orElseThrow(() -> new ResourceNotFoundException("标签不存在，ID: " + tagId)))
                     .collect(Collectors.toSet());
+            
+            // 增加标签使用次数
+            tags.forEach(tag -> {
+                tag.incrementUseCount();
+                tagRepository.save(tag);
+            });
         }
         
         // 设置付费类型
@@ -114,7 +125,7 @@ public class CourseServiceImpl implements CourseService {
     
     @Override
     @Transactional
-    public Course updateCourse(Long id, CourseCreateDTO dto) {
+    public Course updateCourse(Long id, CourseCreateDTO dto, Long institutionId) {
         // 获取课程
         Course course = getCourseById(id);
         
@@ -125,8 +136,8 @@ public class CourseServiceImpl implements CourseService {
         }
         
         // 验证机构是否存在
-        Institution institution = institutionRepository.findById(dto.getInstitutionId())
-                .orElseThrow(() -> new ResourceNotFoundException("机构不存在，ID: " + dto.getInstitutionId()));
+        Institution institution = institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new ResourceNotFoundException("机构不存在，ID: " + institutionId));
         
         // 验证分类是否存在（如果指定了分类）
         Category category = null;
@@ -135,13 +146,39 @@ public class CourseServiceImpl implements CourseService {
                     .orElseThrow(() -> new ResourceNotFoundException("分类不存在，ID: " + dto.getCategoryId()));
         }
         
+        // 保存旧标签用于计数更新
+        Set<Tag> oldTags = new HashSet<>(course.getTags());
+        
         // 验证标签是否存在（如果指定了标签）
-        Set<Tag> tags = new HashSet<>();
+        Set<Tag> newTags = new HashSet<>();
         if (dto.getTagIds() != null && !dto.getTagIds().isEmpty()) {
-            tags = dto.getTagIds().stream()
+            newTags = dto.getTagIds().stream()
                     .map(tagId -> tagRepository.findById(tagId)
                             .orElseThrow(() -> new ResourceNotFoundException("标签不存在，ID: " + tagId)))
                     .collect(Collectors.toSet());
+            
+            // 处理标签使用计数
+            // 1. 减少不再使用的旧标签的计数
+            oldTags.forEach(oldTag -> {
+                if (!newTags.contains(oldTag)) {
+                    oldTag.decrementUseCount();
+                    tagRepository.save(oldTag);
+                }
+            });
+            
+            // 2. 增加新增标签的计数
+            newTags.forEach(newTag -> {
+                if (!oldTags.contains(newTag)) {
+                    newTag.incrementUseCount();
+                    tagRepository.save(newTag);
+                }
+            });
+        } else {
+            // 如果新标签列表为空，减少所有旧标签的计数
+            oldTags.forEach(oldTag -> {
+                oldTag.decrementUseCount();
+                tagRepository.save(oldTag);
+            });
         }
         
         // 设置付费类型
@@ -162,7 +199,7 @@ public class CourseServiceImpl implements CourseService {
         course.setDescription(dto.getDescription());
         course.setInstitution(institution);
         course.setCategory(category);
-        course.setTags(tags);
+        course.setTags(newTags);
         course.setPaymentType(paymentType);
         course.setPrice(dto.getPrice());
         course.setDiscountPrice(dto.getDiscountPrice());
@@ -205,12 +242,20 @@ public class CourseServiceImpl implements CourseService {
             throw new BusinessException(400, "只有草稿状态的课程才能删除");
         }
         
+        // 减少标签使用计数
+        if (course.getTags() != null && !course.getTags().isEmpty()) {
+            course.getTags().forEach(tag -> {
+                tag.decrementUseCount();
+                tagRepository.save(tag);
+            });
+        }
+        
         courseRepository.delete(course);
     }
     
     @Override
     @Transactional
-    public Course updateCourseCover(Long id, String coverImageUrl) {
+    public Course updateCourseCover(Long id, MultipartFile file) throws IOException {
         Course course = getCourseById(id);
         
         // 检查课程状态，只有草稿或已拒绝状态的课程才能更新封面
@@ -219,9 +264,85 @@ public class CourseServiceImpl implements CourseService {
             throw new BusinessException(400, "只有草稿或已拒绝状态的课程才能更新封面");
         }
         
-        course.setCoverImage(coverImageUrl);
+        // 检查文件类型
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new BusinessException(400, "只支持上传图片文件");
+        }
         
-        return courseRepository.save(course);
+        // 检查文件大小（最大5MB）
+        if (file.getSize() > 5 * 1024 * 1024) {
+            throw new BusinessException(400, "文件大小不能超过5MB");
+        }
+        
+        // 生成唯一的对象名
+        String objectName = "course-covers/" + course.getId() + "/" + UUID.randomUUID() + "-" + file.getOriginalFilename();
+        
+        // 上传到MinIO
+        String coverImageUrl = minioService.uploadFile(objectName, file.getInputStream(), file.getContentType());
+        
+        // 获取旧封面URL
+        String oldCoverUrl = course.getCoverImage();
+        
+        // 更新课程封面
+        course.setCoverImage(coverImageUrl);
+        Course updatedCourse = courseRepository.save(course);
+        
+        // 尝试删除旧封面
+        if (oldCoverUrl != null && !oldCoverUrl.isEmpty()) {
+            try {
+                // 从URL中提取对象名
+                String oldObjectName = extractObjectNameFromUrl(oldCoverUrl);
+                if (oldObjectName != null) {
+                    boolean deleted = minioService.deleteFile(oldObjectName);
+                    if (deleted) {
+                        log.info("删除旧封面成功: {}", oldObjectName);
+                    } else {
+                        log.warn("删除旧封面失败: {}", oldObjectName);
+                    }
+                }
+            } catch (Exception e) {
+                log.error("删除旧封面出错: {}", e.getMessage(), e);
+                // 继续执行，不影响封面更新
+            }
+        }
+        
+        return updatedCourse;
+    }
+    
+    /**
+     * 从URL中提取对象名
+     * 例如：http://localhost:8999/media/course-covers/123/uuid-filename.jpg
+     * 提取为：course-covers/123/uuid-filename.jpg
+     */
+    private String extractObjectNameFromUrl(String url) {
+        if (url == null || url.isEmpty()) {
+            return null;
+        }
+        
+        try {
+            // 查找桶名在URL中的位置
+            String bucketName = "media"; // MinIO配置中的桶名
+            int bucketIndex = url.indexOf("/" + bucketName + "/");
+            
+            if (bucketIndex != -1) {
+                // +桶名长度+2，是为了跳过"/桶名/"
+                return url.substring(bucketIndex + bucketName.length() + 2);
+            }
+            
+            // 如果使用特殊格式，尝试直接从路径中提取
+            String[] parts = url.split("/");
+            if (parts.length >= 3) {
+                // 假设格式为：course-covers/123/uuid-filename.jpg
+                return String.join("/", parts[parts.length - 3], parts[parts.length - 2], parts[parts.length - 1]);
+            }
+            
+            log.warn("无法从URL中提取对象名: {}", url);
+            return null;
+        } catch (Exception e) {
+            log.error("提取对象名出错: {}", e.getMessage());
+            return null;
+        }
     }
     
     @Override

@@ -38,12 +38,6 @@ public class CourseCreateDTO {
     private String description;
     
     /**
-     * 所属机构ID
-     */
-    @NotNull(message = "机构ID不能为空")
-    private Long institutionId;
-    
-    /**
      * 课程分类ID
      */
     private Long categoryId;

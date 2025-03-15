@@ -1,5 +1,6 @@
 package com.zhangziqi.online_course_mine.controller;
 
+import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.model.dto.course.CourseCreateDTO;
 import com.zhangziqi.online_course_mine.model.entity.Course;
 import com.zhangziqi.online_course_mine.model.vo.PreviewUrlVO;
@@ -16,9 +17,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 
 /**
@@ -48,7 +52,7 @@ public class CourseController {
         log.info("创建课程, 用户ID: {}, 机构ID: {}, 课程标题: {}", 
                 userId, institutionId, dto.getTitle());
         
-        Course course = courseService.createCourse(dto, userId);
+        Course course = courseService.createCourse(dto, userId, institutionId);
         
         return Result.success(course);
     }
@@ -86,7 +90,7 @@ public class CourseController {
         log.info("更新课程, 课程ID: {}, 机构ID: {}, 课程标题: {}", 
                 courseId, institutionId, dto.getTitle());
         
-        Course course = courseService.updateCourse(courseId, dto);
+        Course course = courseService.updateCourse(courseId, dto, institutionId);
         
         return Result.success(course);
     }
@@ -148,21 +152,27 @@ public class CourseController {
     /**
      * 更新课程封面
      */
-    @PostMapping("/{id}/cover")
+    @PostMapping(value = "/{id}/cover", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
-    @Operation(summary = "更新课程封面", description = "更新指定课程的封面图片")
+    @Operation(summary = "更新课程封面", description = "上传课程封面图片")
     public Result<Course> updateCourseCover(
             @Parameter(description = "课程ID") @PathVariable("id") Long courseId,
-            @Parameter(description = "封面图片URL") @RequestParam String coverImageUrl) {
+            @Parameter(description = "封面图片文件") @RequestParam("file") MultipartFile file) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
         
-        log.info("更新课程封面, 课程ID: {}, 机构ID: {}, 封面URL: {}", 
-                courseId, institutionId, coverImageUrl);
+        log.info("更新课程封面, 课程ID: {}, 机构ID: {}, 文件大小: {}", 
+                courseId, institutionId, file.getSize());
         
-        Course course = courseService.updateCourseCover(courseId, coverImageUrl);
-        
-        return Result.success(course);
+        try {
+            Course course = courseService.updateCourseCover(courseId, file);
+            return Result.success(course);
+        } catch (BusinessException e) {
+            return Result.fail(e.getCode(), e.getMessage());
+        } catch (IOException e) {
+            log.error("课程封面上传失败", e);
+            return Result.fail(500, "课程封面上传失败: " + e.getMessage());
+        }
     }
     
     /**

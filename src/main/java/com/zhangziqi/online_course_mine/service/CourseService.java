@@ -5,6 +5,8 @@ import com.zhangziqi.online_course_mine.model.entity.Course;
 import com.zhangziqi.online_course_mine.model.vo.PreviewUrlVO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
 
 /**
  * 课程服务接口
@@ -16,18 +18,20 @@ public interface CourseService {
      *
      * @param dto 课程创建DTO
      * @param creatorId 创建者ID
+     * @param institutionId 机构ID
      * @return 创建的课程
      */
-    Course createCourse(CourseCreateDTO dto, Long creatorId);
+    Course createCourse(CourseCreateDTO dto, Long creatorId, Long institutionId);
 
     /**
      * 更新课程
      *
      * @param id 课程ID
      * @param dto 课程更新DTO
+     * @param institutionId 机构ID
      * @return 更新后的课程
      */
-    Course updateCourse(Long id, CourseCreateDTO dto);
+    Course updateCourse(Long id, CourseCreateDTO dto, Long institutionId);
 
     /**
      * 获取课程详情
@@ -57,10 +61,11 @@ public interface CourseService {
      * 更新课程封面
      *
      * @param id 课程ID
-     * @param coverImageUrl 封面图片URL
+     * @param file 封面图片文件
      * @return 更新后的课程
+     * @throws IOException 如果文件处理出错
      */
-    Course updateCourseCover(Long id, String coverImageUrl);
+    Course updateCourseCover(Long id, MultipartFile file) throws IOException;
 
     /**
      * 提交课程审核

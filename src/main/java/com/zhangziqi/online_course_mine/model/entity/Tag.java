@@ -1,5 +1,6 @@
 package com.zhangziqi.online_course_mine.model.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -44,6 +45,7 @@ public class Tag extends BaseEntity {
     /**
      * 关联的课程
      */
+    @JsonIgnore
     @ManyToMany(mappedBy = "tags")
     @Builder.Default
     private Set<Course> courses = new HashSet<>();

@@ -26,11 +26,14 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.io.IOException;
+import java.io.InputStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -57,6 +60,9 @@ public class CourseServiceTest {
     @Mock
     private ValueOperations<String, String> valueOperations;
 
+    @Mock
+    private MinioService minioService;
+
     @InjectMocks
     private CourseServiceImpl courseService;
 
@@ -66,6 +72,10 @@ public class CourseServiceTest {
     private Course testCourse;
     private CourseCreateDTO testCourseCreateDTO;
     private Long testCreatorId = 1L;
+
+    // MultipartFile模拟
+    @Mock
+    private MultipartFile mockFile;
 
     @BeforeEach
     void setUp() {
@@ -100,7 +110,6 @@ public class CourseServiceTest {
         testCourseCreateDTO = CourseCreateDTO.builder()
                 .title("测试课程")
                 .description("这是一个测试课程")
-                .institutionId(testInstitution.getId())
                 .categoryId(testCategory.getId())
                 .tagIds(new HashSet<>(Collections.singletonList(testTag.getId())))
                 .paymentType(CoursePaymentType.FREE.getValue())
@@ -124,7 +133,7 @@ public class CourseServiceTest {
         });
 
         // 执行测试
-        Course result = courseService.createCourse(testCourseCreateDTO, testCreatorId);
+        Course result = courseService.createCourse(testCourseCreateDTO, testCreatorId, testInstitution.getId());
 
         // 验证结果
         assertNotNull(result);
@@ -154,7 +163,7 @@ public class CourseServiceTest {
 
         // 执行测试并验证异常
         ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
-            courseService.createCourse(testCourseCreateDTO, testCreatorId);
+            courseService.createCourse(testCourseCreateDTO, testCreatorId, testInstitution.getId());
         });
 
         // 验证异常消息
@@ -178,7 +187,7 @@ public class CourseServiceTest {
 
         // 执行测试并验证异常
         BusinessException exception = assertThrows(BusinessException.class, () -> {
-            courseService.createCourse(testCourseCreateDTO, testCreatorId);
+            courseService.createCourse(testCourseCreateDTO, testCreatorId, testInstitution.getId());
         });
 
         // 验证异常消息
@@ -256,7 +265,6 @@ public class CourseServiceTest {
         CourseCreateDTO updateDTO = CourseCreateDTO.builder()
                 .title("更新后的课程")
                 .description("这是更新后的课程描述")
-                .institutionId(testInstitution.getId())
                 .categoryId(testCategory.getId())
                 .tagIds(new HashSet<>(Collections.singletonList(testTag.getId())))
                 .paymentType(CoursePaymentType.FREE.getValue())
@@ -269,7 +277,7 @@ public class CourseServiceTest {
         when(courseRepository.save(any(Course.class))).thenReturn(testCourse);
 
         // 执行测试
-        Course result = courseService.updateCourse(testCourse.getId(), updateDTO);
+        Course result = courseService.updateCourse(testCourse.getId(), updateDTO, testInstitution.getId());
 
         // 验证结果
         assertNotNull(result);
@@ -331,5 +339,139 @@ public class CourseServiceTest {
         verify(courseRepository).findById(testCourse.getId());
         verify(redisTemplate).opsForValue();
         verify(valueOperations).set(anyString(), eq(testCourse.getId().toString()), anyLong(), eq(TimeUnit.MINUTES));
+    }
+
+    @Test
+    @DisplayName("更新课程封面 - 成功")
+    void updateCourseCover_Success() throws IOException {
+        // 准备测试数据
+        Course draftCourse = Course.builder()
+                .id(1L)
+                .title("测试课程")
+                .description("这是一个测试课程")
+                .institution(testInstitution)
+                .status(CourseStatus.DRAFT.getValue())
+                .coverImage("http://localhost:8999/media/course-covers/1/old-image.jpg")
+                .build();
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(draftCourse));
+        when(mockFile.getContentType()).thenReturn("image/jpeg");
+        when(mockFile.getSize()).thenReturn(1024 * 1024L); // 1MB
+        when(mockFile.getOriginalFilename()).thenReturn("test-image.jpg");
+        when(mockFile.getInputStream()).thenReturn(mock(InputStream.class));
+        when(minioService.uploadFile(anyString(), any(InputStream.class), anyString())).thenReturn("http://localhost:8999/media/course-covers/1/some-uuid-test-image.jpg");
+        
+        // 使用lenient()标记可能不会被调用的模拟
+        lenient().when(minioService.deleteFile(anyString())).thenReturn(true);
+        
+        when(courseRepository.save(any(Course.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        
+        // 执行测试
+        Course result = courseService.updateCourseCover(draftCourse.getId(), mockFile);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertNotEquals("http://localhost:8999/media/course-covers/1/old-image.jpg", result.getCoverImage());
+        assertTrue(result.getCoverImage().contains("course-covers/1/"));
+        
+        // 验证调用
+        verify(courseRepository).findById(draftCourse.getId());
+        verify(mockFile, atLeastOnce()).getContentType();  // 允许多次调用
+        verify(mockFile).getSize();
+        verify(mockFile).getInputStream();
+        verify(minioService).uploadFile(anyString(), any(InputStream.class), anyString());
+        // 不验证deleteFile方法，因为它可能被调用也可能不被调用
+        verify(courseRepository).save(draftCourse);
+    }
+
+    @Test
+    @DisplayName("更新课程封面 - 课程状态不允许")
+    void updateCourseCover_InvalidStatus() {
+        // 准备测试数据 - 使用PUBLISHED状态的课程
+        Course publishedCourse = Course.builder()
+                .id(1L)
+                .title("已发布课程")
+                .description("这是一个已发布的课程")
+                .institution(testInstitution)
+                .status(CourseStatus.PUBLISHED.getValue())
+                .build();
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(publishedCourse));
+        
+        // 执行测试并验证异常
+        BusinessException exception = assertThrows(BusinessException.class, () -> {
+            courseService.updateCourseCover(publishedCourse.getId(), mockFile);
+        });
+        
+        // 验证异常消息
+        assertTrue(exception.getMessage().contains("只有草稿或已拒绝状态的课程才能更新封面"));
+        
+        // 验证调用
+        verify(courseRepository).findById(publishedCourse.getId());
+        verify(mockFile, never()).getContentType();
+        verify(minioService, never()).uploadFile(anyString(), any(InputStream.class), anyString());
+        verify(courseRepository, never()).save(any(Course.class));
+    }
+
+    @Test
+    @DisplayName("更新课程封面 - 文件类型不支持")
+    void updateCourseCover_UnsupportedFileType() {
+        // 准备测试数据
+        Course draftCourse = Course.builder()
+                .id(1L)
+                .title("测试课程")
+                .description("这是一个测试课程")
+                .institution(testInstitution)
+                .status(CourseStatus.DRAFT.getValue())
+                .build();
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(draftCourse));
+        when(mockFile.getContentType()).thenReturn("application/pdf"); // 不支持的文件类型
+        
+        // 执行测试并验证异常
+        BusinessException exception = assertThrows(BusinessException.class, () -> {
+            courseService.updateCourseCover(draftCourse.getId(), mockFile);
+        });
+        
+        // 验证异常消息
+        assertTrue(exception.getMessage().contains("只支持上传图片文件"));
+        
+        // 验证调用
+        verify(courseRepository).findById(draftCourse.getId());
+        verify(mockFile).getContentType();
+        verify(minioService, never()).uploadFile(anyString(), any(InputStream.class), anyString());
+        verify(courseRepository, never()).save(any(Course.class));
+    }
+
+    @Test
+    @DisplayName("更新课程封面 - 文件大小超限")
+    void updateCourseCover_FileTooLarge() {
+        // 准备测试数据
+        Course draftCourse = Course.builder()
+                .id(1L)
+                .title("测试课程")
+                .description("这是一个测试课程")
+                .institution(testInstitution)
+                .status(CourseStatus.DRAFT.getValue())
+                .build();
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(draftCourse));
+        when(mockFile.getContentType()).thenReturn("image/jpeg");
+        when(mockFile.getSize()).thenReturn(10 * 1024 * 1024L); // 10MB, 超过5MB限制
+        
+        // 执行测试并验证异常
+        BusinessException exception = assertThrows(BusinessException.class, () -> {
+            courseService.updateCourseCover(draftCourse.getId(), mockFile);
+        });
+        
+        // 验证异常消息
+        assertTrue(exception.getMessage().contains("文件大小不能超过5MB"));
+        
+        // 验证调用
+        verify(courseRepository).findById(draftCourse.getId());
+        verify(mockFile).getContentType();
+        verify(mockFile).getSize();
+        verify(minioService, never()).uploadFile(anyString(), any(InputStream.class), anyString());
+        verify(courseRepository, never()).save(any(Course.class));
     }
 } 
