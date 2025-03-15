@@ -1,5 +1,5 @@
 // 导入基础类型
-import { User, Role } from './auth';
+import { Role } from './auth';
 
 // 用户查询参数
 export interface UserQueryParams {
@@ -30,13 +30,14 @@ export interface UserPageResponse {
 export interface UserDTO {
   id?: number;
   username: string;
-  password?: string;
   email: string;
+  institutionId: number;
+  password?: string;
+  role?: string;
   phone?: string;
   nickname?: string;
   status?: number;
-  institutionId?: number;
-  roleIds?: number[];
+  name: string;
 }
 
 // 用户状态更新DTO
@@ -47,4 +48,14 @@ export interface UserStatusDTO {
 // 用户角色分配DTO
 export interface UserRoleAssignmentDTO {
   roleIds: number[];
+}
+
+export interface User {
+  id: number;
+  username: string;
+  email: string;
+  institutionId: number;
+  role: string;
+  createdAt: string;
+  updatedAt: string;
 } 

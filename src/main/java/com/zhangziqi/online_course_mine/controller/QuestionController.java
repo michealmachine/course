@@ -18,7 +18,12 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 题目管理控制器
@@ -125,19 +130,30 @@ public class QuestionController {
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
-    @Operation(summary = "获取题目列表", description = "分页获取题目列表，可按类型、难度和关键词筛选")
+    @Operation(summary = "获取题目列表", description = "分页获取题目列表，可按类型、难度、关键词和标签筛选")
     public Result<Page<QuestionVO>> getQuestions(
             @Parameter(description = "题目类型") @RequestParam(required = false) Integer type,
             @Parameter(description = "难度级别") @RequestParam(required = false) Integer difficulty,
             @Parameter(description = "关键词") @RequestParam(required = false) String keyword,
+            @Parameter(description = "标签ID列表，支持数组或逗号分隔的字符串") @RequestParam(required = false) String tagIds,
             @PageableDefault(size = 10) Pageable pageable) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
         
-        log.info("获取题目列表, 机构ID: {}, 类型: {}, 难度: {}, 关键词: {}", 
-                institutionId, type, difficulty, keyword);
+        // 处理tagIds参数（支持逗号分隔的字符串）
+        List<Long> tagIdList = null;
+        if (tagIds != null && !tagIds.isEmpty()) {
+            tagIdList = Arrays.stream(tagIds.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .map(Long::parseLong)
+                    .collect(Collectors.toList());
+        }
+        
+        log.info("获取题目列表, 机构ID: {}, 类型: {}, 难度: {}, 关键词: {}, 标签IDs: {}", 
+                institutionId, type, difficulty, keyword, tagIdList);
         
         Page<QuestionVO> questions = questionService.getQuestions(
-                institutionId, type, difficulty, keyword, pageable);
+                institutionId, type, difficulty, keyword, tagIdList, pageable);
         return Result.success(questions);
     }
     
@@ -158,5 +174,28 @@ public class QuestionController {
         
         List<QuestionVO> questions = questionService.getRandomQuestions(institutionId, type, count);
         return Result.success(questions);
+    }
+    
+    /**
+     * 检查题目是否被引用
+     */
+    @GetMapping("/{id}/check-references")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
+    @Operation(summary = "检查题目引用", description = "检查题目是否被题组或其他实体引用")
+    public Result<Map<String, Object>> checkQuestionReferences(
+            @Parameter(description = "题目ID") @PathVariable Long id) {
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+        
+        log.info("检查题目引用关系, ID: {}, 机构ID: {}", id, institutionId);
+        
+        // 检查题目是否被题组引用
+        boolean isReferencedByGroups = questionService.isQuestionReferencedByGroups(id, institutionId);
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("isReferenced", isReferencedByGroups);
+        result.put("references", Collections.singletonMap("groups", isReferencedByGroups));
+        
+        return Result.success(result);
     }
 } 

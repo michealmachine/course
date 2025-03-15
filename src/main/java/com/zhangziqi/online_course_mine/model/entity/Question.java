@@ -63,6 +63,12 @@ public class Question extends BaseEntity {
     private String analysis;
 
     /**
+     * 正确答案（填空题必填，简答题可选）
+     */
+    @Column(length = 2000)
+    private String answer;
+
+    /**
      * 所属机构
      */
     @ManyToOne(fetch = FetchType.LAZY)

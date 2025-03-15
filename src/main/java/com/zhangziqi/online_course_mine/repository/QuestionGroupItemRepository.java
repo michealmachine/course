@@ -85,8 +85,15 @@ public interface QuestionGroupItemRepository extends JpaRepository<QuestionGroup
     List<Long> findGroupIdsByQuestionId(@Param("questionId") Long questionId);
 
     /**
-     * 统计题目被引用的次数
+     * 根据题目ID删除所有与该题目相关的题目组项
      */
-    @Query("SELECT COUNT(gi) FROM QuestionGroupItem gi WHERE gi.question.id = :questionId")
+    @Modifying
+    @Query("DELETE FROM QuestionGroupItem i WHERE i.question.id = :questionId")
+    void deleteByQuestionId(@Param("questionId") Long questionId);
+    
+    /**
+     * 计算题目被题组引用的次数
+     */
+    @Query("SELECT COUNT(i) FROM QuestionGroupItem i WHERE i.question.id = :questionId")
     long countByQuestionId(@Param("questionId") Long questionId);
 } 

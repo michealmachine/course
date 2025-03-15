@@ -56,4 +56,20 @@ public interface QuestionRepository extends JpaRepository<Question, Long>, JpaSp
      */
     @Query(value = "SELECT * FROM questions WHERE institution_id = :institutionId AND type = :type ORDER BY RAND() LIMIT :limit", nativeQuery = true)
     List<Question> findRandomQuestions(@Param("institutionId") Long institutionId, @Param("type") Integer type, @Param("limit") int limit);
+    
+    /**
+     * 根据标签ID列表查询包含所有这些标签的题目ID
+     * 使用COUNT(DISTINCT m.tag_id) = :tagCount确保题目包含所有指定的标签
+     */
+    @Query(value = "SELECT q.id FROM questions q " +
+            "JOIN question_tag_mappings m ON q.id = m.question_id " +
+            "WHERE m.tag_id IN :tagIds " +
+            "GROUP BY q.id " +
+            "HAVING COUNT(DISTINCT m.tag_id) = :tagCount", nativeQuery = true)
+    List<Long> findQuestionIdsByTagIds(@Param("tagIds") List<Long> tagIds, @Param("tagCount") Long tagCount);
+    
+    /**
+     * 根据ID列表和机构查询题目（分页）
+     */
+    Page<Question> findByIdInAndInstitution(List<Long> ids, Institution institution, Pageable pageable);
 } 

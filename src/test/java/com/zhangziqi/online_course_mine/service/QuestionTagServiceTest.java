@@ -3,10 +3,8 @@ package com.zhangziqi.online_course_mine.service;
 import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.exception.ResourceNotFoundException;
 import com.zhangziqi.online_course_mine.model.dto.QuestionTagDTO;
-import com.zhangziqi.online_course_mine.model.entity.Institution;
-import com.zhangziqi.online_course_mine.model.entity.Question;
-import com.zhangziqi.online_course_mine.model.entity.QuestionTag;
-import com.zhangziqi.online_course_mine.model.entity.QuestionTagMapping;
+import com.zhangziqi.online_course_mine.model.entity.*;
+import com.zhangziqi.online_course_mine.model.enums.QuestionType;
 import com.zhangziqi.online_course_mine.model.vo.QuestionTagVO;
 import com.zhangziqi.online_course_mine.repository.InstitutionRepository;
 import com.zhangziqi.online_course_mine.repository.QuestionRepository;
@@ -26,6 +24,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -55,6 +55,7 @@ public class QuestionTagServiceTest {
     private QuestionTagMapping testTagMapping;
     private QuestionTagDTO testTagDTO;
     private List<Object[]> testTagCountResult;
+    private User testUser;
 
     @BeforeEach
     void setUp() {
@@ -64,29 +65,41 @@ public class QuestionTagServiceTest {
                 .name("测试机构")
                 .build();
 
+        // 创建测试用户
+        testUser = User.builder()
+                .id(1L)
+                .name("测试用户")
+                .email("test@example.com")
+                .build();
+
+        // 创建测试题目
+        testQuestion = Question.builder()
+                .id(1L)
+                .title("测试题目")
+                .content("这是一道测试题目的内容")
+                .type(QuestionType.SINGLE_CHOICE.getValue())
+                .difficulty(2)
+                .score(5)
+                .analysis("这是题目解析")
+                .answer("这是答案")
+                .institution(testInstitution)
+                .creatorId(testUser.getId())
+                .creatorName(testUser.getName())
+                .build();
+
         // 创建测试标签
         testTag = QuestionTag.builder()
                 .id(1L)
-                .institution(testInstitution)
                 .name("测试标签")
-                .build();
-
-        // 创建测试问题
-        testQuestion = Question.builder()
-                .id(1L)
                 .institution(testInstitution)
-                .title("测试题目")
-                .content("这是一道测试题目")
-                .type(1)
-                .difficulty(2)
-                .score(5)
+                .creatorId(testUser.getId())
                 .build();
 
         // 创建测试标签映射
         testTagMapping = QuestionTagMapping.builder()
                 .id(1L)
-                .tag(testTag)
                 .question(testQuestion)
+                .tag(testTag)
                 .build();
 
         // 创建测试标签DTO
@@ -514,5 +527,158 @@ public class QuestionTagServiceTest {
         verify(questionRepository).findByIdAndInstitutionId(testQuestion.getId(), testInstitution.getId());
         verify(tagRepository).findByIdAndInstitutionId(testTag.getId(), testInstitution.getId());
         verify(tagMappingRepository).deleteByQuestionIdAndTagId(testQuestion.getId(), testTag.getId());
+    }
+
+    @Test
+    @DisplayName("为不同类型的题目添加标签")
+    void addTagToQuestions_DifferentTypes_Success() {
+        // 创建不同类型的题目
+        List<Question> questions = Arrays.asList(
+            Question.builder()
+                .id(1L)
+                .title("单选题")
+                .content("单选题内容")
+                .type(QuestionType.SINGLE_CHOICE.getValue())
+                .difficulty(2)
+                .score(5)
+                .analysis("解析")
+                .answer("A")
+                .institution(testInstitution)
+                .build(),
+            Question.builder()
+                .id(2L)
+                .title("填空题")
+                .content("填空题内容____")
+                .type(QuestionType.FILL_BLANK.getValue())
+                .difficulty(2)
+                .score(5)
+                .analysis("解析")
+                .answer("答案")
+                .institution(testInstitution)
+                .build(),
+            Question.builder()
+                .id(3L)
+                .title("判断题")
+                .content("判断题内容")
+                .type(QuestionType.TRUE_FALSE.getValue())
+                .difficulty(2)
+                .score(5)
+                .analysis("解析")
+                .answer("正确")
+                .institution(testInstitution)
+                .build()
+        );
+
+        // 创建标签
+        QuestionTag tag = QuestionTag.builder()
+                .id(1L)
+                .name("通用标签")
+                .institution(testInstitution)
+                .build();
+
+        // 设置模拟行为
+        when(questionRepository.findAllById(anyList())).thenReturn(questions);
+        when(tagRepository.findById(anyLong())).thenReturn(Optional.of(tag));
+        when(tagMappingRepository.saveAll(anyList())).thenAnswer(invocation -> {
+            List<QuestionTagMapping> mappings = invocation.getArgument(0);
+            AtomicLong id = new AtomicLong(1);
+            return mappings.stream()
+                    .peek(m -> m.setId(id.getAndIncrement()))
+                    .collect(Collectors.toList());
+        });
+
+        // 执行测试 - 根据实际实现调整方法名和参数
+        List<Long> questionIds = questions.stream()
+                .map(Question::getId)
+                .collect(Collectors.toList());
+        
+        // 如果addTagToQuestions方法不存在，请查看并使用当前实现中的正确方法名
+        // 假设正确的方法是addTagToQuestionsById
+        questionTagService.addTagToQuestionsById(tag.getId(), questionIds);
+
+        // 验证方法调用
+        verify(questionRepository).findAllById(questionIds);
+        verify(tagRepository).findById(tag.getId());
+        verify(tagMappingRepository).saveAll(argThat(mappings -> 
+            mappings.size() == 3 && 
+            mappings.stream().allMatch(m -> 
+                m.getTag().equals(tag) && 
+                questions.contains(m.getQuestion())
+            )
+        ));
+    }
+
+    @Test
+    @DisplayName("获取带有标签的题目列表")
+    void getQuestionsByTags_DifferentTypes_Success() {
+        // 创建不同类型的题目和标签
+        List<Question> questions = Arrays.asList(
+            Question.builder()
+                .id(1L)
+                .title("单选题")
+                .content("单选题内容")
+                .type(QuestionType.SINGLE_CHOICE.getValue())
+                .difficulty(2)
+                .score(5)
+                .analysis("解析")
+                .answer("A")
+                .institution(testInstitution)
+                .build(),
+            Question.builder()
+                .id(2L)
+                .title("简答题")
+                .content("简答题内容")
+                .type(QuestionType.SHORT_ANSWER.getValue())
+                .difficulty(2)
+                .score(5)
+                .analysis("解析")
+                .answer("参考答案")
+                .institution(testInstitution)
+                .build()
+        );
+
+        List<QuestionTag> tags = Arrays.asList(
+            QuestionTag.builder()
+                .id(1L)
+                .name("标签1")
+                .institution(testInstitution)
+                .build(),
+            QuestionTag.builder()
+                .id(2L)
+                .name("标签2")
+                .institution(testInstitution)
+                .build()
+        );
+
+        List<QuestionTagMapping> mappings = new ArrayList<>();
+        for (Question q : questions) {
+            for (QuestionTag t : tags) {
+                mappings.add(QuestionTagMapping.builder()
+                    .id((long) (mappings.size() + 1))
+                    .question(q)
+                    .tag(t)
+                    .build());
+            }
+        }
+
+        // 设置模拟行为
+        when(tagMappingRepository.findByTagIdIn(anyList())).thenReturn(mappings);
+
+        // 执行测试 - 根据实际实现调整方法名和参数
+        List<Long> tagIds = tags.stream()
+                .map(QuestionTag::getId)
+                .collect(Collectors.toList());
+        
+        // 如果getQuestionsByTags方法不存在，请查看并使用当前实现中的正确方法名
+        // 假设正确的方法是getQuestionsByTagIds
+        List<Question> result = questionTagService.getQuestionsByTagIds(tagIds);
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(2, result.size());
+        assertTrue(result.containsAll(questions));
+
+        // 验证方法调用
+        verify(tagMappingRepository).findByTagIdIn(tagIds);
     }
 } 

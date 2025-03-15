@@ -13,6 +13,9 @@ import com.zhangziqi.online_course_mine.service.QuestionTagService;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -28,6 +31,7 @@ public class QuestionExcelListener extends AnalysisEventListener<QuestionExcelDa
     private final Long institutionId;
     private final Long userId;
     private final Integer batchSize;
+    private final TransactionTemplate transactionTemplate;
     
     /**
      * 导入结果
@@ -56,12 +60,14 @@ public class QuestionExcelListener extends AnalysisEventListener<QuestionExcelDa
                              QuestionTagService questionTagService,
                              Long institutionId,
                              Long userId,
-                             Integer batchSize) {
+                             Integer batchSize,
+                             TransactionTemplate transactionTemplate) {
         this.questionService = questionService;
         this.questionTagService = questionTagService;
         this.institutionId = institutionId;
         this.userId = userId;
         this.batchSize = batchSize == null ? 50 : batchSize;
+        this.transactionTemplate = transactionTemplate;
         this.result = QuestionImportResultVO.builder()
                 .totalCount(0)
                 .successCount(0)
@@ -127,21 +133,40 @@ public class QuestionExcelListener extends AnalysisEventListener<QuestionExcelDa
         
         // 处理每条数据
         for (QuestionExcelData excelData : dataList) {
+            final int currentRowIndex = rowIndexMap.get(excelData);
             try {
-                // 校验和转换数据
-                QuestionDTO questionDTO = convertToQuestionDTO(excelData);
-                
-                // 保存题目
-                com.zhangziqi.online_course_mine.model.vo.QuestionVO savedQuestion = questionService.createQuestion(questionDTO, userId);
-                
-                // 处理标签
-                if (savedQuestion != null && savedQuestion.getId() != null && 
-                    excelData.getTags() != null && !excelData.getTags().trim().isEmpty()) {
-                    processQuestionTags(savedQuestion.getId(), excelData.getTags());
-                }
+                // 使用事务模板，每个题目一个独立事务
+                Boolean success = transactionTemplate.execute(new TransactionCallback<Boolean>() {
+                    @Override
+                    public Boolean doInTransaction(TransactionStatus status) {
+                        try {
+                            // 校验和转换数据
+                            QuestionDTO questionDTO = convertToQuestionDTO(excelData);
+                            
+                            // 保存题目
+                            com.zhangziqi.online_course_mine.model.vo.QuestionVO savedQuestion = questionService.createQuestion(questionDTO, userId);
+                            
+                            // 处理标签
+                            if (savedQuestion != null && savedQuestion.getId() != null && 
+                                excelData.getTags() != null && !excelData.getTags().trim().isEmpty()) {
+                                processQuestionTags(savedQuestion.getId(), excelData.getTags());
+                            }
+                            
+                            return true;
+                        } catch (Exception e) {
+                            // 明确设置事务回滚
+                            status.setRollbackOnly();
+                            log.error("保存题目时出错，行号: {}, 标题: {}, 错误: {}", 
+                                    currentRowIndex, excelData.getTitle(), e.getMessage());
+                            throw e; // 重新抛出以触发事务回滚
+                        }
+                    }
+                });
                 
                 // 记录成功
-                successCount.incrementAndGet();
+                if (success != null && success) {
+                    successCount.incrementAndGet();
+                }
             } catch (Exception e) {
                 // 记录失败
                 failureCount.incrementAndGet();
@@ -149,14 +174,14 @@ public class QuestionExcelListener extends AnalysisEventListener<QuestionExcelDa
                 // 添加失败信息
                 result.getFailureItems().add(
                     QuestionImportResultVO.FailureItem.builder()
-                        .rowIndex(rowIndexMap.get(excelData))
+                        .rowIndex(currentRowIndex)
                         .title(StringUtils.defaultIfBlank(excelData.getTitle(), "未知标题"))
                         .errorMessage(e.getMessage())
                         .build()
                 );
                 
                 log.error("导入试题失败，行号: {}, 标题: {}, 错误: {}", 
-                    rowIndexMap.get(excelData), excelData.getTitle(), e.getMessage());
+                    currentRowIndex, excelData.getTitle(), e.getMessage());
             }
         }
     }
@@ -181,6 +206,7 @@ public class QuestionExcelListener extends AnalysisEventListener<QuestionExcelDa
                 .score(excelData.getScore())
                 .analysis(excelData.getAnalysis())
                 .options(options)
+                .answer(excelData.getCorrectAnswer())
                 .build();
     }
 
@@ -199,8 +225,8 @@ public class QuestionExcelListener extends AnalysisEventListener<QuestionExcelDa
         }
         
         // 类型校验
-        if (excelData.getType() == null || (excelData.getType() != 1 && excelData.getType() != 2)) {
-            throw new BusinessException("题目类型必须为1(单选题)或2(多选题)");
+        if (excelData.getType() == null || excelData.getType() < 0 || excelData.getType() > 4) {
+            throw new BusinessException("题目类型必须为0(单选题)、1(多选题)、2(判断题)、3(填空题)或4(简答题)");
         }
         
         // 难度校验
@@ -215,9 +241,31 @@ public class QuestionExcelListener extends AnalysisEventListener<QuestionExcelDa
             throw new BusinessException("分值必须在1-100之间");
         }
         
+        // 根据题目类型进行特定校验
+        switch (excelData.getType()) {
+            case 0: // 单选题
+            case 1: // 多选题
+                validateChoiceQuestion(excelData);
+                break;
+            case 2: // 判断题
+                validateTrueFalseQuestion(excelData);
+                break;
+            case 3: // 填空题
+                validateFillBlankQuestion(excelData);
+                break;
+            case 4: // 简答题
+                // 简答题不需要选项和正确答案，只需要题干和解析
+                break;
+        }
+    }
+    
+    /**
+     * 校验选择题(单选题和多选题)
+     */
+    private void validateChoiceQuestion(QuestionExcelData excelData) {
         // 选项校验
         if (StringUtils.isBlank(excelData.getOptionA()) || StringUtils.isBlank(excelData.getOptionB())) {
-            throw new BusinessException("至少需要提供A、B两个选项");
+            throw new BusinessException("选择题至少需要提供A、B两个选项");
         }
         
         // 正确答案校验
@@ -226,13 +274,13 @@ public class QuestionExcelListener extends AnalysisEventListener<QuestionExcelDa
         }
         
         // 单选题答案校验
-        if (excelData.getType() == 1 && excelData.getCorrectAnswer().length() > 1) {
+        if (excelData.getType() == 0 && excelData.getCorrectAnswer().length() > 1) {
             throw new BusinessException("单选题只能有一个正确答案");
         }
         
         // 多选题答案校验
-        if (excelData.getType() == 2 && excelData.getCorrectAnswer().length() < 2) {
-            throw new BusinessException("多选题至少需要两个正确答案");
+        if (excelData.getType() == 1 && excelData.getCorrectAnswer().length() < 2) {
+            throw new BusinessException("多选题至少需要两个正确选项");
         }
         
         // 验证答案有效性
@@ -240,9 +288,46 @@ public class QuestionExcelListener extends AnalysisEventListener<QuestionExcelDa
     }
     
     /**
-     * 验证正确答案的有效性
+     * 校验判断题
+     */
+    private void validateTrueFalseQuestion(QuestionExcelData excelData) {
+        // 判断题必须只有A和B两个选项，分别代表"正确"和"错误"
+        if (StringUtils.isBlank(excelData.getOptionA()) || StringUtils.isBlank(excelData.getOptionB())) {
+            throw new BusinessException("判断题必须提供A(正确)和B(错误)两个选项");
+        }
+        
+        // 如果选项A不是"正确"，选项B不是"错误"，进行提示
+        if (!"正确".equals(excelData.getOptionA()) || !"错误".equals(excelData.getOptionB())) {
+            log.warn("判断题选项A应为'正确'，选项B应为'错误'");
+        }
+        
+        // 正确答案校验，只能是A或B
+        if (StringUtils.isBlank(excelData.getCorrectAnswer()) || 
+            (!excelData.getCorrectAnswer().equalsIgnoreCase("A") && 
+             !excelData.getCorrectAnswer().equalsIgnoreCase("B"))) {
+            throw new BusinessException("判断题答案只能是A(正确)或B(错误)");
+        }
+    }
+    
+    /**
+     * 校验填空题
+     */
+    private void validateFillBlankQuestion(QuestionExcelData excelData) {
+        // 填空题必须有正确答案，但不需要选项
+        if (StringUtils.isBlank(excelData.getCorrectAnswer())) {
+            throw new BusinessException("填空题必须提供正确答案");
+        }
+    }
+
+    /**
+     * 验证正确答案的有效性(仅适用于选择题)
      */
     private void validateCorrectAnswer(QuestionExcelData excelData) {
+        // 对于非选择题类型，不需要验证选项
+        if (excelData.getType() > 1) {
+            return;
+        }
+        
         String correctAnswer = excelData.getCorrectAnswer().toUpperCase();
         
         // 验证每个答案选项是否存在
@@ -294,7 +379,18 @@ public class QuestionExcelListener extends AnalysisEventListener<QuestionExcelDa
      */
     private List<QuestionOptionDTO> buildOptions(QuestionExcelData excelData) {
         List<QuestionOptionDTO> options = new ArrayList<>();
-        String correctAnswer = excelData.getCorrectAnswer().toUpperCase();
+        
+        // 简答题不需要选项
+        if (excelData.getType() == 4) {
+            return options;
+        }
+        
+        // 填空题不需要选项
+        if (excelData.getType() == 3) {
+            return options;
+        }
+        
+        String correctAnswer = excelData.getCorrectAnswer() != null ? excelData.getCorrectAnswer().toUpperCase() : "";
         
         // 添加选项A
         if (StringUtils.isNotBlank(excelData.getOptionA())) {
@@ -389,14 +485,28 @@ public class QuestionExcelListener extends AnalysisEventListener<QuestionExcelDa
             }
             
             try {
-                // 检查标签是否存在
-                Long tagId = getOrCreateTag(tagName);
-                
-                // 关联标签到题目
-                if (tagId != null) {
-                    questionTagService.addTagToQuestion(questionId, tagId, institutionId);
-                }
+                // 使用新的事务处理标签
+                final String finalTagName = tagName;
+                transactionTemplate.execute(new TransactionCallback<Void>() {
+                    @Override
+                    public Void doInTransaction(TransactionStatus status) {
+                        try {
+                            // 检查标签是否存在
+                            Long tagId = getOrCreateTag(finalTagName);
+                            
+                            // 关联标签到题目
+                            if (tagId != null) {
+                                questionTagService.addTagToQuestion(questionId, tagId, institutionId);
+                            }
+                            return null;
+                        } catch (Exception e) {
+                            status.setRollbackOnly();
+                            throw e;
+                        }
+                    }
+                });
             } catch (Exception e) {
+                // 记录警告但不影响主流程
                 log.warn("为题目 {} 添加标签 {} 失败: {}", questionId, tagName, e.getMessage());
             }
         }

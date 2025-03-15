@@ -91,4 +91,13 @@ public interface QuestionTagService {
      * @return 是否移除成功
      */
     boolean removeTagFromQuestion(Long questionId, Long tagId, Long institutionId);
+    
+    /**
+     * 根据名称获取标签
+     *
+     * @param institutionId 机构ID
+     * @param name 标签名称
+     * @return 标签视图对象
+     */
+    QuestionTagVO getTagByName(Long institutionId, String name);
 } 

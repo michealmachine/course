@@ -35,10 +35,10 @@ public class QuestionExcelData {
     private String content;
 
     /**
-     * 题目类型 1-单选题，2-多选题
+     * 题目类型 0-单选题，1-多选题，2-判断题，3-填空题，4-简答题
      */
-    @ExcelProperty(value = "题目类型(1单选/2多选)", index = 2)
-    @ColumnWidth(20)
+    @ExcelProperty(value = "题目类型(0单选/1多选/2判断/3填空/4简答)", index = 2)
+    @ColumnWidth(35)
     private Integer type;
 
     /**

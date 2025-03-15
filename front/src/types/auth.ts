@@ -30,21 +30,20 @@ export interface User {
   createdAt: string;
   updatedAt: string;
   lastLoginAt?: string;
+  institutionId: number;
+  role: string;
 }
 
 // 登录请求参数
 export interface LoginRequest {
   username: string;
   password: string;
-  captchaCode: string;
-  captchaKey: string;
 }
 
 // 邮箱验证码请求参数
 export interface EmailVerificationRequest {
   email: string;
-  captchaCode: string;
-  captchaKey: string;
+  type: 'register' | 'reset_password';
 }
 
 // 注册请求参数
@@ -56,6 +55,7 @@ export interface RegisterRequest {
   captchaCode: string;
   captchaKey: string;
   emailCode: string;        // 邮箱验证码
+  institutionId: number;
 }
 
 // 登录响应
@@ -72,4 +72,9 @@ export interface LoginResponse {
 export interface CaptchaResponse {
   captchaId: string;
   captchaImage: string;
+}
+
+export interface RefreshTokenResponse {
+  accessToken: string;
+  refreshToken: string;
 } 

@@ -84,6 +84,7 @@ public class QuestionServiceTest {
                 .difficulty(2)
                 .score(5)
                 .analysis("这是题目解析")
+                .answer("这是答案")
                 .institution(testInstitution)
                 .creatorId(testUser.getId())
                 .creatorName(testUser.getName())
@@ -139,6 +140,7 @@ public class QuestionServiceTest {
                 .difficulty(2)
                 .score(5)
                 .analysis("这是题目解析")
+                .answer("这是答案")
                 .options(optionDTOs)
                 .build();
     }
@@ -397,5 +399,150 @@ public class QuestionServiceTest {
         verify(questionRepository).save(any(Question.class));
         verify(optionRepository).deleteByQuestionId(testQuestion.getId());
         verify(optionRepository).saveAll(anyList());
+    }
+
+    @Test
+    @DisplayName("创建题目 - 填空题")
+    void createQuestion_FillBlank_Success() {
+        // 创建填空题DTO
+        QuestionDTO fillBlankDTO = QuestionDTO.builder()
+                .institutionId(testInstitution.getId())
+                .title("测试填空题")
+                .content("这是一道填空题的内容____")
+                .type(QuestionType.FILL_BLANK.getValue())
+                .difficulty(2)
+                .score(5)
+                .analysis("这是题目解析")
+                .answer("正确答案")
+                .build();
+
+        // 设置模拟行为
+        when(institutionRepository.findById(anyLong())).thenReturn(Optional.of(testInstitution));
+        when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
+        when(questionRepository.save(any(Question.class))).thenAnswer(invocation -> {
+            Question savedQuestion = invocation.getArgument(0);
+            savedQuestion.setId(1L);
+            return savedQuestion;
+        });
+
+        // 执行测试
+        QuestionVO result = questionService.createQuestion(fillBlankDTO, testUser.getId());
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(fillBlankDTO.getTitle(), result.getTitle());
+        assertEquals(fillBlankDTO.getContent(), result.getContent());
+        assertEquals(fillBlankDTO.getType(), result.getType());
+        assertEquals(fillBlankDTO.getAnswer(), result.getAnswer());
+        assertTrue(result.getOptions().isEmpty());
+
+        // 验证方法调用
+        verify(institutionRepository).findById(testInstitution.getId());
+        verify(userRepository).findById(testUser.getId());
+        verify(questionRepository).save(any(Question.class));
+        verify(optionRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    @DisplayName("创建题目 - 判断题")
+    void createQuestion_TrueFalse_Success() {
+        // 创建判断题选项
+        List<QuestionOptionDTO> trueFalseOptions = Arrays.asList(
+            QuestionOptionDTO.builder()
+                .content("正确")
+                .isCorrect(true)
+                .orderIndex(0)
+                .build(),
+            QuestionOptionDTO.builder()
+                .content("错误")
+                .isCorrect(false)
+                .orderIndex(1)
+                .build()
+        );
+
+        // 创建判断题DTO
+        QuestionDTO trueFalseDTO = QuestionDTO.builder()
+                .institutionId(testInstitution.getId())
+                .title("测试判断题")
+                .content("这是一道判断题的内容")
+                .type(QuestionType.TRUE_FALSE.getValue())
+                .difficulty(2)
+                .score(5)
+                .analysis("这是题目解析")
+                .options(trueFalseOptions)
+                .build();
+
+        // 设置模拟行为
+        when(institutionRepository.findById(anyLong())).thenReturn(Optional.of(testInstitution));
+        when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
+        when(questionRepository.save(any(Question.class))).thenAnswer(invocation -> {
+            Question savedQuestion = invocation.getArgument(0);
+            savedQuestion.setId(1L);
+            return savedQuestion;
+        });
+        when(optionRepository.saveAll(anyList())).thenReturn(Arrays.asList(
+            QuestionOption.builder().id(1L).content("正确").isCorrect(true).orderIndex(0).build(),
+            QuestionOption.builder().id(2L).content("错误").isCorrect(false).orderIndex(1).build()
+        ));
+
+        // 执行测试
+        QuestionVO result = questionService.createQuestion(trueFalseDTO, testUser.getId());
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(trueFalseDTO.getTitle(), result.getTitle());
+        assertEquals(trueFalseDTO.getContent(), result.getContent());
+        assertEquals(trueFalseDTO.getType(), result.getType());
+        assertEquals(2, result.getOptions().size());
+        assertEquals("正确", result.getOptions().get(0).getContent());
+        assertEquals("错误", result.getOptions().get(1).getContent());
+
+        // 验证方法调用
+        verify(institutionRepository).findById(testInstitution.getId());
+        verify(userRepository).findById(testUser.getId());
+        verify(questionRepository).save(any(Question.class));
+        verify(optionRepository).saveAll(anyList());
+    }
+
+    @Test
+    @DisplayName("创建题目 - 简答题")
+    void createQuestion_ShortAnswer_Success() {
+        // 创建简答题DTO
+        QuestionDTO shortAnswerDTO = QuestionDTO.builder()
+                .institutionId(testInstitution.getId())
+                .title("测试简答题")
+                .content("这是一道简答题的内容")
+                .type(QuestionType.SHORT_ANSWER.getValue())
+                .difficulty(2)
+                .score(5)
+                .analysis("这是题目解析")
+                .answer("参考答案")
+                .build();
+
+        // 设置模拟行为
+        when(institutionRepository.findById(anyLong())).thenReturn(Optional.of(testInstitution));
+        when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
+        when(questionRepository.save(any(Question.class))).thenAnswer(invocation -> {
+            Question savedQuestion = invocation.getArgument(0);
+            savedQuestion.setId(1L);
+            return savedQuestion;
+        });
+
+        // 执行测试
+        QuestionVO result = questionService.createQuestion(shortAnswerDTO, testUser.getId());
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(shortAnswerDTO.getTitle(), result.getTitle());
+        assertEquals(shortAnswerDTO.getContent(), result.getContent());
+        assertEquals(shortAnswerDTO.getType(), result.getType());
+        assertEquals(shortAnswerDTO.getAnswer(), result.getAnswer());
+        assertTrue(result.getOptions().isEmpty());
+
+        // 验证方法调用
+        verify(institutionRepository).findById(testInstitution.getId());
+        verify(userRepository).findById(testUser.getId());
+        verify(questionRepository).save(any(Question.class));
+        verify(optionRepository, never()).saveAll(anyList());
     }
 } 

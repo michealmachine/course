@@ -18,6 +18,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
@@ -46,6 +48,9 @@ public class QuestionImportServiceTest {
     
     @Mock
     private Executor importTaskExecutor;
+    
+    @Mock
+    private TransactionTemplate transactionTemplate;
 
     @Spy
     @InjectMocks
@@ -95,7 +100,16 @@ public class QuestionImportServiceTest {
         ReflectionTestUtils.setField(questionImportService, "concurrentEnabled", false);
         
         // 当调用createQuestion方法时返回模拟的QuestionVO
-        QuestionVO mockQuestionVO = QuestionVO.builder().id(1L).build();
+        QuestionVO mockQuestionVO = QuestionVO.builder()
+                .id(1L)
+                .title("测试题目")
+                .content("测试内容")
+                .type(0)
+                .difficulty(1)
+                .score(5)
+                .analysis("测试解析")
+                .answer("测试答案")
+                .build();
         when(questionService.createQuestion(any(), anyLong())).thenReturn(mockQuestionVO);
         
         // 当调用getAllTags方法时返回空列表
@@ -107,13 +121,13 @@ public class QuestionImportServiceTest {
 
         // 验证结果
         assertNotNull(result);
-        assertEquals(2, result.getTotalCount()); // 我们创建了2条测试数据
-        assertEquals(2, result.getSuccessCount());
+        assertEquals(5, result.getTotalCount()); // 我们创建了5条测试数据
+        assertEquals(5, result.getSuccessCount());
         assertEquals(0, result.getFailureCount());
         assertTrue(result.getDuration() > 0);
 
         // 验证questionService.createQuestion被调用的次数
-        verify(questionService, times(2)).createQuestion(any(), eq(1L));
+        verify(questionService, times(5)).createQuestion(any(), eq(1L));
     }
     
     @Test
@@ -124,26 +138,28 @@ public class QuestionImportServiceTest {
         // 模拟异步处理返回结果
         CompletableFuture<QuestionImportResultVO> mockFuture = CompletableFuture.completedFuture(
                 QuestionImportResultVO.builder()
-                        .totalCount(2)
-                        .successCount(2)
+                        .totalCount(5)
+                        .successCount(5)
                         .failureCount(0)
                         .build());
         
         // 模拟processBatchAsync方法的调用
-        doReturn(mockFuture).when(questionImportService).processBatchAsync(anyList(), anyLong(), anyLong(), anyInt());
+        doReturn(mockFuture).when(questionImportService).processBatchAsync(
+            anyList(), anyLong(), anyLong(), anyInt(), any(TransactionTemplate.class));
         
         // 执行导入
         QuestionImportResultVO result = questionImportService.importQuestions(excelFile, 1L, 1L, 10);
         
         // 验证结果
         assertNotNull(result);
-        assertEquals(2, result.getTotalCount());
-        assertEquals(2, result.getSuccessCount());
+        assertEquals(5, result.getTotalCount());
+        assertEquals(5, result.getSuccessCount());
         assertEquals(0, result.getFailureCount());
         assertTrue(result.getDuration() > 0);
         
         // 验证processBatchAsync被调用
-        verify(questionImportService, times(1)).processBatchAsync(anyList(), eq(1L), eq(1L), eq(1));
+        verify(questionImportService, times(1)).processBatchAsync(
+            anyList(), eq(1L), eq(1L), eq(1), any(TransactionTemplate.class));
     }
     
     @Test
@@ -152,9 +168,15 @@ public class QuestionImportServiceTest {
         QuestionVO mockQuestionVO = QuestionVO.builder().id(1L).build();
         when(questionService.createQuestion(any(), anyLong())).thenReturn(mockQuestionVO);
         
+        // 设置transactionTemplate的模拟行为
+        when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(null);
+        });
+        
         // 执行批处理
         CompletableFuture<QuestionImportResultVO> future = questionImportService.processBatchAsync(
-                createTestData(), 1L, 1L, 1);
+                createTestData(), 1L, 1L, 1, transactionTemplate);
         
         // 等待执行完成并获取结果
         QuestionImportResultVO result = future.get();
@@ -179,7 +201,7 @@ public class QuestionImportServiceTest {
         testData.add(QuestionExcelData.builder()
                 .title("测试单选题")
                 .content("这是一道单选题内容")
-                .type(1)
+                .type(0)
                 .difficulty(1)
                 .score(5)
                 .analysis("这是解析")
@@ -195,7 +217,7 @@ public class QuestionImportServiceTest {
         testData.add(QuestionExcelData.builder()
                 .title("测试多选题")
                 .content("这是一道多选题内容")
-                .type(2)
+                .type(1)
                 .difficulty(2)
                 .score(10)
                 .analysis("这是解析")
@@ -206,6 +228,49 @@ public class QuestionImportServiceTest {
                 .correctAnswer("ABC")
                 .tags("标签3,标签4")
                 .build());
+
+        // 添加判断题测试数据
+        testData.add(QuestionExcelData.builder()
+                .title("测试判断题")
+                .content("这是一道判断题内容")
+                .type(2)
+                .difficulty(1)
+                .score(3)
+                .analysis("这是解析")
+                .optionA("正确")
+                .optionB("错误")
+                .correctAnswer("A")
+                .tags("标签5")
+                .build());
+
+        // 添加填空题测试数据
+        testData.add(QuestionExcelData.builder()
+                .title("测试填空题")
+                .content("这是一道填空题内容____")
+                .type(3)
+                .difficulty(2)
+                .score(5)
+                .analysis("这是解析")
+                .correctAnswer("答案")
+                .tags("标签6")
+                .build());
+
+        // 添加简答题测试数据
+        QuestionExcelData.QuestionExcelDataBuilder builder = QuestionExcelData.builder()
+                .title("测试简答题")
+                .content("这是一道简答题内容")
+                .type(4)
+                .difficulty(3)
+                .score(10)
+                .analysis("这是解析")
+                .correctAnswer("参考答案")  // 使用correctAnswer替代answer
+                .tags("标签7");
+        
+        // 如果QuestionExcelData有answer字段，使用下面的代码
+        // 否则使用上面的correctAnswer代替
+        // .answer("参考答案")
+        
+        testData.add(builder.build());
         
         return testData;
     }

@@ -5,6 +5,7 @@ import com.zhangziqi.online_course_mine.exception.ResourceNotFoundException;
 import com.zhangziqi.online_course_mine.model.dto.QuestionGroupDTO;
 import com.zhangziqi.online_course_mine.model.dto.QuestionGroupItemDTO;
 import com.zhangziqi.online_course_mine.model.entity.*;
+import com.zhangziqi.online_course_mine.model.enums.QuestionType;
 import com.zhangziqi.online_course_mine.model.vo.QuestionGroupItemVO;
 import com.zhangziqi.online_course_mine.model.vo.QuestionGroupVO;
 import com.zhangziqi.online_course_mine.model.vo.QuestionVO;
@@ -23,6 +24,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -79,29 +81,32 @@ public class QuestionGroupServiceTest {
         testUser = User.builder()
                 .id(1L)
                 .name("测试用户")
-                .username("testuser")
-                .nickname("测试昵称")
                 .email("test@example.com")
                 .build();
 
         // 创建测试题目组
         testGroup = QuestionGroup.builder()
                 .id(1L)
-                .institution(testInstitution)
                 .name("测试题目组")
                 .description("这是一个测试题目组")
+                .institution(testInstitution)
                 .creatorId(testUser.getId())
+                .creatorName(testUser.getName())
                 .build();
 
         // 创建测试题目
         testQuestion = Question.builder()
                 .id(1L)
-                .institution(testInstitution)
                 .title("测试题目")
-                .content("这是一道测试题目")
-                .type(1)
+                .content("这是一道测试题目的内容")
+                .type(QuestionType.SINGLE_CHOICE.getValue())
                 .difficulty(2)
                 .score(5)
+                .analysis("这是题目解析")
+                .answer("这是答案")
+                .institution(testInstitution)
+                .creatorId(testUser.getId())
+                .creatorName(testUser.getName())
                 .build();
 
         // 创建测试题目组项
@@ -110,8 +115,6 @@ public class QuestionGroupServiceTest {
                 .group(testGroup)
                 .question(testQuestion)
                 .orderIndex(0)
-                .difficulty(2)
-                .score(5)
                 .build();
 
         // 创建测试题目组DTO
@@ -606,5 +609,153 @@ public class QuestionGroupServiceTest {
         // 验证方法调用
         verify(groupRepository).findByIdAndInstitutionId(testGroup.getId(), testInstitution.getId());
         verify(sectionGroupRepository).deleteByGroupIdAndSectionId(testGroup.getId(), 1L);
+    }
+
+    @Test
+    @DisplayName("添加不同类型的题目到题目组")
+    void addQuestionsToGroup_DifferentTypes_Success() {
+        // 创建不同类型的题目
+        List<Question> questions = Arrays.asList(
+            Question.builder()
+                .id(1L)
+                .title("单选题")
+                .content("单选题内容")
+                .type(QuestionType.SINGLE_CHOICE.getValue())
+                .difficulty(2)
+                .score(5)
+                .analysis("解析")
+                .answer("A")
+                .institution(testInstitution)
+                .build(),
+            Question.builder()
+                .id(2L)
+                .title("多选题")
+                .content("多选题内容")
+                .type(QuestionType.MULTIPLE_CHOICE.getValue())
+                .difficulty(3)
+                .score(10)
+                .analysis("解析")
+                .answer("A,B,C")
+                .institution(testInstitution)
+                .build(),
+            Question.builder()
+                .id(3L)
+                .title("判断题")
+                .content("判断题内容")
+                .type(QuestionType.TRUE_FALSE.getValue())
+                .difficulty(1)
+                .score(3)
+                .analysis("解析")
+                .answer("正确")
+                .institution(testInstitution)
+                .build()
+        );
+
+        // 创建题目组
+        QuestionGroup group = QuestionGroup.builder()
+                .id(1L)
+                .name("混合题型组")
+                .description("包含不同类型的题目")
+                .institution(testInstitution)
+                .build();
+
+        // 设置模拟行为
+        when(questionRepository.findAllById(anyList())).thenReturn(questions);
+        when(groupRepository.findById(anyLong())).thenReturn(Optional.of(group));
+        when(groupItemRepository.findByGroupId(anyLong())).thenReturn(new ArrayList<>());
+        when(groupItemRepository.saveAll(anyList())).thenAnswer(invocation -> {
+            List<QuestionGroupItem> items = invocation.getArgument(0);
+            AtomicLong id = new AtomicLong(1);
+            return items.stream()
+                    .peek(item -> item.setId(id.getAndIncrement()))
+                    .collect(Collectors.toList());
+        });
+
+        // 执行测试
+        List<Long> questionIds = questions.stream()
+                .map(Question::getId)
+                .collect(Collectors.toList());
+                
+        // 根据实际实现调整方法名和参数
+        // 假设正确的方法是addQuestionsToGroupById
+        questionGroupService.addQuestionsToGroupById(group.getId(), questionIds);
+
+        // 验证方法调用
+        verify(questionRepository).findAllById(questionIds);
+        verify(groupRepository).findById(group.getId());
+        verify(groupItemRepository).findByGroupId(group.getId());
+        verify(groupItemRepository).saveAll(argThat(itemsList -> {
+            // 确保参数是List类型
+            if (!(itemsList instanceof List)) {
+                return false;
+            }
+            
+            List<?> items = (List<?>) itemsList;
+            return items.size() == 3 && 
+                   items.stream()
+                        .allMatch(item -> item instanceof QuestionGroupItem && 
+                                ((QuestionGroupItem) item).getGroup().equals(group) && 
+                                questions.contains(((QuestionGroupItem) item).getQuestion()));
+        }));
+    }
+
+    @Test
+    @DisplayName("获取题目组中的不同类型题目")
+    void getQuestionsInGroup_DifferentTypes_Success() {
+        // 创建不同类型的题目
+        List<Question> questions = Arrays.asList(
+            Question.builder()
+                .id(1L)
+                .title("填空题")
+                .content("填空题内容____")
+                .type(QuestionType.FILL_BLANK.getValue())
+                .difficulty(2)
+                .score(5)
+                .analysis("解析")
+                .answer("答案")
+                .institution(testInstitution)
+                .build(),
+            Question.builder()
+                .id(2L)
+                .title("简答题")
+                .content("简答题内容")
+                .type(QuestionType.SHORT_ANSWER.getValue())
+                .difficulty(3)
+                .score(10)
+                .analysis("解析")
+                .answer("参考答案")
+                .institution(testInstitution)
+                .build()
+        );
+
+        // 创建题目组项
+        List<QuestionGroupItem> groupItems = new ArrayList<>();
+        for (int i = 0; i < questions.size(); i++) {
+            groupItems.add(QuestionGroupItem.builder()
+                .id((long)(i + 1))
+                .group(testGroup)
+                .question(questions.get(i))
+                .orderIndex(i)
+                .build());
+        }
+
+        // 设置模拟行为
+        when(groupItemRepository.findByGroupId(anyLong())).thenReturn(groupItems);
+
+        // 执行测试
+        // 根据实际实现调整方法名和参数
+        // 假设正确的方法是getQuestionsByGroupId
+        List<Question> result = questionGroupService.getQuestionsByGroupId(testGroup.getId());
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(2, result.size());
+        assertEquals(questions.get(0).getType(), result.get(0).getType());
+        assertEquals(questions.get(1).getType(), result.get(1).getType());
+        assertEquals(questions.get(0).getAnswer(), result.get(0).getAnswer());
+        assertEquals(questions.get(1).getAnswer(), result.get(1).getAnswer());
+
+        // 验证方法调用
+        verify(groupItemRepository).findByGroupId(testGroup.getId());
     }
 } 

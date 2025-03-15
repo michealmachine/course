@@ -278,6 +278,26 @@ public class QuestionTagServiceImpl implements QuestionTagService {
     }
 
     /**
+     * 根据名称查询标签详情
+     */
+    @Override
+    public QuestionTagVO getTagByName(Long institutionId, String name) {
+        // 获取机构
+        Institution institution = institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new ResourceNotFoundException("机构不存在"));
+        
+        // 查找标签
+        QuestionTag tag = tagRepository.findByInstitutionAndName(institution, name)
+                .orElseThrow(() -> new ResourceNotFoundException("标签不存在"));
+        
+        // 获取标签关联的题目数量
+        long questionCount = tagMappingRepository.countQuestionsByTagId(tag.getId());
+        
+        // 构建响应对象
+        return buildTagVO(tag, questionCount);
+    }
+
+    /**
      * 构建标签视图对象
      */
     private QuestionTagVO buildTagVO(QuestionTag tag, Long questionCount) {

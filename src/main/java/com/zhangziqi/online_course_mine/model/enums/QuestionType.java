@@ -15,7 +15,22 @@ public enum QuestionType {
     /**
      * 多选题
      */
-    MULTIPLE_CHOICE(1, "多选题");
+    MULTIPLE_CHOICE(1, "多选题"),
+    
+    /**
+     * 判断题
+     */
+    TRUE_FALSE(2, "判断题"),
+    
+    /**
+     * 填空题
+     */
+    FILL_BLANK(3, "填空题"),
+    
+    /**
+     * 简答题
+     */
+    SHORT_ANSWER(4, "简答题");
 
     /**
      * 类型值

@@ -47,11 +47,11 @@ public class QuestionDTO {
     private String content;
     
     /**
-     * 题目类型：1-单选题，2-多选题
+     * 题目类型：0-单选题，1-多选题，2-判断题，3-填空题，4-简答题
      */
     @NotNull(message = "题目类型不能为空")
-    @Min(value = 1, message = "题目类型值无效")
-    @Max(value = 2, message = "题目类型值无效")
+    @Min(value = 0, message = "题目类型值无效")
+    @Max(value = 4, message = "题目类型值无效")
     private Integer type;
     
     /**
@@ -77,10 +77,14 @@ public class QuestionDTO {
     private String analysis;
     
     /**
-     * 题目选项列表
+     * 题目选项列表（仅用于单选题、多选题和判断题）
      */
     @Valid
-    @NotNull(message = "题目选项不能为空")
-    @Size(min = 2, message = "至少需要2个选项")
     private List<QuestionOptionDTO> options;
+    
+    /**
+     * 正确答案（填空题必填，简答题可选）
+     */
+    @Size(max = 2000, message = "正确答案长度不能超过2000个字符")
+    private String answer;
 } 

@@ -23,7 +23,9 @@ import {
   Building2,
   HardDrive,
   Film,
-  Database
+  Database,
+  BookOpen as BookOpenIcon,
+  FileQuestion,
 } from 'lucide-react';
 
 // 侧边栏菜单项
@@ -65,6 +67,12 @@ const menuItems: MenuItem[] = [
     title: '存储配额',
     href: '/dashboard/storage',
     icon: <Database className="w-5 h-5" />,
+    roles: [UserRole.INSTITUTION],
+  },
+  {
+    title: '题库管理',
+    href: '/dashboard/questions',
+    icon: <FileQuestion className="w-5 h-5" />,
     roles: [UserRole.INSTITUTION],
   },
   {

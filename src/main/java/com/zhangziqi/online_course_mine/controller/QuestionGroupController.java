@@ -298,4 +298,23 @@ public class QuestionGroupController {
         boolean result = groupService.dissociateGroupFromSection(groupId, sectionId, institutionId);
         return Result.success(result);
     }
+
+    /**
+     * 批量添加题目到题目组
+     */
+    @PostMapping("/{groupId}/questions")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
+    @Operation(summary = "批量添加题目到题目组", description = "向题目组中批量添加多个题目")
+    public Result<List<QuestionGroupItemVO>> addQuestionsToGroup(
+            @Parameter(description = "题目组ID") @PathVariable("groupId") Long groupId,
+            @RequestBody List<Long> questionIds) {
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+        
+        log.info("批量添加题目到题目组, 题目组ID: {}, 题目数量: {}, 机构ID: {}", 
+                groupId, questionIds.size(), institutionId);
+        
+        List<QuestionGroupItemVO> items = groupService.addQuestionsToGroup(groupId, questionIds, institutionId);
+        return Result.success(items);
+    }
 } 

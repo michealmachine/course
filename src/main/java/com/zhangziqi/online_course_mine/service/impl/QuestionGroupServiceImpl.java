@@ -165,13 +165,20 @@ public class QuestionGroupServiceImpl implements QuestionGroupService {
         Institution institution = institutionRepository.findById(institutionId)
                 .orElseThrow(() -> new ResourceNotFoundException("机构不存在"));
         
+        // 添加调试日志记录搜索关键词
+        log.debug("搜索题组 - 机构ID: {}, 关键词: '{}', 页码: {}, 每页数量: {}", 
+                institutionId, keyword, pageable.getPageNumber(), pageable.getPageSize());
+        
         Page<QuestionGroup> groupPage;
         
         if (keyword != null && !keyword.trim().isEmpty()) {
             // 根据关键词搜索
+            log.debug("执行关键词搜索: '{}'", keyword.trim());
             groupPage = groupRepository.searchByKeyword(institution, keyword.trim(), pageable);
+            log.debug("搜索结果数量: {}", groupPage.getTotalElements());
         } else {
             // 查询所有题目组
+            log.debug("查询所有题目组");
             groupPage = groupRepository.findByInstitution(institution, pageable);
         }
         
@@ -471,6 +478,73 @@ public class QuestionGroupServiceImpl implements QuestionGroupService {
             log.error("取消题目组与章节的关联失败", e);
             throw new BusinessException("取消题目组与章节的关联失败：" + e.getMessage());
         }
+    }
+
+    /**
+     * 批量添加题目到题目组
+     */
+    @Override
+    @Transactional
+    public List<QuestionGroupItemVO> addQuestionsToGroup(Long groupId, List<Long> questionIds, Long institutionId) {
+        // 验证题目组是否存在
+        QuestionGroup group = groupRepository.findByIdAndInstitutionId(groupId, institutionId)
+                .orElseThrow(() -> new ResourceNotFoundException("题目组不存在"));
+        
+        // 获取当前题目组中的题目数量，用于设置顺序
+        int currentItemCount = (int) groupItemRepository.countByGroupId(groupId);
+        
+        List<QuestionGroupItemVO> results = new ArrayList<>();
+        List<String> errorMessages = new ArrayList<>();
+        
+        for (int i = 0; i < questionIds.size(); i++) {
+            Long questionId = questionIds.get(i);
+            try {
+                // 验证题目是否存在
+                Question question = questionRepository.findById(questionId)
+                        .orElseThrow(() -> new ResourceNotFoundException("题目不存在: " + questionId));
+                
+                // 验证题目和题目组属于同一个机构
+                if (!Objects.equals(group.getInstitutionId(), question.getInstitutionId())) {
+                    errorMessages.add("题目ID: " + questionId + " - 题目和题目组必须属于同一个机构");
+                    continue;
+                }
+                
+                // 验证题目是否已在题目组中
+                if (groupItemRepository.existsByGroupIdAndQuestionId(group.getId(), question.getId())) {
+                    errorMessages.add("题目ID: " + questionId + " - 该题目已在题目组中");
+                    continue;
+                }
+                
+                // 创建题目组项实体
+                QuestionGroupItem item = QuestionGroupItem.builder()
+                        .group(group)
+                        .question(question)
+                        .orderIndex(currentItemCount + i) // 设置顺序
+                        .difficulty(question.getDifficulty()) // 默认使用题目的难度
+                        .score(question.getScore()) // 默认使用题目的分值
+                        .build();
+                
+                // 保存题目组项
+                QuestionGroupItem savedItem = groupItemRepository.save(item);
+                
+                // 获取题目详情
+                QuestionVO questionVO = questionService.getQuestionById(question.getId(), question.getInstitutionId());
+                
+                // 构建响应对象并添加到结果列表
+                results.add(buildGroupItemVO(savedItem, questionVO));
+                
+            } catch (Exception e) {
+                log.error("添加题目到题目组失败, 题目ID: " + questionId, e);
+                errorMessages.add("题目ID: " + questionId + " - " + e.getMessage());
+            }
+        }
+        
+        // 如果有错误消息，记录到日志中
+        if (!errorMessages.isEmpty()) {
+            log.warn("部分题目添加失败: {}", String.join("; ", errorMessages));
+        }
+        
+        return results;
     }
 
     /**

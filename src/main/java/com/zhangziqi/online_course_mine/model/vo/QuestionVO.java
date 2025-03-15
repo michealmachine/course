@@ -68,9 +68,19 @@ public class QuestionVO {
     private String analysis;
     
     /**
+     * 正确答案（填空题必填，简答题可选）
+     */
+    private String answer;
+    
+    /**
      * 题目选项列表
      */
     private List<QuestionOptionVO> options;
+    
+    /**
+     * 标签列表
+     */
+    private List<QuestionTagVO> tags;
     
     /**
      * 创建者ID

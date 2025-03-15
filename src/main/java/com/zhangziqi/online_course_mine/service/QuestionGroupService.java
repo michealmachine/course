@@ -139,5 +139,15 @@ public interface QuestionGroupService {
      * @param institutionId 机构ID
      * @return 是否解除成功
      */
-    boolean dissociateGroupFromSection(Long sectionId, Long groupId, Long institutionId);
+    boolean dissociateGroupFromSection(Long groupId, Long sectionId, Long institutionId);
+    
+    /**
+     * 批量添加题目到题目组
+     *
+     * @param groupId 题目组ID
+     * @param questionIds 题目ID列表
+     * @param institutionId 机构ID
+     * @return 添加后的题目组项信息列表
+     */
+    List<QuestionGroupItemVO> addQuestionsToGroup(Long groupId, List<Long> questionIds, Long institutionId);
 } 

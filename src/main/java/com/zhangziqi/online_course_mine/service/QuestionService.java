@@ -55,11 +55,14 @@ public interface QuestionService {
      * @param type 题目类型（可选）
      * @param difficulty 难度级别（可选）
      * @param keyword 关键词（可选）
+     * @param tagIds 标签ID列表（可选）
      * @param pageable 分页参数
      * @return 分页题目列表
      */
+    Page<QuestionVO> getQuestions(Long institutionId, Integer type, Integer difficulty, String keyword, List<Long> tagIds, Pageable pageable);
+
     Page<QuestionVO> getQuestions(Long institutionId, Integer type, Integer difficulty, String keyword, Pageable pageable);
-    
+
     /**
      * 随机获取指定数量的题目
      *
@@ -77,4 +80,12 @@ public interface QuestionService {
      * @return 题目列表
      */
     List<QuestionVO> getQuestionsByIds(List<Long> questionIds);
+    
+    /**
+     * 检查题目是否被题组引用
+     * @param questionId 题目ID
+     * @param institutionId 机构ID
+     * @return 如果题目被任何题组引用，返回true；否则返回false
+     */
+    boolean isQuestionReferencedByGroups(Long questionId, Long institutionId);
 } 

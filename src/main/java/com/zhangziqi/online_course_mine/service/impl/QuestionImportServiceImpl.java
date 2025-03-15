@@ -5,6 +5,7 @@ import com.alibaba.excel.write.builder.ExcelWriterBuilder;
 import com.alibaba.excel.write.style.column.LongestMatchColumnWidthStyleStrategy;
 import com.zhangziqi.online_course_mine.excel.QuestionExcelListener;
 import com.zhangziqi.online_course_mine.exception.BusinessException;
+import com.zhangziqi.online_course_mine.exception.ResourceNotFoundException;
 import com.zhangziqi.online_course_mine.model.excel.QuestionExcelData;
 import com.zhangziqi.online_course_mine.model.vo.QuestionImportResultVO;
 import com.zhangziqi.online_course_mine.service.QuestionImportService;
@@ -17,8 +18,12 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,6 +44,7 @@ public class QuestionImportServiceImpl implements QuestionImportService {
 
     private final QuestionService questionService;
     private final QuestionTagService questionTagService;
+    private final PlatformTransactionManager transactionManager;
     
     @Qualifier("importTaskExecutor")
     private final Executor importTaskExecutor;
@@ -67,6 +73,9 @@ public class QuestionImportServiceImpl implements QuestionImportService {
             ArrayList<QuestionExcelData> demoData = new ArrayList<>();
             demoData.add(createSingleChoiceDemo());
             demoData.add(createMultipleChoiceDemo());
+            demoData.add(createTrueFalseDemo());
+            demoData.add(createFillBlankDemo());
+            demoData.add(createShortAnswerDemo());
             
             // 使用EasyExcel写入数据
             ExcelWriterBuilder writerBuilder = EasyExcel.write(response.getOutputStream(), QuestionExcelData.class)
@@ -88,7 +97,6 @@ public class QuestionImportServiceImpl implements QuestionImportService {
      * 导入试题Excel
      */
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public QuestionImportResultVO importQuestions(
             MultipartFile file, 
             Long institutionId, 
@@ -134,8 +142,9 @@ public class QuestionImportServiceImpl implements QuestionImportService {
             long startTime) {
         
         // 创建Excel解析监听器
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
         QuestionExcelListener listener = new QuestionExcelListener(
-                questionService, questionTagService, institutionId, userId, batchSize);
+                questionService, questionTagService, institutionId, userId, batchSize, transactionTemplate);
         
         // 读取Excel数据
         EasyExcel.read(inputStream, QuestionExcelData.class, listener)
@@ -207,8 +216,9 @@ public class QuestionImportServiceImpl implements QuestionImportService {
             List<QuestionExcelData> batchData = allData.subList(fromIndex, toIndex);
             
             // 创建并提交异步任务
+            TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
             CompletableFuture<QuestionImportResultVO> future = processBatchAsync(
-                    batchData, institutionId, userId, i + 1);
+                    batchData, institutionId, userId, i + 1, transactionTemplate);
             
             futures.add(future);
         }
@@ -246,7 +256,8 @@ public class QuestionImportServiceImpl implements QuestionImportService {
             List<QuestionExcelData> batchData, 
             Long institutionId, 
             Long userId,
-            int batchIndex) {
+            int batchIndex,
+            TransactionTemplate transactionTemplate) {
         
         log.info("开始处理批次 {}, 数据量: {}", batchIndex, batchData.size());
         
@@ -258,36 +269,55 @@ public class QuestionImportServiceImpl implements QuestionImportService {
                 .failureItems(new ArrayList<>())
                 .build();
         
-        // 处理每条数据
+        // 处理每条数据，每个题目一个独立事务
         for (int i = 0; i < batchData.size(); i++) {
             QuestionExcelData excelData = batchData.get(i);
+            // 计算在Excel中的行号（表头占一行，数据从第二行开始，且每个批次的起始行不同）
+            final int rowIndex = i + 2 + (batchIndex - 1) * batchData.size();
+            
             try {
-                // 计算在Excel中的行号（表头占一行，数据从第二行开始，且每个批次的起始行不同）
-                int rowIndex = i + 2 + (batchIndex - 1) * batchData.size();
+                // 使用事务模板，确保每个题目处理有独立事务
+                Boolean success = transactionTemplate.execute(new TransactionCallback<Boolean>() {
+                    @Override
+                    public Boolean doInTransaction(TransactionStatus status) {
+                        try {
+                            // 转换数据
+                            com.zhangziqi.online_course_mine.model.dto.QuestionDTO questionDTO = 
+                                    convertToQuestionDTO(excelData);
+                            
+                            // 设置机构ID
+                            questionDTO.setInstitutionId(institutionId);
+                            
+                            // 保存题目
+                            com.zhangziqi.online_course_mine.model.vo.QuestionVO savedQuestion = 
+                                    questionService.createQuestion(questionDTO, userId);
+                            
+                            // 处理标签
+                            if (savedQuestion != null && savedQuestion.getId() != null && 
+                                excelData.getTags() != null && !excelData.getTags().trim().isEmpty()) {
+                                processQuestionTags(savedQuestion.getId(), excelData.getTags(), 
+                                        institutionId, userId);
+                            }
+                            
+                            return true;
+                        } catch (Exception e) {
+                            // 明确设置事务回滚
+                            status.setRollbackOnly();
+                            // 异常会被捕获，但事务会回滚
+                            log.error("导入试题失败，批次: {}, 行: {}, 标题: {}, 错误: {}", 
+                                    batchIndex, rowIndex, excelData.getTitle(), e.getMessage());
+                            throw e; // 重新抛出以触发事务回滚
+                        }
+                    }
+                });
                 
-                // 转换数据
-                com.zhangziqi.online_course_mine.model.dto.QuestionDTO questionDTO = 
-                        convertToQuestionDTO(excelData);
-                
-                // 保存题目
-                com.zhangziqi.online_course_mine.model.vo.QuestionVO savedQuestion = 
-                        questionService.createQuestion(questionDTO, userId);
-                
-                // 处理标签
-                if (savedQuestion != null && savedQuestion.getId() != null && 
-                    excelData.getTags() != null && !excelData.getTags().trim().isEmpty()) {
-                    processQuestionTags(savedQuestion.getId(), excelData.getTags(), 
-                            institutionId, userId);
+                // 处理成功
+                if (success != null && success) {
+                    result.setSuccessCount(result.getSuccessCount() + 1);
                 }
-                
-                // 记录成功
-                result.setSuccessCount(result.getSuccessCount() + 1);
             } catch (Exception e) {
-                // 记录失败
+                // 处理失败 - 注意这里的异常是从事务回调中抛出的
                 result.setFailureCount(result.getFailureCount() + 1);
-                
-                // 计算在Excel中的行号
-                int rowIndex = i + 2 + (batchIndex - 1) * batchData.size();
                 
                 // 添加失败信息
                 result.getFailureItems().add(
@@ -297,9 +327,6 @@ public class QuestionImportServiceImpl implements QuestionImportService {
                         .errorMessage(e.getMessage())
                         .build()
                 );
-                
-                log.error("导入试题失败，批次: {}, 行: {}, 标题: {}, 错误: {}", 
-                        batchIndex, rowIndex, excelData.getTitle(), e.getMessage());
             }
         }
         
@@ -325,15 +352,20 @@ public class QuestionImportServiceImpl implements QuestionImportService {
             }
             
             try {
-                // 尝试获取或创建标签
-                com.zhangziqi.online_course_mine.model.dto.QuestionTagDTO tagDTO = 
-                    com.zhangziqi.online_course_mine.model.dto.QuestionTagDTO.builder()
-                        .institutionId(institutionId)
-                        .name(tagName)
-                        .build();
-                
-                com.zhangziqi.online_course_mine.model.vo.QuestionTagVO tag = 
-                    questionTagService.createTag(tagDTO, userId);
+                // 先查找是否存在标签
+                com.zhangziqi.online_course_mine.model.vo.QuestionTagVO tag = null;
+                try {
+                    // 尝试获取已有标签
+                    tag = questionTagService.getTagByName(institutionId, tagName);
+                } catch (ResourceNotFoundException e) {
+                    // 标签不存在，创建新标签
+                    com.zhangziqi.online_course_mine.model.dto.QuestionTagDTO tagDTO = 
+                        com.zhangziqi.online_course_mine.model.dto.QuestionTagDTO.builder()
+                            .institutionId(institutionId)
+                            .name(tagName)
+                            .build();
+                    tag = questionTagService.createTag(tagDTO, userId);
+                }
                 
                 // 关联标签到题目
                 if (tag != null && tag.getId() != null) {
@@ -360,8 +392,8 @@ public class QuestionImportServiceImpl implements QuestionImportService {
             throw new BusinessException("题目内容不能为空");
         }
         
-        if (excelData.getType() == null || (excelData.getType() != 1 && excelData.getType() != 2)) {
-            throw new BusinessException("题目类型必须为1(单选题)或2(多选题)");
+        if (excelData.getType() == null || excelData.getType() < 0 || excelData.getType() > 4) {
+            throw new BusinessException("题目类型必须为0(单选题)、1(多选题)、2(判断题)、3(填空题)或4(简答题)");
         }
         
         if (excelData.getDifficulty() == null || 
@@ -374,14 +406,52 @@ public class QuestionImportServiceImpl implements QuestionImportService {
             throw new BusinessException("分值必须在1-100之间");
         }
         
-        // 构建选项列表
+        // 根据题型执行特定验证和处理
         ArrayList<com.zhangziqi.online_course_mine.model.dto.QuestionOptionDTO> options = new ArrayList<>();
-        String correctAnswer = excelData.getCorrectAnswer().toUpperCase();
+        
+        switch (excelData.getType()) {
+            case 0: // 单选题
+            case 1: // 多选题
+                options = validateAndBuildChoiceQuestionOptions(excelData);
+                break;
+            case 2: // 判断题
+                options = validateAndBuildTrueFalseQuestionOptions(excelData);
+                break;
+            case 3: // 填空题
+                validateFillBlankQuestion(excelData);
+                // 填空题不需要选项
+                break;
+            case 4: // 简答题
+                // 简答题不需要选项和正确答案，只需要题干和解析
+                break;
+        }
+        
+        // 创建并返回DTO
+        return com.zhangziqi.online_course_mine.model.dto.QuestionDTO.builder()
+                .title(excelData.getTitle())
+                .content(excelData.getContent())
+                .type(excelData.getType())
+                .difficulty(excelData.getDifficulty())
+                .score(excelData.getScore())
+                .analysis(excelData.getAnalysis())
+                .options(options)
+                .answer(excelData.getCorrectAnswer())
+                .build();
+    }
+    
+    /**
+     * 验证选择题并构建选项
+     */
+    private ArrayList<com.zhangziqi.online_course_mine.model.dto.QuestionOptionDTO> validateAndBuildChoiceQuestionOptions(
+            QuestionExcelData excelData) {
+        
+        ArrayList<com.zhangziqi.online_course_mine.model.dto.QuestionOptionDTO> options = new ArrayList<>();
+        String correctAnswer = excelData.getCorrectAnswer() != null ? excelData.getCorrectAnswer().toUpperCase() : "";
         
         // 验证选项和正确答案
         if (excelData.getOptionA() == null || excelData.getOptionA().trim().isEmpty() ||
             excelData.getOptionB() == null || excelData.getOptionB().trim().isEmpty()) {
-            throw new BusinessException("至少需要提供A、B两个选项");
+            throw new BusinessException("选择题至少需要提供A、B两个选项");
         }
         
         if (correctAnswer == null || correctAnswer.trim().isEmpty()) {
@@ -389,13 +459,13 @@ public class QuestionImportServiceImpl implements QuestionImportService {
         }
         
         // 单选题校验
-        if (excelData.getType() == 1 && correctAnswer.length() > 1) {
+        if (excelData.getType() == 0 && correctAnswer.length() > 1) {
             throw new BusinessException("单选题只能有一个正确答案");
         }
         
         // 多选题校验
-        if (excelData.getType() == 2 && correctAnswer.length() < 2) {
-            throw new BusinessException("多选题至少需要两个正确答案");
+        if (excelData.getType() == 1 && correctAnswer.length() < 2) {
+            throw new BusinessException("多选题至少需要两个正确选项");
         }
         
         // 添加选项A
@@ -456,57 +526,259 @@ public class QuestionImportServiceImpl implements QuestionImportService {
             throw new BusinessException("选项F不存在，无法设为正确答案");
         }
         
-        // 创建题目DTO
-        return com.zhangziqi.online_course_mine.model.dto.QuestionDTO.builder()
-                .title(excelData.getTitle())
-                .content(excelData.getContent())
-                .type(excelData.getType())
-                .difficulty(excelData.getDifficulty())
-                .score(excelData.getScore())
-                .analysis(excelData.getAnalysis())
-                .options(options)
-                .institutionId(null) // 由调用方设置
-                .build();
+        return options;
+    }
+    
+    /**
+     * 验证判断题并构建选项
+     */
+    private ArrayList<com.zhangziqi.online_course_mine.model.dto.QuestionOptionDTO> validateAndBuildTrueFalseQuestionOptions(
+            QuestionExcelData excelData) {
+        
+        ArrayList<com.zhangziqi.online_course_mine.model.dto.QuestionOptionDTO> options = new ArrayList<>();
+        String correctAnswer = excelData.getCorrectAnswer() != null ? excelData.getCorrectAnswer().toUpperCase() : "";
+        
+        // 判断题必须只有A和B两个选项，分别代表"正确"和"错误"
+        if (excelData.getOptionA() == null || excelData.getOptionA().trim().isEmpty() ||
+            excelData.getOptionB() == null || excelData.getOptionB().trim().isEmpty()) {
+            throw new BusinessException("判断题必须提供A(正确)和B(错误)两个选项");
+        }
+        
+        // 如果选项A不是"正确"，选项B不是"错误"，进行提示
+        if (!"正确".equals(excelData.getOptionA()) || !"错误".equals(excelData.getOptionB())) {
+            log.warn("判断题选项A应为'正确'，选项B应为'错误'");
+        }
+        
+        // 正确答案校验，只能是A或B
+        if (StringUtils.isBlank(correctAnswer) || 
+            (!correctAnswer.equals("A") && !correctAnswer.equals("B"))) {
+            throw new BusinessException("判断题答案只能是A(正确)或B(错误)");
+        }
+        
+        // 添加选项A (正确)
+        options.add(com.zhangziqi.online_course_mine.model.dto.QuestionOptionDTO.builder()
+                .content(excelData.getOptionA())
+                .isCorrect(correctAnswer.equals("A"))
+                .orderIndex(0)
+                .build());
+        
+        // 添加选项B (错误)
+        options.add(com.zhangziqi.online_course_mine.model.dto.QuestionOptionDTO.builder()
+                .content(excelData.getOptionB())
+                .isCorrect(correctAnswer.equals("B"))
+                .orderIndex(1)
+                .build());
+        
+        return options;
+    }
+    
+    /**
+     * 验证填空题
+     */
+    private void validateFillBlankQuestion(QuestionExcelData excelData) {
+        // 填空题必须有正确答案，但不需要选项
+        if (StringUtils.isBlank(excelData.getCorrectAnswer())) {
+            throw new BusinessException("填空题必须提供正确答案");
+        }
     }
 
     /**
      * 创建单选题示例数据
      */
     private QuestionExcelData createSingleChoiceDemo() {
-        return QuestionExcelData.builder()
+        QuestionExcelData data = QuestionExcelData.builder()
                 .title("示例单选题")
-                .content("下列关于Java语言特点的说法，正确的是?")
-                .type(1) // 单选题
+                .content("下列哪个是Java的基本数据类型？")
+                .type(0) // 单选题
                 .difficulty(1) // 简单
-                .score(5) // 5分
-                .analysis("Java语言是面向对象的编程语言，具有跨平台特性。")
-                .optionA("Java是编译型语言")
-                .optionB("Java程序可以跨平台运行")
-                .optionC("Java不支持多线程")
-                .optionD("Java不是面向对象语言")
-                .correctAnswer("B") // 正确答案是B
-                .tags("Java,编程基础") // 标签
+                .score(5)
+                .analysis("int是Java的基本数据类型，而String、Integer和ArrayList都是引用类型。")
+                .optionA("String")
+                .optionB("int")
+                .optionC("Integer")
+                .optionD("ArrayList")
+                .correctAnswer("B")
+                .tags("Java,基础")
                 .build();
+                
+        // 验证示例数据
+        try {
+            convertToQuestionDTO(data);
+        } catch (Exception e) {
+            log.error("单选题示例数据验证失败：{}", e.getMessage());
+            // 使用默认值
+            data = QuestionExcelData.builder()
+                    .title("示例单选题")
+                    .content("1+1=?")
+                    .type(0)
+                    .difficulty(1)
+                    .score(5)
+                    .analysis("简单的加法运算")
+                    .optionA("1")
+                    .optionB("2")
+                    .optionC("3")
+                    .optionD("4")
+                    .correctAnswer("B")
+                    .tags("数学,基础")
+                    .build();
+        }
+        
+        return data;
     }
 
     /**
      * 创建多选题示例数据
      */
     private QuestionExcelData createMultipleChoiceDemo() {
-        return QuestionExcelData.builder()
+        QuestionExcelData data = QuestionExcelData.builder()
                 .title("示例多选题")
-                .content("以下哪些是Java的基本数据类型?")
-                .type(2) // 多选题
+                .content("下列哪些是HTTP请求方法？")
+                .type(1) // 多选题
                 .difficulty(2) // 中等
-                .score(10) // 10分
-                .analysis("Java的基本数据类型包括：byte、short、int、long、float、double、char和boolean。")
-                .optionA("int")
-                .optionB("String")
-                .optionC("double")
-                .optionD("boolean")
-                .optionE("Integer")
-                .correctAnswer("ACD") // 正确答案是A、C、D
-                .tags("Java,数据类型") // 标签
+                .score(10)
+                .analysis("GET, POST, PUT, DELETE是HTTP请求方法，而SEND和RECEIVE不是标准HTTP方法。")
+                .optionA("GET")
+                .optionB("POST")
+                .optionC("PUT")
+                .optionD("DELETE")
+                .optionE("SEND")
+                .optionF("RECEIVE")
+                .correctAnswer("ABCD")
+                .tags("网络,HTTP")
                 .build();
+                
+        // 验证示例数据
+        try {
+            convertToQuestionDTO(data);
+        } catch (Exception e) {
+            log.error("多选题示例数据验证失败：{}", e.getMessage());
+            // 使用默认值
+            data = QuestionExcelData.builder()
+                    .title("示例多选题")
+                    .content("以下哪些是偶数？")
+                    .type(1)
+                    .difficulty(2)
+                    .score(10)
+                    .analysis("2、4、6都是偶数")
+                    .optionA("2")
+                    .optionB("3")
+                    .optionC("4")
+                    .optionD("6")
+                    .correctAnswer("ACD")
+                    .tags("数学,基础")
+                    .build();
+        }
+        
+        return data;
+    }
+    
+    /**
+     * 创建判断题示例数据
+     */
+    private QuestionExcelData createTrueFalseDemo() {
+        QuestionExcelData data = QuestionExcelData.builder()
+                .title("示例判断题")
+                .content("Java中，String类是基本数据类型。")
+                .type(2) // 判断题
+                .difficulty(1) // 简单
+                .score(3)
+                .analysis("Java中，String类是引用数据类型，不是基本数据类型。基本数据类型包括byte、short、int、long、float、double、boolean和char。")
+                .optionA("正确")
+                .optionB("错误")
+                .correctAnswer("B")
+                .tags("Java,基础")
+                .build();
+                
+        // 验证示例数据
+        try {
+            convertToQuestionDTO(data);
+        } catch (Exception e) {
+            log.error("判断题示例数据验证失败：{}", e.getMessage());
+            // 使用默认值
+            data = QuestionExcelData.builder()
+                    .title("示例判断题")
+                    .content("1+1=2")
+                    .type(2)
+                    .difficulty(1)
+                    .score(3)
+                    .analysis("这是一个基本的数学事实")
+                    .optionA("正确")
+                    .optionB("错误")
+                    .correctAnswer("A")
+                    .tags("数学,基础")
+                    .build();
+        }
+        
+        return data;
+    }
+    
+    /**
+     * 创建填空题示例数据
+     */
+    private QuestionExcelData createFillBlankDemo() {
+        QuestionExcelData data = QuestionExcelData.builder()
+                .title("示例填空题")
+                .content("SQL查询语句中，用于限制结果集行数的关键字是____。")
+                .type(3) // 填空题
+                .difficulty(2) // 中等
+                .score(5)
+                .analysis("SQL中，LIMIT关键字用于限制查询结果返回的行数。例如：SELECT * FROM users LIMIT 10 表示只返回前10条记录。")
+                .correctAnswer("LIMIT")
+                .tags("数据库,SQL")
+                .build();
+                
+        // 验证示例数据
+        try {
+            convertToQuestionDTO(data);
+        } catch (Exception e) {
+            log.error("填空题示例数据验证失败：{}", e.getMessage());
+            // 使用默认值
+            data = QuestionExcelData.builder()
+                    .title("示例填空题")
+                    .content("1+1=____")
+                    .type(3)
+                    .difficulty(1)
+                    .score(5)
+                    .analysis("简单的加法运算")
+                    .correctAnswer("2")
+                    .tags("数学,基础")
+                    .build();
+        }
+        
+        return data;
+    }
+    
+    /**
+     * 创建简答题示例数据
+     */
+    private QuestionExcelData createShortAnswerDemo() {
+        QuestionExcelData data = QuestionExcelData.builder()
+                .title("示例简答题")
+                .content("简述Java中的垃圾回收机制及其工作原理。")
+                .type(4) // 简答题
+                .difficulty(3) // 困难
+                .score(15)
+                .analysis("Java的垃圾回收(GC)是自动内存管理的一种机制，它的工作原理主要包括标记、清除和压缩三个阶段。JVM通过可达性分析判断对象是否可回收，采用分代回收策略提高效率。常见的垃圾回收算法有标记-清除算法、复制算法、标记-整理算法和分代收集算法等。")
+                .tags("Java,JVM,高级")
+                .build();
+                
+        // 验证示例数据
+        try {
+            convertToQuestionDTO(data);
+        } catch (Exception e) {
+            log.error("简答题示例数据验证失败：{}", e.getMessage());
+            // 使用默认值
+            data = QuestionExcelData.builder()
+                    .title("示例简答题")
+                    .content("简述1+1=2的原理")
+                    .type(4)
+                    .difficulty(1)
+                    .score(10)
+                    .analysis("这是一个基本的数学运算，可以通过数轴或实物演示来理解")
+                    .tags("数学,基础")
+                    .build();
+        }
+        
+        return data;
     }
 } 
