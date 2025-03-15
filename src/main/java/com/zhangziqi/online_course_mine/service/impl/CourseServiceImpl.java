@@ -150,7 +150,7 @@ public class CourseServiceImpl implements CourseService {
         Set<Tag> oldTags = new HashSet<>(course.getTags());
         
         // 验证标签是否存在（如果指定了标签）
-        Set<Tag> newTags = new HashSet<>();
+        Set<Tag> newTags;
         if (dto.getTagIds() != null && !dto.getTagIds().isEmpty()) {
             newTags = dto.getTagIds().stream()
                     .map(tagId -> tagRepository.findById(tagId)
@@ -174,6 +174,7 @@ public class CourseServiceImpl implements CourseService {
                 }
             });
         } else {
+            newTags = new HashSet<>();
             // 如果新标签列表为空，减少所有旧标签的计数
             oldTags.forEach(oldTag -> {
                 oldTag.decrementUseCount();
