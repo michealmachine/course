@@ -92,7 +92,7 @@ const questionService = {
    */
   deleteQuestion: async (questionId: number): Promise<void> => {
     try {
-      await request.delete(`/questions/${questionId}`);
+      await request.delete(`/v1/questions/${questionId}`);
     } catch (error) {
       console.error(`删除题目失败, ID: ${questionId}:`, error);
       throw error;
@@ -117,7 +117,7 @@ const questionService = {
   checkQuestionReferences: async (questionId: number, institutionId: number): Promise<{ isReferenced: boolean; references: any }> => {
     try {
       const response: AxiosResponse<ApiResponse<{ isReferenced: boolean; references: any }>> = 
-        await request.get(`/questions/${questionId}/check-references`, { 
+        await request.get(`/v1/questions/${questionId}/check-references`, { 
           params: { institutionId } 
         });
       return response.data.data;
