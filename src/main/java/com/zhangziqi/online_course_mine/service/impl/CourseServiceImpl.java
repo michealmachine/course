@@ -109,7 +109,7 @@ public class CourseServiceImpl implements CourseService {
                 .isPublishedVersion(false)
                 .versionType(CourseVersion.DRAFT.getValue())
                 .category(category)
-                .tags(tags)
+                .tags(tags.isEmpty() ? null : tags)
                 .paymentType(paymentType)
                 .price(dto.getPrice())
                 .discountPrice(dto.getDiscountPrice())

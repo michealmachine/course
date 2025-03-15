@@ -29,13 +29,14 @@ const categoryService = {
   /**
    * 根据ID获取分类详情
    */
-  getCategoryById: async (id: number): Promise<Category> => {
+  getCategoryById: async (id: number): Promise<Category | null> => {
     try {
-      const response: AxiosResponse<ApiResponse<Category>> = await request.get<Category>(`/categories/${id}`);
+      const response: AxiosResponse<ApiResponse<Category>> = 
+        await request.get<Category>(`/categories/${id}`);
       return response.data.data;
     } catch (error) {
       console.error(`获取分类详情失败, ID: ${id}:`, error);
-      throw error;
+      return null;
     }
   },
 
@@ -121,11 +122,12 @@ const categoryService = {
    */
   getCategoryTree: async (): Promise<CategoryTree[]> => {
     try {
-      const response: AxiosResponse<ApiResponse<CategoryTree[]>> = await request.get<CategoryTree[]>('/categories/tree');
-      return response.data.data;
+      const response: AxiosResponse<ApiResponse<CategoryTree[]>> = 
+        await request.get<CategoryTree[]>('/categories/tree');
+      return response.data.data || [];
     } catch (error) {
       console.error('获取分类树失败:', error);
-      throw error;
+      return [];
     }
   },
 
@@ -167,6 +169,20 @@ const categoryService = {
     } catch (error) {
       console.error(`更新分类排序失败, ID: ${id}:`, error);
       throw error;
+    }
+  },
+
+  /**
+   * 获取所有分类列表
+   */
+  getAllCategories: async (): Promise<Category[]> => {
+    try {
+      const response: AxiosResponse<ApiResponse<Category[]>> = 
+        await request.get<Category[]>('/categories');
+      return response.data.data || [];
+    } catch (error) {
+      console.error('获取分类列表失败:', error);
+      return [];
     }
   }
 };

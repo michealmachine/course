@@ -176,6 +176,9 @@ export function TagManagement() {
         return;
       }
       
+      // 先关闭对话框，避免状态更新冲突
+      setIsDialogOpen(false);
+      
       if (editingTag) {
         // 更新标签
         await tagService.updateTag(editingTag.id, tagDTO);
@@ -186,19 +189,24 @@ export function TagManagement() {
         toast.success('标签创建成功');
       }
       
-      // 刷新列表
-      loadTags(currentPage);
-      setIsDialogOpen(false);
+      // 使用setTimeout延迟加载，避免组件状态更新冲突
+      setTimeout(() => {
+        if (document.getElementById('tag-management-container')) {
+          // 确保组件仍然挂载
+          loadTags(currentPage);
+        }
+      }, 100);
     } catch (error) {
       toast.error(editingTag ? '更新标签失败' : '创建标签失败');
       console.error(editingTag ? '更新标签失败:' : '创建标签失败:', error);
+      setIsDialogOpen(false);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="space-y-4">
+    <div id="tag-management-container" className="space-y-4">
       {/* 搜索和添加区域 */}
       <div className="flex justify-between items-center">
         <div className="flex space-x-2">

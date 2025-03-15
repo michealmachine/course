@@ -52,7 +52,8 @@ public interface SectionRepository extends JpaRepository<Section, Long> {
      * @param chapterId 章节ID
      * @return 最大排序索引
      */
-    Integer findMaxOrderIndexByChapter_Id(Long chapterId);
+    @Query("SELECT MAX(s.orderIndex) FROM Section s WHERE s.chapter.id = :chapterId")
+    Integer findMaxOrderIndexByChapter_Id(@Param("chapterId") Long chapterId);
     
     /**
      * 根据课程ID查找所有小节

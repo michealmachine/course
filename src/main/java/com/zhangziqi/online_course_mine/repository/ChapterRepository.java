@@ -3,6 +3,8 @@ package com.zhangziqi.online_course_mine.repository;
 import com.zhangziqi.online_course_mine.model.entity.Chapter;
 import com.zhangziqi.online_course_mine.model.entity.Course;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -42,5 +44,6 @@ public interface ChapterRepository extends JpaRepository<Chapter, Long> {
      * @param courseId 课程ID
      * @return 最大排序索引
      */
-    Integer findMaxOrderIndexByCourse_Id(Long courseId);
+    @Query("SELECT MAX(c.orderIndex) FROM Chapter c WHERE c.course.id = :courseId")
+    Integer findMaxOrderIndexByCourse_Id(@Param("courseId") Long courseId);
 } 
