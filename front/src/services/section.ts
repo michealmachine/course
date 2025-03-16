@@ -8,45 +8,23 @@ import {
   SectionResource,
   SectionResourceDTO,
   SectionQuestionGroup,
-  SectionQuestionGroupDTO
+  SectionQuestionGroupDTO,
+  SectionQuestionGroupConfigDTO
 } from '@/types/course';
 import { ApiResponse } from '@/types/api';
 import { AxiosResponse } from 'axios';
+import { isCacheExpired, setCache, MAX_CACHE_AGE } from '@/utils/cache';
 
-// 小节缓存
-interface SectionCache {
-  byId: Record<number, Section>;
-  byChapter: Record<number, Section[]>;
-  timestamp: Record<string, number>;
-}
-
-// 缓存过期时间（毫秒）
-const CACHE_EXPIRY = 60 * 1000; // 1分钟
-
-// 初始化缓存
-const cache: SectionCache = {
+// 缓存对象
+const cache: {
+  byId: Record<number, Section>,
+  byChapter: Record<number, Section[]>
+} = {
   byId: {},
-  byChapter: {},
-  timestamp: {}
+  byChapter: {}
 };
 
-// 检查缓存是否过期
-const isCacheExpired = (key: string): boolean => {
-  const timestamp = cache.timestamp[key];
-  if (!timestamp) return true;
-  return Date.now() - timestamp > CACHE_EXPIRY;
-};
-
-// 设置缓存
-const setCache = (key: string, data: any) => {
-  cache.timestamp[key] = Date.now();
-  return data;
-};
-
-/**
- * 小节管理服务
- */
-const sectionService = {
+export const sectionService = {
   /**
    * 创建小节
    */
@@ -69,7 +47,7 @@ const sectionService = {
   },
 
   /**
-   * 根据ID获取小节详情
+   * 获取小节详情
    */
   getSectionById: async (id: number): Promise<Section> => {
     try {
@@ -214,9 +192,90 @@ const sectionService = {
       throw error;
     }
   },
+  
+  /**
+   * 设置小节媒体资源（直接关联）
+   */
+  setMediaResource: async (sectionId: number, mediaId: number, resourceType: string): Promise<Section> => {
+    try {
+      const response: AxiosResponse<ApiResponse<Section>> = 
+        await request.put<Section>(`/sections/${sectionId}/media/${mediaId}?resourceType=${resourceType}`);
+      const updatedSection = response.data.data;
+      
+      // 更新缓存
+      cache.byId[sectionId] = updatedSection;
+      
+      return updatedSection;
+    } catch (error) {
+      console.error(`设置小节媒体资源失败, sectionId: ${sectionId}, mediaId: ${mediaId}:`, error);
+      throw error;
+    }
+  },
+  
+  /**
+   * 移除小节媒体资源（直接关联）
+   */
+  removeMediaResource: async (sectionId: number): Promise<Section> => {
+    try {
+      const response: AxiosResponse<ApiResponse<Section>> = 
+        await request.delete<Section>(`/sections/${sectionId}/media`);
+      const updatedSection = response.data.data;
+      
+      // 更新缓存
+      cache.byId[sectionId] = updatedSection;
+      
+      return updatedSection;
+    } catch (error) {
+      console.error(`移除小节媒体资源失败, sectionId: ${sectionId}:`, error);
+      throw error;
+    }
+  },
+  
+  /**
+   * 设置小节题目组（直接关联）
+   */
+  setQuestionGroup: async (
+    sectionId: number, 
+    questionGroupId: number, 
+    config?: SectionQuestionGroupConfigDTO
+  ): Promise<Section> => {
+    try {
+      const response: AxiosResponse<ApiResponse<Section>> = 
+        await request.put<Section>(`/sections/${sectionId}/question-group/${questionGroupId}`, config || {});
+      const updatedSection = response.data.data;
+      
+      // 更新缓存
+      cache.byId[sectionId] = updatedSection;
+      
+      return updatedSection;
+    } catch (error) {
+      console.error(`设置小节题目组失败, sectionId: ${sectionId}, questionGroupId: ${questionGroupId}:`, error);
+      throw error;
+    }
+  },
+  
+  /**
+   * 移除小节题目组（直接关联）
+   */
+  removeQuestionGroup: async (sectionId: number): Promise<Section> => {
+    try {
+      const response: AxiosResponse<ApiResponse<Section>> = 
+        await request.delete<Section>(`/sections/${sectionId}/question-group`);
+      const updatedSection = response.data.data;
+      
+      // 更新缓存
+      cache.byId[sectionId] = updatedSection;
+      
+      return updatedSection;
+    } catch (error) {
+      console.error(`移除小节题目组失败, sectionId: ${sectionId}:`, error);
+      throw error;
+    }
+  },
 
   /**
    * 添加小节资源
+   * @deprecated 使用 setMediaResource 替代
    */
   addSectionResource: async (resource: SectionResourceDTO): Promise<SectionResource> => {
     try {
@@ -235,6 +294,7 @@ const sectionService = {
 
   /**
    * 获取小节资源列表
+   * @deprecated 资源现在直接存储在小节对象中
    */
   getSectionResources: async (sectionId: number): Promise<SectionResource[]> => {
     try {
@@ -248,40 +308,21 @@ const sectionService = {
   },
 
   /**
-   * 更新小节资源
-   */
-  updateSectionResource: async (sectionId: number, resourceId: number, resource: SectionResourceDTO): Promise<SectionResource> => {
-    try {
-      const response: AxiosResponse<ApiResponse<SectionResource>> = 
-        await request.put<SectionResource>(`/sections/${sectionId}/resources/${resourceId}`, resource);
-      
-      // 清除相关小节缓存
-      delete cache.byId[sectionId];
-      
-      return response.data.data;
-    } catch (error) {
-      console.error(`更新小节资源失败, sectionId: ${sectionId}, resourceId: ${resourceId}:`, error);
-      throw error;
-    }
-  },
-
-  /**
    * 删除小节资源
+   * @deprecated 使用 removeMediaResource 替代
    */
-  deleteSectionResource: async (sectionId: number, resourceId: number): Promise<void> => {
+  deleteSectionResource: async (resourceId: number): Promise<void> => {
     try {
-      await request.delete(`/sections/${sectionId}/resources/${resourceId}`);
-      
-      // 清除相关小节缓存
-      delete cache.byId[sectionId];
+      await request.delete(`/sections/resources/${resourceId}`);
     } catch (error) {
-      console.error(`删除小节资源失败, sectionId: ${sectionId}, resourceId: ${resourceId}:`, error);
+      console.error(`删除小节资源失败, resourceId: ${resourceId}:`, error);
       throw error;
     }
   },
 
   /**
    * 添加小节题目组
+   * @deprecated 使用 setQuestionGroup 替代
    */
   addSectionQuestionGroup: async (questionGroup: SectionQuestionGroupDTO): Promise<SectionQuestionGroup> => {
     try {
@@ -300,6 +341,7 @@ const sectionService = {
 
   /**
    * 获取小节题目组列表
+   * @deprecated 题目组现在直接存储在小节对象中
    */
   getSectionQuestionGroups: async (sectionId: number): Promise<SectionQuestionGroup[]> => {
     try {
@@ -314,6 +356,7 @@ const sectionService = {
 
   /**
    * 更新小节题目组
+   * @deprecated 使用 setQuestionGroup 替代
    */
   updateSectionQuestionGroup: async (
     sectionId: number, 
@@ -322,10 +365,7 @@ const sectionService = {
   ): Promise<SectionQuestionGroup> => {
     try {
       const response: AxiosResponse<ApiResponse<SectionQuestionGroup>> = 
-        await request.put<SectionQuestionGroup>(
-          `/sections/${sectionId}/question-groups/${questionGroupId}`, 
-          questionGroup
-        );
+        await request.put<SectionQuestionGroup>(`/sections/${sectionId}/question-groups/${questionGroupId}`, questionGroup);
       
       // 清除相关小节缓存
       delete cache.byId[sectionId];
@@ -339,6 +379,7 @@ const sectionService = {
 
   /**
    * 删除小节题目组
+   * @deprecated 使用 removeQuestionGroup 替代
    */
   deleteSectionQuestionGroup: async (sectionId: number, questionGroupId: number): Promise<void> => {
     try {
@@ -350,15 +391,6 @@ const sectionService = {
       console.error(`删除小节题目组失败, sectionId: ${sectionId}, questionGroupId: ${questionGroupId}:`, error);
       throw error;
     }
-  },
-  
-  /**
-   * 清除缓存
-   */
-  clearCache: () => {
-    cache.byId = {};
-    cache.byChapter = {};
-    cache.timestamp = {};
   }
 };
 

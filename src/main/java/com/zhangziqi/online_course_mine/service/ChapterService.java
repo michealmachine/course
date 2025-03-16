@@ -1,7 +1,7 @@
 package com.zhangziqi.online_course_mine.service;
 
 import com.zhangziqi.online_course_mine.model.dto.chapter.*;
-import com.zhangziqi.online_course_mine.model.entity.Chapter;
+import com.zhangziqi.online_course_mine.model.vo.ChapterVO;
 
 import java.util.List;
 
@@ -16,7 +16,7 @@ public interface ChapterService {
      * @param dto 章节创建DTO
      * @return 创建的章节
      */
-    Chapter createChapter(ChapterCreateDTO dto);
+    ChapterVO createChapter(ChapterCreateDTO dto);
 
     /**
      * 更新章节
@@ -25,7 +25,7 @@ public interface ChapterService {
      * @param dto 章节更新DTO
      * @return 更新后的章节
      */
-    Chapter updateChapter(Long id, ChapterCreateDTO dto);
+    ChapterVO updateChapter(Long id, ChapterCreateDTO dto);
 
     /**
      * 获取章节详情
@@ -33,7 +33,7 @@ public interface ChapterService {
      * @param id 章节ID
      * @return 章节
      */
-    Chapter getChapterById(Long id);
+    ChapterVO getChapterById(Long id);
 
     /**
      * 获取课程下的章节列表
@@ -41,7 +41,7 @@ public interface ChapterService {
      * @param courseId 课程ID
      * @return 章节列表
      */
-    List<Chapter> getChaptersByCourse(Long courseId);
+    List<ChapterVO> getChaptersByCourse(Long courseId);
 
     /**
      * 删除章节
@@ -57,7 +57,7 @@ public interface ChapterService {
      * @param accessType 访问类型
      * @return 更新后的章节
      */
-    Chapter updateAccessType(Long id, Integer accessType);
+    ChapterVO updateAccessType(Long id, Integer accessType);
 
     /**
      * 调整章节顺序
@@ -66,5 +66,5 @@ public interface ChapterService {
      * @param chapterOrders 章节顺序列表，包含ID和顺序
      * @return 更新后的章节列表
      */
-    List<Chapter> reorderChapters(Long courseId, List<ChapterOrderDTO> chapterOrders);
+    List<ChapterVO> reorderChapters(Long courseId, List<ChapterOrderDTO> chapterOrders);
 } 

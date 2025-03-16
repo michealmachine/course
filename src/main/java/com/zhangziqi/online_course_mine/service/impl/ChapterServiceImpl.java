@@ -7,6 +7,7 @@ import com.zhangziqi.online_course_mine.model.dto.chapter.ChapterOrderDTO;
 import com.zhangziqi.online_course_mine.model.entity.Chapter;
 import com.zhangziqi.online_course_mine.model.entity.Course;
 import com.zhangziqi.online_course_mine.model.enums.ChapterAccessType;
+import com.zhangziqi.online_course_mine.model.vo.ChapterVO;
 import com.zhangziqi.online_course_mine.repository.ChapterRepository;
 import com.zhangziqi.online_course_mine.repository.CourseRepository;
 import com.zhangziqi.online_course_mine.service.ChapterService;
@@ -34,7 +35,7 @@ public class ChapterServiceImpl implements ChapterService {
 
     @Override
     @Transactional
-    public Chapter createChapter(ChapterCreateDTO dto) {
+    public ChapterVO createChapter(ChapterCreateDTO dto) {
         // 验证课程是否存在
         Course course = courseRepository.findById(dto.getCourseId())
                 .orElseThrow(() -> new ResourceNotFoundException("课程不存在，ID: " + dto.getCourseId()));
@@ -66,14 +67,15 @@ public class ChapterServiceImpl implements ChapterService {
         // 更新课程的章节总数和总时长
         updateCourseTotalLessonsAndDuration(course);
         
-        return savedChapter;
+        // 转换为VO并返回
+        return ChapterVO.fromEntity(savedChapter);
     }
 
     @Override
     @Transactional
-    public Chapter updateChapter(Long id, ChapterCreateDTO dto) {
+    public ChapterVO updateChapter(Long id, ChapterCreateDTO dto) {
         // 获取章节
-        Chapter chapter = getChapterById(id);
+        Chapter chapter = findChapterById(id);
         
         // 验证课程是否存在，且课程ID是否一致
         if (!chapter.getCourse().getId().equals(dto.getCourseId())) {
@@ -102,31 +104,45 @@ public class ChapterServiceImpl implements ChapterService {
         // 更新课程的总时长
         updateCourseTotalLessonsAndDuration(chapter.getCourse());
         
-        return updatedChapter;
+        // 转换为VO并返回
+        return ChapterVO.fromEntity(updatedChapter);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Chapter getChapterById(Long id) {
+    public ChapterVO getChapterById(Long id) {
+        Chapter chapter = findChapterById(id);
+        return ChapterVO.fromEntityWithSections(chapter);
+    }
+    
+    /**
+     * 查找章节实体（内部使用）
+     */
+    private Chapter findChapterById(Long id) {
         return chapterRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("章节不存在，ID: " + id));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<Chapter> getChaptersByCourse(Long courseId) {
+    public List<ChapterVO> getChaptersByCourse(Long courseId) {
         // 验证课程是否存在
         courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("课程不存在，ID: " + courseId));
         
-        return chapterRepository.findByCourse_IdOrderByOrderIndexAsc(courseId);
+        List<Chapter> chapters = chapterRepository.findByCourse_IdOrderByOrderIndexAsc(courseId);
+        
+        // 转换为VO并返回
+        return chapters.stream()
+                .map(ChapterVO::fromEntityWithSections)
+                .collect(Collectors.toList());
     }
 
     @Override
     @Transactional
     public void deleteChapter(Long id) {
         // 获取章节
-        Chapter chapter = getChapterById(id);
+        Chapter chapter = findChapterById(id);
         Course course = chapter.getCourse();
         
         // 删除章节
@@ -138,9 +154,9 @@ public class ChapterServiceImpl implements ChapterService {
 
     @Override
     @Transactional
-    public Chapter updateAccessType(Long id, Integer accessType) {
+    public ChapterVO updateAccessType(Long id, Integer accessType) {
         // 获取章节
-        Chapter chapter = getChapterById(id);
+        Chapter chapter = findChapterById(id);
         
         // 验证访问类型
         if (accessType == null) {
@@ -155,12 +171,15 @@ public class ChapterServiceImpl implements ChapterService {
         // 更新访问类型
         chapter.setAccessType(accessType);
         
-        return chapterRepository.save(chapter);
+        Chapter updatedChapter = chapterRepository.save(chapter);
+        
+        // 转换为VO并返回
+        return ChapterVO.fromEntity(updatedChapter);
     }
 
     @Override
     @Transactional
-    public List<Chapter> reorderChapters(Long courseId, List<ChapterOrderDTO> chapterOrders) {
+    public List<ChapterVO> reorderChapters(Long courseId, List<ChapterOrderDTO> chapterOrders) {
         // 验证课程是否存在
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("课程不存在，ID: " + courseId));
@@ -185,7 +204,12 @@ public class ChapterServiceImpl implements ChapterService {
         }
         
         // 获取更新后的章节列表，按orderIndex排序
-        return chapterRepository.findByCourse_IdOrderByOrderIndexAsc(courseId);
+        List<Chapter> updatedChapters = chapterRepository.findByCourse_IdOrderByOrderIndexAsc(courseId);
+        
+        // 转换为VO并返回
+        return updatedChapters.stream()
+                .map(ChapterVO::fromEntity)
+                .collect(Collectors.toList());
     }
     
     /**

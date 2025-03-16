@@ -2,7 +2,7 @@ package com.zhangziqi.online_course_mine.controller;
 
 import com.zhangziqi.online_course_mine.model.dto.chapter.ChapterCreateDTO;
 import com.zhangziqi.online_course_mine.model.dto.chapter.ChapterOrderDTO;
-import com.zhangziqi.online_course_mine.model.entity.Chapter;
+import com.zhangziqi.online_course_mine.model.vo.ChapterVO;
 import com.zhangziqi.online_course_mine.model.vo.Result;
 import com.zhangziqi.online_course_mine.security.SecurityUtil;
 import com.zhangziqi.online_course_mine.service.ChapterService;
@@ -38,13 +38,13 @@ public class ChapterController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
     @Operation(summary = "创建章节", description = "创建一个新的课程章节")
-    public Result<Chapter> createChapter(@Valid @RequestBody ChapterCreateDTO dto) {
+    public Result<ChapterVO> createChapter(@Valid @RequestBody ChapterCreateDTO dto) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
         
         log.info("创建章节, 课程ID: {}, 机构ID: {}, 章节标题: {}", 
                 dto.getCourseId(), institutionId, dto.getTitle());
         
-        Chapter chapter = chapterService.createChapter(dto);
+        ChapterVO chapter = chapterService.createChapter(dto);
         
         return Result.success(chapter);
     }
@@ -56,13 +56,13 @@ public class ChapterController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
     @Operation(summary = "获取章节详情", description = "获取指定章节的详细信息")
-    public Result<Chapter> getChapterById(
+    public Result<ChapterVO> getChapterById(
             @Parameter(description = "章节ID") @PathVariable("id") Long chapterId) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
         
         log.info("获取章节详情, 章节ID: {}, 机构ID: {}", chapterId, institutionId);
         
-        Chapter chapter = chapterService.getChapterById(chapterId);
+        ChapterVO chapter = chapterService.getChapterById(chapterId);
         
         return Result.success(chapter);
     }
@@ -74,7 +74,7 @@ public class ChapterController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
     @Operation(summary = "更新章节", description = "更新指定章节的信息")
-    public Result<Chapter> updateChapter(
+    public Result<ChapterVO> updateChapter(
             @Parameter(description = "章节ID") @PathVariable("id") Long chapterId,
             @Valid @RequestBody ChapterCreateDTO dto) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
@@ -82,7 +82,7 @@ public class ChapterController {
         log.info("更新章节, 章节ID: {}, 机构ID: {}, 章节标题: {}", 
                 chapterId, institutionId, dto.getTitle());
         
-        Chapter chapter = chapterService.updateChapter(chapterId, dto);
+        ChapterVO chapter = chapterService.updateChapter(chapterId, dto);
         
         return Result.success(chapter);
     }
@@ -112,13 +112,13 @@ public class ChapterController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
     @Operation(summary = "获取课程章节列表", description = "获取指定课程的所有章节")
-    public Result<List<Chapter>> getChaptersByCourse(
+    public Result<List<ChapterVO>> getChaptersByCourse(
             @Parameter(description = "课程ID") @PathVariable("courseId") Long courseId) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
         
         log.info("获取课程章节列表, 课程ID: {}, 机构ID: {}", courseId, institutionId);
         
-        List<Chapter> chapters = chapterService.getChaptersByCourse(courseId);
+        List<ChapterVO> chapters = chapterService.getChaptersByCourse(courseId);
         
         return Result.success(chapters);
     }
@@ -130,7 +130,7 @@ public class ChapterController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
     @Operation(summary = "更新章节访问类型", description = "更新指定章节的访问类型")
-    public Result<Chapter> updateAccessType(
+    public Result<ChapterVO> updateAccessType(
             @Parameter(description = "章节ID") @PathVariable("id") Long chapterId,
             @Parameter(description = "访问类型") @RequestParam Integer accessType) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
@@ -138,7 +138,7 @@ public class ChapterController {
         log.info("更新章节访问类型, 章节ID: {}, 机构ID: {}, 访问类型: {}", 
                 chapterId, institutionId, accessType);
         
-        Chapter chapter = chapterService.updateAccessType(chapterId, accessType);
+        ChapterVO chapter = chapterService.updateAccessType(chapterId, accessType);
         
         return Result.success(chapter);
     }
@@ -150,7 +150,7 @@ public class ChapterController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
     @Operation(summary = "调整章节顺序", description = "调整课程中章节的顺序")
-    public Result<List<Chapter>> reorderChapters(
+    public Result<List<ChapterVO>> reorderChapters(
             @Parameter(description = "课程ID") @PathVariable("courseId") Long courseId,
             @Valid @RequestBody List<ChapterOrderDTO> chapterOrders) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
@@ -158,7 +158,7 @@ public class ChapterController {
         log.info("调整章节顺序, 课程ID: {}, 机构ID: {}, 章节数量: {}", 
                 courseId, institutionId, chapterOrders.size());
         
-        List<Chapter> chapters = chapterService.reorderChapters(courseId, chapterOrders);
+        List<ChapterVO> chapters = chapterService.reorderChapters(courseId, chapterOrders);
         
         return Result.success(chapters);
     }

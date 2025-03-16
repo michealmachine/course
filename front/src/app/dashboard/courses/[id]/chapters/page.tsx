@@ -58,30 +58,31 @@ export default function CourseChaptersPage() {
   }, [debouncedCourseId]);
   
   // 加载章节列表
+  const loadChapters = async () => {
+    try {
+      setIsLoadingChapters(true);
+      const data = await chapterService.getChaptersByCourse(courseId);
+      setChapters(data);
+    } catch (err: any) {
+      toast.error('获取章节列表失败', {
+        description: err.message || '请稍后重试'
+      });
+      console.error('获取章节列表失败:', err);
+    } finally {
+      setIsLoadingChapters(false);
+    }
+  };
+  
+  // 加载章节列表
   useEffect(() => {
-    const fetchChapters = async () => {
-      if (!debouncedCourseId) return;
-      
-      try {
-        setIsLoadingChapters(true);
-        const data = await chapterService.getChaptersByCourse(debouncedCourseId);
-        setChapters(data);
-      } catch (err: any) {
-        toast.error('获取章节列表失败', {
-          description: err.message || '请稍后重试'
-        });
-        console.error('获取章节列表失败:', err);
-      } finally {
-        setIsLoadingChapters(false);
-      }
-    };
-    
-    fetchChapters();
+    if (debouncedCourseId) {
+      loadChapters();
+    }
   }, [debouncedCourseId]);
   
   // 处理添加新章节
   const handleAddChapter = () => {
-    router.push(`/dashboard/courses/${courseId}/chapters/create`);
+    // 不再需要处理弹窗，由ChapterList组件自己管理
   };
   
   // 章节点击处理
@@ -93,6 +94,12 @@ export default function CourseChaptersPage() {
   // 返回课程详情
   const handleBackToCourse = () => {
     router.push(`/dashboard/courses/${courseId}`);
+  };
+  
+  // 处理章节创建后刷新列表
+  const handleChapterUpdated = () => {
+    // 重新加载章节列表数据
+    loadChapters();
   };
   
   if (isLoadingCourse || isLoadingChapters) {
@@ -185,37 +192,15 @@ export default function CourseChaptersPage() {
             管理 {course?.title} 的章节和小节
           </p>
         </div>
-        <Button onClick={handleAddChapter}>
-          <Plus className="mr-2 h-4 w-4" />
-          添加章节
-        </Button>
       </div>
       
-      {/* 章节列表 */}
-      <div className="space-y-4">
-        {chapters.length === 0 ? (
-          <div className="text-center py-12 bg-muted/20 rounded-lg">
-            <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">暂无章节</h3>
-            <p className="text-muted-foreground mb-4">点击"添加章节"按钮开始创建课程内容</p>
-            <Button onClick={handleAddChapter}>
-              <Plus className="mr-2 h-4 w-4" />
-              添加章节
-            </Button>
-          </div>
-        ) : (
-          <div>
-            {chapters.map((chapter) => (
-              <ChapterSections 
-                key={chapter.id}
-                chapter={chapter}
-                courseId={courseId}
-                onChapterClick={handleChapterClick}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+      {/* 使用ChapterList组件显示和管理章节 */}
+      <ChapterList 
+        courseId={courseId}
+        onChapterClick={handleChapterClick}
+        onChapterCreated={handleChapterUpdated}
+        onChapterUpdated={handleChapterUpdated}
+      />
     </div>
   );
 } 

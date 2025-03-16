@@ -10,7 +10,10 @@ import jakarta.validation.constraints.Min;
 
 /**
  * 小节题目组关联数据传输对象
+ * 
+ * @deprecated 此类已弃用，推荐使用 {@link com.zhangziqi.online_course_mine.service.SectionService#setQuestionGroup(Long, Long, SectionQuestionGroupConfigDTO)} 方法
  */
+@Deprecated
 @Data
 @Builder
 @NoArgsConstructor

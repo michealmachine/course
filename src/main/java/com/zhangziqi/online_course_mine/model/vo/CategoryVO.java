@@ -1,13 +1,20 @@
 package com.zhangziqi.online_course_mine.model.vo;
 
+import com.zhangziqi.online_course_mine.model.entity.Category;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
 /**
- * 分类展示对象
+ * 分类值对象
  */
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class CategoryVO {
 
     /**
@@ -19,11 +26,6 @@ public class CategoryVO {
      * 分类名称
      */
     private String name;
-
-    /**
-     * 分类编码
-     */
-    private String code;
 
     /**
      * 分类描述
@@ -46,29 +48,24 @@ public class CategoryVO {
     private Integer level;
 
     /**
+     * 分类图标
+     */
+    private String iconUrl;
+
+    /**
      * 排序索引
      */
     private Integer orderIndex;
 
     /**
-     * 是否启用
-     */
-    private Boolean enabled;
-
-    /**
-     * 分类图标
-     */
-    private String icon;
-
-    /**
      * 课程数量
      */
-    private Long courseCount;
+    private Integer courseCount;
 
     /**
      * 子分类数量
      */
-    private Long childrenCount;
+    private Integer childrenCount;
 
     /**
      * 创建时间
@@ -79,4 +76,32 @@ public class CategoryVO {
      * 更新时间
      */
     private LocalDateTime updatedAt;
+
+    /**
+     * 从实体转换为VO
+     */
+    public static CategoryVO fromEntity(Category category) {
+        if (category == null) {
+            return null;
+        }
+        
+        CategoryVO.CategoryVOBuilder builder = CategoryVO.builder()
+                .id(category.getId())
+                .name(category.getName())
+                .description(category.getDescription())
+                .level(category.getLevel())
+                .iconUrl(category.getIcon())
+                .orderIndex(category.getOrderIndex())
+                .courseCount(category.getCourses() != null ? category.getCourses().size() : 0)
+                .createdAt(category.getCreatedAt())
+                .updatedAt(category.getUpdatedAt());
+        
+        // 设置父分类信息
+        if (category.getParent() != null) {
+            builder.parentId(category.getParent().getId());
+            builder.parentName(category.getParent().getName());
+        }
+        
+        return builder.build();
+    }
 } 

@@ -43,7 +43,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, Upload } from 'lucide-react';
 
 // 表单验证模式
 const formSchema = z.object({
@@ -101,7 +101,7 @@ export default function CourseForm({ course, onSuccess }: CourseFormProps) {
     defaultValues: course ? {
       title: course.title,
       description: course.description || '',
-      categoryId: course.categoryId,
+      categoryId: course.category?.id,
       tagIds: course.tags?.map(tag => tag.id) || [],
       paymentType: course.paymentType,
       price: course.price || 0,
@@ -225,31 +225,86 @@ export default function CourseForm({ course, onSuccess }: CourseFormProps) {
   useEffect(() => {
     if (course) {
       // 如果是编辑模式，加载分类详情
-      if (course.categoryId) {
+      if (course.category && course.category.id) {
         const loadCategory = async () => {
           try {
-            const categoryDetail = await categoryService.getCategoryById(course.categoryId as number);
+            setIsLoadingCategories(true);
+            const categoryDetail = await categoryService.getCategoryById(course.category!.id);
             if (categoryDetail && !categories.some(c => c.id === categoryDetail.id)) {
               setCategories(prev => [categoryDetail, ...prev]);
             }
           } catch (err) {
             console.error('加载分类详情失败:', err);
+          } finally {
+            setIsLoadingCategories(false);
           }
         };
         loadCategory();
       }
       
-      // 加载课程标签详情
+      // 如果有tags数组，则确保添加到标签列表中
       if (course.tags && course.tags.length > 0) {
-        // 如果course.tags是完整对象数组，直接使用
-        setTags(prev => {
-          const existingIds = new Set(prev.map(t => t.id));
-          const newTags = course.tags?.filter(tag => !existingIds.has(tag.id)) || [];
-          return [...newTags, ...prev];
-        });
+        const validTags = course.tags.filter(tag => tag && tag.id && tag.name);
+        if (validTags.length > 0) {
+          setTags(prev => {
+            const existingIds = new Set(prev.map(t => t.id));
+            // 过滤出prev中不存在的标签
+            const newTags = validTags.filter(tag => !existingIds.has(tag.id));
+            return [...newTags, ...prev];
+          });
+          
+          // 确保表单的tagIds值是正确的
+          const tagIds = validTags.map(tag => tag.id);
+          form.setValue('tagIds', tagIds);
+        }
       }
     }
-  }, [course, categories]);
+  }, [course, categories, form]);
+
+  // 添加封面上传预览功能
+  const [previewImage, setPreviewImage] = useState<string | null>(course?.coverUrl || null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+
+  // 处理封面文件选择
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setCoverFile(file);
+      
+      // 创建预览URL
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setPreviewImage(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // 上传封面图片
+  const handleCoverUpload = async () => {
+    if (!coverFile || !course) return;
+    
+    try {
+      setIsSubmitting(true);
+      const updatedCourse = await courseService.updateCourseCover(course.id, coverFile);
+      // 更新预览图片
+      setPreviewImage(updatedCourse.coverUrl || null);
+      // 通知上层组件
+      if (onSuccess) {
+        onSuccess(updatedCourse);
+      }
+      setCoverFile(null);
+      
+      // 重置文件输入
+      const fileInput = document.getElementById('cover-upload') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+      
+    } catch (err: any) {
+      setError(err.message || '上传封面失败');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // 提交表单
   const onSubmit = async (data: CourseCreateDTO) => {
@@ -675,6 +730,60 @@ export default function CourseForm({ course, onSuccess }: CourseFormProps) {
                 />
               </div>
             </div>
+            
+            {/* 封面上传区域 - 新增 */}
+            {course && (
+              <div className="space-y-6">
+                <h3 className="text-lg font-medium border-b pb-2">课程封面</h3>
+                
+                <div className="flex justify-center mb-6">
+                  {previewImage ? (
+                    <div className="relative w-full max-w-md h-64 rounded-md overflow-hidden">
+                      <img
+                        src={previewImage}
+                        alt="课程封面预览"
+                        className="object-cover w-full h-full"
+                      />
+                    </div>
+                  ) : (
+                    <div className="border border-dashed border-gray-300 rounded-md p-12 text-center w-full max-w-md">
+                      <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                      <p className="mt-2 text-sm text-gray-500">尚未上传封面图片</p>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-4">
+                    <input
+                      id="cover-upload"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleCoverChange}
+                      className="block w-full text-sm text-gray-500
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-md file:border-0
+                        file:text-sm file:font-semibold
+                        file:bg-gray-50 file:text-gray-700
+                        hover:file:bg-gray-100"
+                    />
+                    <Button 
+                      type="button"
+                      onClick={handleCoverUpload} 
+                      disabled={!coverFile || isSubmitting}
+                    >
+                      {isSubmitting ? '上传中...' : '上传封面'}
+                    </Button>
+                  </div>
+                  
+                  {coverFile && (
+                    <p className="text-sm text-green-600">
+                      已选择文件: {coverFile.name}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
             
             <div className="flex justify-end space-x-4 pt-4 border-t">
               <Button 

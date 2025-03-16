@@ -1,7 +1,5 @@
 package com.zhangziqi.online_course_mine.model.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.zhangziqi.online_course_mine.model.enums.ChapterAccessType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -15,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 课程章节实体类
+ * 章节实体类
  */
 @Data
 @Entity
@@ -24,7 +22,6 @@ import java.util.List;
 @AllArgsConstructor
 @Table(name = "chapters")
 @EqualsAndHashCode(callSuper = true)
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Chapter extends BaseEntity {
 
     /**
@@ -65,7 +62,6 @@ public class Chapter extends BaseEntity {
     /**
      * 章节小节
      */
-    @JsonIgnore
     @OneToMany(mappedBy = "chapter", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("orderIndex ASC")
     @Builder.Default

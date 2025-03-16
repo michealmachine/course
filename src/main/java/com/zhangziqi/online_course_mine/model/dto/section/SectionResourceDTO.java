@@ -9,8 +9,11 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Min;
 
 /**
- * 小节资源关联数据传输对象
+ * 小节资源数据传输对象
+ * 
+ * @deprecated 此类已弃用，推荐使用 {@link com.zhangziqi.online_course_mine.service.SectionService#setMediaResource(Long, Long, String)} 方法
  */
+@Deprecated
 @Data
 @Builder
 @NoArgsConstructor

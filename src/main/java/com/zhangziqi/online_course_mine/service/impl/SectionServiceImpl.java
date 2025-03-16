@@ -4,6 +4,7 @@ import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.exception.ResourceNotFoundException;
 import com.zhangziqi.online_course_mine.model.dto.section.*;
 import com.zhangziqi.online_course_mine.model.entity.*;
+import com.zhangziqi.online_course_mine.model.vo.SectionVO;
 import com.zhangziqi.online_course_mine.repository.*;
 import com.zhangziqi.online_course_mine.service.SectionService;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +35,7 @@ public class SectionServiceImpl implements SectionService {
 
     @Override
     @Transactional
-    public Section createSection(SectionCreateDTO dto) {
+    public SectionVO createSection(SectionCreateDTO dto) {
         // 验证章节是否存在
         Chapter chapter = chapterRepository.findById(dto.getChapterId())
                 .orElseThrow(() -> new ResourceNotFoundException("章节不存在，ID: " + dto.getChapterId()));
@@ -52,16 +53,20 @@ public class SectionServiceImpl implements SectionService {
                 .chapter(chapter)
                 .orderIndex(dto.getOrderIndex())
                 .contentType(dto.getContentType())
+                .resourceTypeDiscriminator("NONE") // 设置默认资源类型鉴别器
                 .build();
         
-        return sectionRepository.save(section);
+        Section savedSection = sectionRepository.save(section);
+        
+        // 转换为VO并返回
+        return SectionVO.fromEntity(savedSection);
     }
 
     @Override
     @Transactional
-    public Section updateSection(Long id, SectionCreateDTO dto) {
+    public SectionVO updateSection(Long id, SectionCreateDTO dto) {
         // 获取小节
-        Section section = getSectionById(id);
+        Section section = findSectionById(id);
         
         // 验证章节是否存在，且章节ID是否一致
         if (!section.getChapter().getId().equals(dto.getChapterId())) {
@@ -76,41 +81,62 @@ public class SectionServiceImpl implements SectionService {
         section.setOrderIndex(dto.getOrderIndex());
         section.setContentType(dto.getContentType());
         
-        return sectionRepository.save(section);
+        Section updatedSection = sectionRepository.save(section);
+        
+        // 转换为VO并返回
+        return SectionVO.fromEntity(updatedSection);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Section getSectionById(Long id) {
+    public SectionVO getSectionById(Long id) {
+        Section section = findSectionById(id);
+        return SectionVO.fromEntity(section);
+    }
+    
+    /**
+     * 查找小节实体（内部使用）
+     */
+    private Section findSectionById(Long id) {
         return sectionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("小节不存在，ID: " + id));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<Section> getSectionsByChapter(Long chapterId) {
+    public List<SectionVO> getSectionsByChapter(Long chapterId) {
         // 验证章节是否存在
         chapterRepository.findById(chapterId)
                 .orElseThrow(() -> new ResourceNotFoundException("章节不存在，ID: " + chapterId));
         
-        return sectionRepository.findByChapter_IdOrderByOrderIndexAsc(chapterId);
+        List<Section> sections = sectionRepository.findByChapter_IdOrderByOrderIndexAsc(chapterId);
+        
+        // 转换为VO并返回
+        return sections.stream()
+                .map(SectionVO::fromEntity)
+                .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<Section> getSectionsByCourse(Long courseId) {
+    public List<SectionVO> getSectionsByCourse(Long courseId) {
         // 验证课程是否存在
         courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("课程不存在，ID: " + courseId));
         
-        return sectionRepository.findByCourseIdOrderByChapterOrderIndexAndOrderIndexAsc(courseId);
+        List<Section> sections = sectionRepository.findByCourseIdOrderByChapterOrderIndexAndOrderIndexAsc(courseId);
+        
+        // 转换为VO并返回
+        return sections.stream()
+                .map(SectionVO::fromEntity)
+                .collect(Collectors.toList());
     }
 
     @Override
     @Transactional
     public void deleteSection(Long id) {
         // 获取小节
-        Section section = getSectionById(id);
+        Section section = findSectionById(id);
         
         // 删除关联的资源
         sectionResourceRepository.deleteBySection_Id(section.getId());
@@ -124,7 +150,7 @@ public class SectionServiceImpl implements SectionService {
 
     @Override
     @Transactional
-    public List<Section> reorderSections(Long chapterId, List<SectionOrderDTO> sectionOrders) {
+    public List<SectionVO> reorderSections(Long chapterId, List<SectionOrderDTO> sectionOrders) {
         // 验证章节是否存在
         Chapter chapter = chapterRepository.findById(chapterId)
                 .orElseThrow(() -> new ResourceNotFoundException("章节不存在，ID: " + chapterId));
@@ -149,188 +175,123 @@ public class SectionServiceImpl implements SectionService {
         }
         
         // 获取更新后的小节列表，按orderIndex排序
-        return sectionRepository.findByChapter_IdOrderByOrderIndexAsc(chapterId);
+        List<Section> updatedSections = sectionRepository.findByChapter_IdOrderByOrderIndexAsc(chapterId);
+        
+        // 转换为VO并返回
+        return updatedSections.stream()
+                .map(SectionVO::fromEntity)
+                .collect(Collectors.toList());
     }
 
     @Override
     @Transactional
-    public SectionResource addSectionResource(SectionResourceDTO dto) {
+    public SectionVO setMediaResource(Long sectionId, Long mediaId, String resourceType) {
         // 验证小节是否存在
-        Section section = sectionRepository.findById(dto.getSectionId())
-                .orElseThrow(() -> new ResourceNotFoundException("小节不存在，ID: " + dto.getSectionId()));
+        Section section = findSectionById(sectionId);
         
         // 验证媒体资源是否存在
-        Media media = mediaRepository.findById(dto.getMediaId())
-                .orElseThrow(() -> new ResourceNotFoundException("媒体资源不存在，ID: " + dto.getMediaId()));
+        Media media = mediaRepository.findById(mediaId)
+                .orElseThrow(() -> new ResourceNotFoundException("媒体资源不存在，ID: " + mediaId));
         
         // 验证资源类型
-        if (dto.getResourceType() == null) {
+        if (resourceType == null) {
             throw new BusinessException(400, "资源类型不能为空");
         }
         
-        // 如果没有指定排序索引，则放在最后
-        if (dto.getOrderIndex() == null) {
-            Integer maxOrderIndex = getMaxOrderIndexForSectionResource(dto.getSectionId());
-            dto.setOrderIndex(maxOrderIndex != null ? maxOrderIndex + 1 : 0);
+        // 如果当前小节已经有题目组，则先移除
+        if ("QUESTION_GROUP".equals(section.getResourceTypeDiscriminator())) {
+            section.setQuestionGroup(null);
         }
         
-        // 创建小节资源
-        SectionResource sectionResource = SectionResource.builder()
-                .section(section)
-                .media(media)
-                .resourceType(dto.getResourceType())
-                .orderIndex(dto.getOrderIndex())
-                .build();
+        // 设置媒体资源
+        section.setMedia(media);
+        section.setMediaResourceType(resourceType);
+        section.setResourceTypeDiscriminator("MEDIA");
         
-        return sectionResourceRepository.save(sectionResource);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<SectionResource> getSectionResources(Long sectionId) {
-        // 验证小节是否存在
-        sectionRepository.findById(sectionId)
-                .orElseThrow(() -> new ResourceNotFoundException("小节不存在，ID: " + sectionId));
+        Section updatedSection = sectionRepository.save(section);
         
-        // 尝试查找按顺序排序的资源
-        List<SectionResource> resources = sectionResourceRepository.findBySection_Id(sectionId);
-        
-        // 手动排序，如果repository不提供排序方法
-        resources.sort((a, b) -> Integer.compare(a.getOrderIndex(), b.getOrderIndex()));
-        
-        return resources;
+        // 转换为VO并返回
+        return SectionVO.fromEntity(updatedSection);
     }
 
     @Override
     @Transactional
-    public void deleteSectionResource(Long resourceId) {
-        // 验证小节资源是否存在
-        SectionResource resource = sectionResourceRepository.findById(resourceId)
-                .orElseThrow(() -> new ResourceNotFoundException("小节资源不存在，ID: " + resourceId));
+    public SectionVO removeMediaResource(Long sectionId) {
+        // 验证小节是否存在
+        Section section = findSectionById(sectionId);
         
-        // 删除小节资源
-        sectionResourceRepository.delete(resource);
+        // 检查小节是否有媒体资源
+        if (!"MEDIA".equals(section.getResourceTypeDiscriminator())) {
+            throw new BusinessException(400, "小节没有关联媒体资源");
+        }
+        
+        // 移除媒体资源
+        section.setMedia(null);
+        section.setMediaResourceType(null);
+        section.setResourceTypeDiscriminator("NONE");
+        
+        Section updatedSection = sectionRepository.save(section);
+        
+        // 转换为VO并返回
+        return SectionVO.fromEntity(updatedSection);
     }
 
     @Override
     @Transactional
-    public SectionQuestionGroup addSectionQuestionGroup(SectionQuestionGroupDTO dto) {
+    public SectionVO setQuestionGroup(Long sectionId, Long questionGroupId, SectionQuestionGroupConfigDTO dto) {
         // 验证小节是否存在
-        Section section = sectionRepository.findById(dto.getSectionId())
-                .orElseThrow(() -> new ResourceNotFoundException("小节不存在，ID: " + dto.getSectionId()));
+        Section section = findSectionById(sectionId);
         
         // 验证题目组是否存在
-        QuestionGroup questionGroup = questionGroupRepository.findById(dto.getQuestionGroupId())
-                .orElseThrow(() -> new ResourceNotFoundException("题目组不存在，ID: " + dto.getQuestionGroupId()));
+        QuestionGroup questionGroup = questionGroupRepository.findById(questionGroupId)
+                .orElseThrow(() -> new ResourceNotFoundException("题目组不存在，ID: " + questionGroupId));
         
-        // 如果没有指定排序索引，则放在最后
-        if (dto.getOrderIndex() == null) {
-            Integer maxOrderIndex = getMaxOrderIndexForSectionQuestionGroup(dto.getSectionId());
-            dto.setOrderIndex(maxOrderIndex != null ? maxOrderIndex + 1 : 0);
+        // 如果当前小节已经有媒体资源，则先移除
+        if ("MEDIA".equals(section.getResourceTypeDiscriminator())) {
+            section.setMedia(null);
+            section.setMediaResourceType(null);
         }
         
-        // 设置默认值
-        Boolean randomOrder = dto.getRandomOrder() != null ? dto.getRandomOrder() : false;
-        Boolean orderByDifficulty = dto.getOrderByDifficulty() != null ? dto.getOrderByDifficulty() : false;
-        Boolean showAnalysis = dto.getShowAnalysis() != null ? dto.getShowAnalysis() : true;
+        // 设置题目组和相关配置
+        section.setQuestionGroup(questionGroup);
+        section.setResourceTypeDiscriminator("QUESTION_GROUP");
         
-        // 创建小节题目组
-        SectionQuestionGroup sectionQuestionGroup = SectionQuestionGroup.builder()
-                .questionGroup(questionGroup)
-                .sectionId(section.getId()) // 显式设置sectionId
-                .orderIndex(dto.getOrderIndex())
-                .randomOrder(randomOrder)
-                .orderByDifficulty(orderByDifficulty)
-                .showAnalysis(showAnalysis)
-                .build();
+        // 设置题目组配置
+        Boolean randomOrder = dto != null && dto.getRandomOrder() != null ? dto.getRandomOrder() : false;
+        Boolean orderByDifficulty = dto != null && dto.getOrderByDifficulty() != null ? dto.getOrderByDifficulty() : false;
+        Boolean showAnalysis = dto != null && dto.getShowAnalysis() != null ? dto.getShowAnalysis() : true;
         
-        // 关联Section (需要检查是否需要在保存前设置)
-        // sectionQuestionGroup.setSection(section);  
+        section.setRandomOrder(randomOrder);
+        section.setOrderByDifficulty(orderByDifficulty);
+        section.setShowAnalysis(showAnalysis);
         
-        return sectionQuestionGroupRepository.save(sectionQuestionGroup);
+        Section updatedSection = sectionRepository.save(section);
+        
+        // 转换为VO并返回
+        return SectionVO.fromEntity(updatedSection);
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public List<SectionQuestionGroup> getSectionQuestionGroups(Long sectionId) {
+    @Transactional
+    public SectionVO removeQuestionGroup(Long sectionId) {
         // 验证小节是否存在
-        sectionRepository.findById(sectionId)
-                .orElseThrow(() -> new ResourceNotFoundException("小节不存在，ID: " + sectionId));
+        Section section = findSectionById(sectionId);
         
-        return sectionQuestionGroupRepository.findBySectionIdOrderByOrderIndexAsc(sectionId);
-    }
-
-    @Override
-    @Transactional
-    public SectionQuestionGroup updateSectionQuestionGroup(Long sectionId, Long questionGroupId, SectionQuestionGroupDTO dto) {
-        // 验证小节题目组是否存在
-        SectionQuestionGroup sectionQuestionGroup = sectionQuestionGroupRepository
-                .findBySectionIdAndQuestionGroupId(sectionId, questionGroupId)
-                .orElseThrow(() -> new ResourceNotFoundException("小节题目组不存在，小节ID: " + sectionId + "，题目组ID: " + questionGroupId));
-        
-        // 更新小节题目组
-        if (dto.getOrderIndex() != null) {
-            sectionQuestionGroup.setOrderIndex(dto.getOrderIndex());
+        // 检查小节是否有题目组
+        if (!"QUESTION_GROUP".equals(section.getResourceTypeDiscriminator())) {
+            throw new BusinessException(400, "小节没有关联题目组");
         }
         
-        if (dto.getRandomOrder() != null) {
-            sectionQuestionGroup.setRandomOrder(dto.getRandomOrder());
-        }
+        // 移除题目组
+        section.setQuestionGroup(null);
+        section.setRandomOrder(false);
+        section.setOrderByDifficulty(false);
+        section.setShowAnalysis(true);
+        section.setResourceTypeDiscriminator("NONE");
         
-        if (dto.getOrderByDifficulty() != null) {
-            sectionQuestionGroup.setOrderByDifficulty(dto.getOrderByDifficulty());
-        }
+        Section updatedSection = sectionRepository.save(section);
         
-        if (dto.getShowAnalysis() != null) {
-            sectionQuestionGroup.setShowAnalysis(dto.getShowAnalysis());
-        }
-        
-        return sectionQuestionGroupRepository.save(sectionQuestionGroup);
-    }
-
-    @Override
-    @Transactional
-    public void deleteSectionQuestionGroup(Long sectionId, Long questionGroupId) {
-        // 验证小节题目组是否存在
-        SectionQuestionGroup sectionQuestionGroup = sectionQuestionGroupRepository
-                .findBySectionIdAndQuestionGroupId(sectionId, questionGroupId)
-                .orElseThrow(() -> new ResourceNotFoundException("小节题目组不存在，小节ID: " + sectionId + "，题目组ID: " + questionGroupId));
-        
-        // 删除小节题目组
-        sectionQuestionGroupRepository.delete(sectionQuestionGroup);
-    }
-    
-    /**
-     * 获取小节资源的最大排序索引
-     * 
-     * @param sectionId 小节ID
-     * @return 最大排序索引
-     */
-    private Integer getMaxOrderIndexForSectionResource(Long sectionId) {
-        List<SectionResource> resources = sectionResourceRepository.findBySection_Id(sectionId);
-        if (resources.isEmpty()) {
-            return null;
-        }
-        return resources.stream()
-                .mapToInt(SectionResource::getOrderIndex)
-                .max()
-                .orElse(0);
-    }
-    
-    /**
-     * 获取小节题目组的最大排序索引
-     * 
-     * @param sectionId 小节ID
-     * @return 最大排序索引
-     */
-    private Integer getMaxOrderIndexForSectionQuestionGroup(Long sectionId) {
-        List<SectionQuestionGroup> questionGroups = sectionQuestionGroupRepository.findBySectionIdOrderByOrderIndexAsc(sectionId);
-        if (questionGroups.isEmpty()) {
-            return null;
-        }
-        return questionGroups.stream()
-                .mapToInt(SectionQuestionGroup::getOrderIndex)
-                .max()
-                .orElse(0);
+        // 转换为VO并返回
+        return SectionVO.fromEntity(updatedSection);
     }
 } 

@@ -1,7 +1,5 @@
 package com.zhangziqi.online_course_mine.model.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,7 +21,6 @@ import java.util.List;
 @AllArgsConstructor
 @Table(name = "categories")
 @EqualsAndHashCode(callSuper = true)
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Category extends BaseEntity {
 
     /**
@@ -52,10 +49,9 @@ public class Category extends BaseEntity {
     private Category parent;
 
     /**
-     * 子分类
+     * 子分类列表
      */
-    @JsonIgnore
-    @OneToMany(mappedBy = "parent")
+    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL)
     @Builder.Default
     private List<Category> children = new ArrayList<>();
 
@@ -84,7 +80,6 @@ public class Category extends BaseEntity {
     /**
      * 关联的课程
      */
-    @JsonIgnore
     @OneToMany(mappedBy = "category")
     @Builder.Default
     private List<Course> courses = new ArrayList<>();

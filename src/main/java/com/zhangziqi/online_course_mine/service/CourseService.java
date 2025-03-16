@@ -1,7 +1,7 @@
 package com.zhangziqi.online_course_mine.service;
 
 import com.zhangziqi.online_course_mine.model.dto.course.*;
-import com.zhangziqi.online_course_mine.model.entity.Course;
+import com.zhangziqi.online_course_mine.model.vo.CourseVO;
 import com.zhangziqi.online_course_mine.model.vo.PreviewUrlVO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,7 +21,7 @@ public interface CourseService {
      * @param institutionId 机构ID
      * @return 创建的课程
      */
-    Course createCourse(CourseCreateDTO dto, Long creatorId, Long institutionId);
+    CourseVO createCourse(CourseCreateDTO dto, Long creatorId, Long institutionId);
 
     /**
      * 更新课程
@@ -31,7 +31,7 @@ public interface CourseService {
      * @param institutionId 机构ID
      * @return 更新后的课程
      */
-    Course updateCourse(Long id, CourseCreateDTO dto, Long institutionId);
+    CourseVO updateCourse(Long id, CourseCreateDTO dto, Long institutionId);
 
     /**
      * 获取课程详情
@@ -39,7 +39,7 @@ public interface CourseService {
      * @param id 课程ID
      * @return 课程
      */
-    Course getCourseById(Long id);
+    CourseVO getCourseById(Long id);
 
     /**
      * 获取机构下的课程列表
@@ -48,7 +48,7 @@ public interface CourseService {
      * @param pageable 分页参数
      * @return 课程分页
      */
-    Page<Course> getCoursesByInstitution(Long institutionId, Pageable pageable);
+    Page<CourseVO> getCoursesByInstitution(Long institutionId, Pageable pageable);
 
     /**
      * 删除课程
@@ -65,7 +65,7 @@ public interface CourseService {
      * @return 更新后的课程
      * @throws IOException 如果文件处理出错
      */
-    Course updateCourseCover(Long id, MultipartFile file) throws IOException;
+    CourseVO updateCourseCover(Long id, MultipartFile file) throws IOException;
 
     /**
      * 提交课程审核
@@ -73,7 +73,7 @@ public interface CourseService {
      * @param id 课程ID
      * @return 更新后的课程
      */
-    Course submitForReview(Long id);
+    CourseVO submitForReview(Long id);
 
     /**
      * 开始审核课程
@@ -82,7 +82,7 @@ public interface CourseService {
      * @param reviewerId 审核人ID
      * @return 更新后的课程
      */
-    Course startReview(Long id, Long reviewerId);
+    CourseVO startReview(Long id, Long reviewerId);
 
     /**
      * 通过课程审核
@@ -92,7 +92,7 @@ public interface CourseService {
      * @param reviewerId 审核人ID
      * @return 更新后的课程
      */
-    Course approveCourse(Long id, String comment, Long reviewerId);
+    CourseVO approveCourse(Long id, String comment, Long reviewerId);
 
     /**
      * 拒绝课程审核
@@ -102,7 +102,7 @@ public interface CourseService {
      * @param reviewerId 审核人ID
      * @return 更新后的课程
      */
-    Course rejectCourse(Long id, String reason, Long reviewerId);
+    CourseVO rejectCourse(Long id, String reason, Long reviewerId);
 
     /**
      * 下线课程
@@ -110,7 +110,7 @@ public interface CourseService {
      * @param id 课程ID
      * @return 更新后的课程
      */
-    Course unpublishCourse(Long id);
+    CourseVO unpublishCourse(Long id);
 
     /**
      * 重新上线课程
@@ -118,7 +118,7 @@ public interface CourseService {
      * @param id 课程ID
      * @return 更新后的课程
      */
-    Course republishCourse(Long id);
+    CourseVO republishCourse(Long id);
 
     /**
      * 重新编辑被拒绝的课程
@@ -126,7 +126,7 @@ public interface CourseService {
      * @param id 课程ID
      * @return 更新后的课程
      */
-    Course reEditRejectedCourse(Long id);
+    CourseVO reEditRejectedCourse(Long id);
 
     /**
      * 生成课程预览URL
@@ -142,7 +142,7 @@ public interface CourseService {
      * @param token 预览token
      * @return 课程
      */
-    Course getCourseByPreviewToken(String token);
+    CourseVO getCourseByPreviewToken(String token);
 
     /**
      * 更新课程支付设置
@@ -153,6 +153,6 @@ public interface CourseService {
      * @param discountPrice 折扣价格
      * @return 更新后的课程
      */
-    Course updatePaymentSettings(Long id, Integer paymentType, 
+    CourseVO updatePaymentSettings(Long id, Integer paymentType, 
         java.math.BigDecimal price, java.math.BigDecimal discountPrice);
 } 

@@ -43,6 +43,7 @@ import {
   DialogTitle, 
   DialogTrigger 
 } from '@/components/ui/dialog';
+import CourseStatusBadge from '@/components/dashboard/courses/CourseStatusBadge';
 
 export default function CoursesPage() {
   const router = useRouter();
@@ -149,22 +150,6 @@ export default function CoursesPage() {
       setError(error.message || '删除课程失败');
     } finally {
       setLoading(false);
-    }
-  };
-  
-  // 渲染课程状态
-  const renderStatus = (status: CourseStatus) => {
-    switch (status) {
-      case CourseStatus.DRAFT:
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">草稿</span>;
-      case CourseStatus.REVIEWING:
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">审核中</span>;
-      case CourseStatus.PUBLISHED:
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">已发布</span>;
-      case CourseStatus.REJECTED:
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">已拒绝</span>;
-      default:
-        return <span>未知</span>;
     }
   };
   
@@ -297,8 +282,8 @@ export default function CoursesPage() {
               <TableRow key={course.id}>
                 <TableCell className="font-medium">{course.title}</TableCell>
                 <TableCell>{renderPaymentType(course.paymentType, course.price)}</TableCell>
-                <TableCell>{formatDate(course.createdAt)}</TableCell>
-                <TableCell>{renderStatus(course.status)}</TableCell>
+                <TableCell>{course.createdAt ? formatDate(course.createdAt) : '未知时间'}</TableCell>
+                <TableCell><CourseStatusBadge status={course.status} /></TableCell>
                 <TableCell>
                   <div className="flex space-x-2">
                     <Button

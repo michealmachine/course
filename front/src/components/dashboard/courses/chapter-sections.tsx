@@ -17,13 +17,15 @@ import {
   FileCode,
   Plus,
   Loader2,
-  BookOpen
+  BookOpen,
+  BrainCircuit
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { SectionDialog } from '@/components/dashboard/sections/section-dialog';
+import { SectionEditDrawer } from '@/components/dashboard/sections/section-edit-drawer';
+import { SectionDrawer } from '@/components/dashboard/sections/section-drawer';
 import { SectionFormValues } from '@/components/dashboard/sections/section-form';
 import { toast } from 'sonner';
 import useDebounce from '@/hooks/useDebounce';
@@ -37,6 +39,12 @@ const contentTypeIcons = {
   image: <ImageIcon className="h-4 w-4 mr-2" />,
   mixed: <File className="h-4 w-4 mr-2" />,
   default: <File className="h-4 w-4 mr-2" />
+};
+
+// 资源类型图标
+const resourceTypeIcons = {
+  QUESTION_GROUP: <BrainCircuit className="h-4 w-4 mr-2" />,
+  MEDIA: null // 使用内容类型图标
 };
 
 interface ChapterSectionsProps {
@@ -61,8 +69,8 @@ export function ChapterSections({
   const [sections, setSections] = useState<Section[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
+  const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false);
   const [selectedSection, setSelectedSection] = useState<Section | null>(null);
   
   // 章节ID防抖，避免频繁请求
@@ -107,79 +115,71 @@ export function ChapterSections({
     }
   };
 
-  // 点击小节，导航到小节详情页
+  // 点击小节，打开编辑抽屉而不是跳转到详情页
   const handleSectionClick = (section: Section) => {
-    router.push(`/dashboard/courses/${courseId}/chapters/${chapter.id}/sections/${section.id}`);
+    setSelectedSection(section);
+    setIsEditDrawerOpen(true);
   };
 
   // 点击编辑小节，打开编辑弹窗
   const handleEditSection = (e: React.MouseEvent, section: Section) => {
     e.stopPropagation(); // 阻止冒泡到小节点击
     setSelectedSection(section);
-    setIsEditDialogOpen(true);
+    setIsEditDrawerOpen(true);
   };
 
-  // 创建新小节，打开创建弹窗
+  // 创建新小节，打开抽屉
   const handleCreateSection = (e: React.MouseEvent) => {
     e.stopPropagation(); // 阻止冒泡到章节点击
-    setIsCreateDialogOpen(true);
+    setIsCreateDrawerOpen(true);
   };
 
-  // 处理小节创建提交
-  const handleCreateSubmit = async (values: SectionFormValues) => {
-    try {
-      await sectionService.createSection({
-        ...values,
-        chapterId: chapter.id
-      });
-      
-      toast.success('小节已创建', {
-        description: '小节已成功添加到课程中'
-      });
-      
-      // 重新加载小节列表
-      loadSections();
-      
-      // 通知父组件
-      if (onSectionCreated) {
-        onSectionCreated();
-      }
-    } catch (error: any) {
-      console.error('创建小节失败:', error);
-      throw error;
+  // 处理小节创建成功
+  const handleSectionCreated = () => {
+    // 重新加载小节列表
+    loadSections();
+    
+    // 通知父组件
+    if (onSectionCreated) {
+      onSectionCreated();
     }
   };
 
   // 处理小节编辑提交
-  const handleEditSubmit = async (values: SectionFormValues) => {
-    if (!selectedSection) return;
+  const handleSectionUpdated = async () => {
+    // 重新加载小节列表
+    loadSections();
     
-    try {
-      await sectionService.updateSection(selectedSection.id, {
-        ...values,
-        chapterId: chapter.id
-      });
-      
-      toast.success('小节已更新', {
-        description: '小节信息已成功保存'
-      });
-      
-      // 重新加载小节列表
-      loadSections();
-      
-      // 通知父组件
-      if (onSectionUpdated) {
-        onSectionUpdated();
-      }
-    } catch (error: any) {
-      console.error('更新小节失败:', error);
-      throw error;
+    // 通知父组件
+    if (onSectionUpdated) {
+      onSectionUpdated();
     }
   };
 
+  // 处理小节删除
+  const handleSectionDeleted = async () => {
+    // 重新加载小节列表
+    loadSections();
+    
+    // 通知父组件
+    if (onSectionUpdated) {
+      onSectionUpdated();
+    }
+    
+    toast.success('小节已删除', {
+      description: '小节列表已更新'
+    });
+  };
+
   // 渲染内容类型图标
-  const getContentTypeIcon = (contentType: string) => {
-    return contentTypeIcons[contentType as keyof typeof contentTypeIcons] || contentTypeIcons.default;
+  const getContentTypeIcon = (section: Section) => {
+    // 如果是题目组资源，使用题目组图标
+    if (section.resourceTypeDiscriminator === 'QUESTION_GROUP') {
+      return resourceTypeIcons.QUESTION_GROUP;
+    }
+    
+    // 否则根据内容类型返回对应图标
+    return contentTypeIcons[section.contentType as keyof typeof contentTypeIcons] || contentTypeIcons.default;
   };
 
   return (
@@ -204,12 +204,6 @@ export function ChapterSections({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {chapter.estimatedMinutes && (
-              <Badge variant="outline" className="text-xs">
-                <BookOpen className="h-3 w-3 mr-1" />
-                {chapter.estimatedMinutes}分钟
-              </Badge>
-            )}
             <Button 
               variant="ghost" 
               size="icon"
@@ -251,7 +245,7 @@ export function ChapterSections({
                     onClick={() => handleSectionClick(section)}
                   >
                     <div className="flex items-center">
-                      {getContentTypeIcon(section.contentType)}
+                      {getContentTypeIcon(section)}
                       <span>{section.title}</span>
                     </div>
                     <Button
@@ -270,26 +264,25 @@ export function ChapterSections({
         )}
       </Card>
       
-      {/* 创建小节弹窗 */}
-      <SectionDialog
-        open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
-        chapterId={chapter.id}
+      {/* 使用抽屉创建小节 */}
+      <SectionDrawer
+        open={isCreateDrawerOpen}
+        onOpenChange={setIsCreateDrawerOpen}
         courseId={courseId}
-        onSubmit={handleCreateSubmit}
-        mode="create"
+        chapterId={chapter.id}
+        onSuccess={handleSectionCreated}
       />
       
-      {/* 编辑小节弹窗 */}
+      {/* 编辑小节抽屉 */}
       {selectedSection && (
-        <SectionDialog
-          open={isEditDialogOpen}
-          onOpenChange={setIsEditDialogOpen}
+        <SectionEditDrawer
+          open={isEditDrawerOpen}
+          onOpenChange={setIsEditDrawerOpen}
           chapterId={chapter.id}
           courseId={courseId}
           section={selectedSection}
-          onSubmit={handleEditSubmit}
-          mode="edit"
+          onSuccess={handleSectionUpdated}
+          onDelete={handleSectionDeleted}
         />
       )}
     </>

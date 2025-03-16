@@ -45,6 +45,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from "sonner";
+import { ChapterSections } from '@/components/dashboard/courses/chapter-sections';
 
 // 定义与后端枚举匹配的章节访问类型
 const ChapterAccessTypeMap = {
@@ -77,9 +78,13 @@ interface SortableChapterItemProps {
   onEdit: (chapter: Chapter) => void;
   onDelete: (chapterId: number) => void;
   onClick: (chapter: Chapter) => void;
+  expanded?: boolean;
+  onSectionUpdated?: () => void;
 }
 
-const SortableChapterItem = ({ chapter, index, onEdit, onDelete, onClick }: SortableChapterItemProps) => {
+const SortableChapterItem = ({ chapter, index, onEdit, onDelete, onClick, expanded = false, onSectionUpdated }: SortableChapterItemProps) => {
+  const [isExpanded, setIsExpanded] = useState(expanded);
+  
   // 辅助函数：获取访问类型对应的显示文本
   const getAccessTypeDisplay = (accessType: ChapterAccessType) => {
     switch(accessType) {
@@ -93,6 +98,12 @@ const SortableChapterItem = ({ chapter, index, onEdit, onDelete, onClick }: Sort
   };
 
   const accessTypeDisplay = getAccessTypeDisplay(chapter.accessType);
+  
+  // 处理章节点击，切换展开/折叠状态
+  const handleChapterClick = () => {
+    setIsExpanded(!isExpanded);
+    onClick(chapter);
+  };
 
   return (
     <Draggable draggableId={chapter.id.toString()} index={index}>
@@ -102,65 +113,42 @@ const SortableChapterItem = ({ chapter, index, onEdit, onDelete, onClick }: Sort
           {...provided.draggableProps}
           className="mb-4"
         >
-          <Card className="bg-card">
-            <CardContent className="p-4">
-              <div className="flex items-center">
-                <div
-                  {...provided.dragHandleProps}
-                  className="flex items-center justify-center p-2 mr-2 text-muted-foreground transition hover:text-foreground cursor-grab"
-                >
-                  <GripVertical className="h-5 w-5" />
-                </div>
-                <div className="flex-grow" onClick={() => onClick(chapter)}>
-                  <div className="cursor-pointer flex items-start justify-between">
-                    <div>
-                      <div className="font-medium mb-1 text-lg">
-                        {chapter.title}
-                      </div>
-                      <div className="text-muted-foreground text-sm line-clamp-2">
-                        {chapter.description || '暂无描述'}
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant={accessTypeDisplay.variant as any}>
-                        {accessTypeDisplay.icon}
-                        {accessTypeDisplay.text}
-                      </Badge>
-                      
-                      <Badge variant="outline">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {chapter.estimatedMinutes} 分钟
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center ml-2 space-x-2">
-                  <Button 
-                    onClick={() => onClick(chapter)}
-                    size="sm" 
-                    variant="ghost"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    onClick={() => onEdit(chapter)}
-                    size="sm" 
-                    variant="ghost"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    onClick={() => onDelete(chapter.id)}
-                    size="sm" 
-                    variant="ghost"
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="relative">
+            {/* 拖拽手柄 */}
+            <div
+              {...provided.dragHandleProps}
+              className="absolute left-2 top-4 z-10 flex items-center justify-center p-2 text-muted-foreground transition hover:text-foreground cursor-grab"
+            >
+              <GripVertical className="h-5 w-5" />
+            </div>
+            
+            {/* 编辑和删除按钮 */}
+            <div className="absolute right-2 top-4 z-10 flex items-center space-x-2">
+              <Button 
+                onClick={() => onEdit(chapter)}
+                size="sm" 
+                variant="ghost"
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+              <Button 
+                onClick={() => onDelete(chapter.id)}
+                size="sm" 
+                variant="ghost"
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            <ChapterSections
+              chapter={chapter}
+              courseId={chapter.courseId}
+              expanded={isExpanded}
+              onChapterClick={handleChapterClick}
+              onSectionUpdated={onSectionUpdated}
+            />
+          </div>
         </div>
       )}
     </Draggable>
@@ -170,9 +158,20 @@ const SortableChapterItem = ({ chapter, index, onEdit, onDelete, onClick }: Sort
 interface ChapterListProps {
   courseId: number;
   onChapterClick: (chapter: Chapter) => void;
+  isDialogOpen?: boolean;
+  setIsDialogOpen?: React.Dispatch<React.SetStateAction<boolean>>;
+  onChapterCreated?: () => void;
+  onChapterUpdated?: () => void;
 }
 
-export function ChapterList({ courseId, onChapterClick }: ChapterListProps) {
+export function ChapterList({ 
+  courseId, 
+  onChapterClick, 
+  isDialogOpen: externalIsDialogOpen, 
+  setIsDialogOpen: externalSetIsDialogOpen,
+  onChapterCreated,
+  onChapterUpdated
+}: ChapterListProps) {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -190,6 +189,10 @@ export function ChapterList({ courseId, onChapterClick }: ChapterListProps) {
       estimatedMinutes: 30,
     },
   });
+  
+  // 使用外部或内部对话框状态
+  const dialogOpen = externalIsDialogOpen !== undefined ? externalIsDialogOpen : isDialogOpen;
+  const setDialogOpen = externalSetIsDialogOpen || setIsDialogOpen;
   
   const loadChapters = async () => {
     try {
@@ -219,24 +222,18 @@ export function ChapterList({ courseId, onChapterClick }: ChapterListProps) {
       estimatedMinutes: 30,
     });
     setEditingChapter(null);
-    setIsDialogOpen(true);
+    setDialogOpen(true);
   };
   
   const openEditDialog = (chapter: Chapter) => {
-    // 将ChapterAccessType映射回表单的字符串值
-    let accessTypeStr = 'FREE';
-    if (chapter.accessType === ChapterAccessType.PAID_ONLY) {
-      accessTypeStr = 'PREMIUM';
-    }
-    
     form.reset({
       title: chapter.title,
       description: chapter.description || '',
-      accessType: accessTypeStr as any,
+      accessType: chapter.accessType === 0 ? 'FREE' : 'PREMIUM',
       estimatedMinutes: chapter.estimatedMinutes || 30,
     });
     setEditingChapter(chapter);
-    setIsDialogOpen(true);
+    setDialogOpen(true);
   };
   
   const onDragEnd = async (result: any) => {
@@ -304,6 +301,14 @@ export function ChapterList({ courseId, onChapterClick }: ChapterListProps) {
         toast.success('章节已更新', {
           description: `章节 "${values.title}" 已成功更新`
         });
+        
+        // 重新加载数据
+        loadChapters();
+        
+        // 通知父组件
+        if (onChapterUpdated) {
+          onChapterUpdated();
+        }
       } else {
         // 创建新章节
         const newChapter = await chapterService.createChapter(chapterData);
@@ -313,13 +318,18 @@ export function ChapterList({ courseId, onChapterClick }: ChapterListProps) {
         toast.success('章节已创建', {
           description: `章节 "${values.title}" 已成功创建`
         });
+        
+        // 重新加载数据
+        loadChapters();
+        
+        // 通知父组件
+        if (onChapterCreated) {
+          onChapterCreated();
+        }
       }
       
-      setIsDialogOpen(false);
-      // 延迟加载以确保后端数据已更新
-      setTimeout(() => {
-        loadChapters(); // 重新加载章节列表
-      }, 500);
+      // 关闭对话框
+      setDialogOpen(false);
     } catch (err: any) {
       console.error('章节操作失败:', err);
       // 输出更详细的错误信息
@@ -363,14 +373,6 @@ export function ChapterList({ courseId, onChapterClick }: ChapterListProps) {
       toast.error('删除章节失败', {
         description: err.message || '无法删除章节'
       });
-    }
-  };
-  
-  // 点击章节进入小节页面或展开小节
-  const handleChapterClick = (chapter: Chapter) => {
-    // 不再导航到小节列表页面，而是使用展开/折叠功能
-    if (onChapterClick) {
-      onChapterClick(chapter);
     }
   };
   
@@ -443,7 +445,8 @@ export function ChapterList({ courseId, onChapterClick }: ChapterListProps) {
                         index={index}
                         onEdit={openEditDialog}
                         onDelete={handleDeleteChapter}
-                        onClick={handleChapterClick}
+                        onClick={onChapterClick}
+                        onSectionUpdated={loadChapters}
                       />
                     ))}
                     {provided.placeholder}
@@ -460,7 +463,7 @@ export function ChapterList({ courseId, onChapterClick }: ChapterListProps) {
         </CardFooter>
       </Card>
       
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[525px]">
           <DialogHeader>
             <DialogTitle>
@@ -582,7 +585,7 @@ export function ChapterList({ courseId, onChapterClick }: ChapterListProps) {
                 <Button 
                   type="button" 
                   variant="outline" 
-                  onClick={() => setIsDialogOpen(false)}
+                  onClick={() => setDialogOpen(false)}
                   disabled={isSubmitting}
                 >
                   取消

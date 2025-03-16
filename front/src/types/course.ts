@@ -20,14 +20,12 @@ export interface TagDTO {
 export interface Category {
   id: number;
   name: string;
-  code: string;
   description?: string;
   parentId?: number;
   parentName?: string;
   level?: number;
+  iconUrl?: string;
   orderIndex?: number;
-  enabled?: boolean;
-  icon?: string;
   courseCount?: number;
   childrenCount?: number;
   createdAt?: string;
@@ -88,28 +86,46 @@ export enum CourseDifficulty {
   ADVANCED = 3       // 高级
 }
 
+// 机构简要信息
+export interface InstitutionVO {
+  id: number;
+  name: string;
+  logo?: string;
+}
+
 // 课程模型
 export interface Course {
   id: number;
   title: string;
   description?: string;
-  institutionId: number;
-  categoryId?: number;
+  coverUrl?: string;
+  status: number;
+  versionType: number;
+  isPublishedVersion?: boolean;
+  creatorId?: number;
+  creatorName?: string;
+  institution?: InstitutionVO;
   category?: Category;
-  coverImageUrl?: string;
-  paymentType: CoursePaymentType;
+  tags?: Tag[];
+  paymentType: number;
   price?: number;
   discountPrice?: number;
-  difficulty?: CourseDifficulty;
+  difficulty?: number;
   targetAudience?: string;
   learningObjectives?: string;
-  status: CourseStatus;
-  createdAt: string;
-  updatedAt: string;
-  createdBy?: number;
-  reviewerId?: number;
+  totalLessons?: number;
+  totalDuration?: number;
+  totalChapters?: number;
+  totalSections?: number;
+  submittedAt?: string;
+  reviewStartedAt?: string;
+  reviewedAt?: string;
+  publishedAt?: string;
   reviewComment?: string;
-  tags?: Tag[];
+  reviewerId?: number;
+  reviewerName?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // 课程创建/更新请求参数
@@ -131,13 +147,13 @@ export interface Chapter {
   id: number;
   title: string;
   description?: string;
-  courseId: number;
   orderIndex: number;
-  accessType: ChapterAccessType;
-  estimatedMinutes?: number;
-  createdAt: string;
-  updatedAt: string;
+  accessType: number;
+  courseId: number;
+  courseName?: string;
   sections?: Section[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // 章节创建/更新请求参数
@@ -161,15 +177,47 @@ export interface Section {
   id: number;
   title: string;
   description?: string;
-  chapterId: number;
   orderIndex: number;
   contentType: string; // video, document, audio, text, image, mixed
-  accessType?: ChapterAccessType; // 访问类型
-  estimatedMinutes?: number; // 预计学习时间
-  createdAt: string;
-  updatedAt: string;
+  chapterId: number;
+  chapterTitle?: string;
+  
+  // 访问类型
+  accessType?: number;
+  
+  // 预计学习时间（分钟）
+  estimatedMinutes?: number;
+  
+  // 资源类型鉴别器：MEDIA, QUESTION_GROUP, NONE
+  resourceTypeDiscriminator?: string;
+  
+  // 直接关联的媒体资源（仅当resourceTypeDiscriminator为MEDIA时有效）
+  media?: MediaVO;
+  
+  // 媒体资源ID（仅当resourceTypeDiscriminator为MEDIA时有效）
+  mediaId?: number;
+  
+  // 媒体资源类型(primary, supplementary, homework, reference)
+  mediaResourceType?: string;
+  
+  // 直接关联的题目组（仅当resourceTypeDiscriminator为QUESTION_GROUP时有效）
+  questionGroup?: QuestionGroupVO;
+  
+  // 题目组ID（仅当resourceTypeDiscriminator为QUESTION_GROUP时有效）
+  questionGroupId?: number;
+  
+  // 题目组配置（仅当resourceTypeDiscriminator为QUESTION_GROUP时有效）
+  randomOrder?: boolean;
+  orderByDifficulty?: boolean;
+  showAnalysis?: boolean;
+  
+  // 已弃用：使用直接关联的媒体资源或题目组替代
   resources?: SectionResource[];
+  // 已弃用：使用直接关联的媒体资源或题目组替代
   questionGroups?: SectionQuestionGroup[];
+  
+  createdTime?: number;
+  updatedTime?: number;
 }
 
 // 小节创建/更新请求参数
@@ -189,16 +237,32 @@ export interface SectionOrderDTO {
   orderIndex: number;
 }
 
+// 媒体信息
+export interface MediaVO {
+  id: number;
+  title: string;
+  description?: string;
+  type?: string;
+  size?: number;
+  originalFilename?: string;
+  status?: string;
+  institutionId?: number;
+  uploaderId?: number;
+  uploadTime?: number;
+  lastAccessTime?: number;
+  accessUrl?: string;
+}
+
 // 小节资源模型
 export interface SectionResource {
   id: number;
   sectionId: number;
   mediaId: number;
+  media?: MediaVO; // 媒体信息
   resourceType: string; // primary, supplementary, homework, reference
   orderIndex: number;
-  createdAt: string;
-  updatedAt: string;
-  media?: any; // 媒体信息
+  createdTime?: number;
+  updatedTime?: number;
 }
 
 // 小节资源创建/更新请求参数
@@ -209,18 +273,31 @@ export interface SectionResourceDTO {
   orderIndex?: number;
 }
 
+// 题目组简要信息
+export interface QuestionGroupVO {
+  id: number;
+  name: string;
+  description?: string;
+  institutionId?: number;
+  questionCount?: number;
+  creatorId?: number;
+  creatorName?: string;
+  createdTime?: number;
+  updatedTime?: number;
+}
+
 // 小节题目组模型
 export interface SectionQuestionGroup {
   id: number;
   sectionId: number;
   questionGroupId: number;
+  questionGroup?: QuestionGroupVO; // 题目组信息
   orderIndex: number;
   randomOrder: boolean;
   orderByDifficulty: boolean;
   showAnalysis: boolean;
-  createdAt: string;
-  updatedAt: string;
-  questionGroup?: any; // 题目组信息
+  createdTime?: number;
+  updatedTime?: number;
 }
 
 // 小节题目组创建/更新请求参数
@@ -228,6 +305,13 @@ export interface SectionQuestionGroupDTO {
   sectionId: number;
   questionGroupId: number;
   orderIndex?: number;
+  randomOrder?: boolean;
+  orderByDifficulty?: boolean;
+  showAnalysis?: boolean;
+}
+
+// 小节题目组配置DTO
+export interface SectionQuestionGroupConfigDTO {
   randomOrder?: boolean;
   orderByDifficulty?: boolean;
   showAnalysis?: boolean;

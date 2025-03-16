@@ -1,7 +1,10 @@
 package com.zhangziqi.online_course_mine.model.vo;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
@@ -9,6 +12,9 @@ import java.time.LocalDateTime;
  * 机构VO
  */
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Schema(description = "机构信息")
 public class InstitutionVO {
 

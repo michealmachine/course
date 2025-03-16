@@ -10,6 +10,7 @@ import com.zhangziqi.online_course_mine.model.entity.Tag;
 import com.zhangziqi.online_course_mine.model.enums.CourseStatus;
 import com.zhangziqi.online_course_mine.model.enums.CourseVersion;
 import com.zhangziqi.online_course_mine.model.enums.CoursePaymentType;
+import com.zhangziqi.online_course_mine.model.vo.CourseVO;
 import com.zhangziqi.online_course_mine.model.vo.PreviewUrlVO;
 import com.zhangziqi.online_course_mine.repository.CategoryRepository;
 import com.zhangziqi.online_course_mine.repository.CourseRepository;
@@ -21,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -59,7 +61,7 @@ public class CourseServiceImpl implements CourseService {
     
     @Override
     @Transactional
-    public Course createCourse(CourseCreateDTO dto, Long creatorId, Long institutionId) {
+    public CourseVO createCourse(CourseCreateDTO dto, Long creatorId, Long institutionId) {
         // 验证机构是否存在
         Institution institution = institutionRepository.findById(institutionId)
                 .orElseThrow(() -> new ResourceNotFoundException("机构不存在，ID: " + institutionId));
@@ -120,14 +122,17 @@ public class CourseServiceImpl implements CourseService {
                 .totalDuration(0)
                 .build();
         
-        return courseRepository.save(course);
+        Course savedCourse = courseRepository.save(course);
+        
+        // 转换为VO并返回
+        return CourseVO.fromEntity(savedCourse);
     }
     
     @Override
     @Transactional
-    public Course updateCourse(Long id, CourseCreateDTO dto, Long institutionId) {
+    public CourseVO updateCourse(Long id, CourseCreateDTO dto, Long institutionId) {
         // 获取课程
-        Course course = getCourseById(id);
+        Course course = findCourseById(id);
         
         // 检查课程状态，只有草稿或已拒绝状态的课程才能更新
         if (!course.getStatusEnum().equals(CourseStatus.DRAFT) && 
@@ -147,7 +152,7 @@ public class CourseServiceImpl implements CourseService {
         }
         
         // 保存旧标签用于计数更新
-        Set<Tag> oldTags = new HashSet<>(course.getTags());
+        Set<Tag> oldTags = course.getTags() != null ? new HashSet<>(course.getTags()) : new HashSet<>();
         
         // 验证标签是否存在（如果指定了标签）
         Set<Tag> newTags;
@@ -158,17 +163,22 @@ public class CourseServiceImpl implements CourseService {
                     .collect(Collectors.toSet());
             
             // 处理标签使用计数
-            // 1. 减少不再使用的旧标签的计数
+            // 1. 减少不再使用的旧标签的计数 - 修改为使用ID比较
+            Set<Long> newTagIds = newTags.stream().map(Tag::getId).collect(Collectors.toSet());
             oldTags.forEach(oldTag -> {
-                if (!newTags.contains(oldTag)) {
+                if (oldTag != null && oldTag.getId() != null && !newTagIds.contains(oldTag.getId())) {
                     oldTag.decrementUseCount();
                     tagRepository.save(oldTag);
                 }
             });
             
-            // 2. 增加新增标签的计数
+            // 2. 增加新增标签的计数 - 修改为使用ID比较
+            Set<Long> oldTagIds = oldTags.stream()
+                    .filter(tag -> tag != null && tag.getId() != null)
+                    .map(Tag::getId)
+                    .collect(Collectors.toSet());
             newTags.forEach(newTag -> {
-                if (!oldTags.contains(newTag)) {
+                if (newTag != null && newTag.getId() != null && !oldTagIds.contains(newTag.getId())) {
                     newTag.incrementUseCount();
                     tagRepository.save(newTag);
                 }
@@ -177,8 +187,10 @@ public class CourseServiceImpl implements CourseService {
             newTags = new HashSet<>();
             // 如果新标签列表为空，减少所有旧标签的计数
             oldTags.forEach(oldTag -> {
-                oldTag.decrementUseCount();
-                tagRepository.save(oldTag);
+                if (oldTag != null) {
+                    oldTag.decrementUseCount();
+                    tagRepository.save(oldTag);
+                }
             });
         }
         
@@ -200,7 +212,7 @@ public class CourseServiceImpl implements CourseService {
         course.setDescription(dto.getDescription());
         course.setInstitution(institution);
         course.setCategory(category);
-        course.setTags(newTags);
+        course.setTags(newTags.isEmpty() ? null : newTags);
         course.setPaymentType(paymentType);
         course.setPrice(dto.getPrice());
         course.setDiscountPrice(dto.getDiscountPrice());
@@ -213,30 +225,50 @@ public class CourseServiceImpl implements CourseService {
             course.setStatusEnum(CourseStatus.DRAFT);
         }
         
-        return courseRepository.save(course);
+        Course updatedCourse = courseRepository.save(course);
+        
+        // 转换为VO并返回
+        return CourseVO.fromEntity(updatedCourse);
     }
     
     @Override
     @Transactional(readOnly = true)
-    public Course getCourseById(Long id) {
+    public CourseVO getCourseById(Long id) {
+        Course course = findCourseById(id);
+        return CourseVO.fromEntity(course);
+    }
+    
+    /**
+     * 查找课程实体（内部使用）
+     */
+    private Course findCourseById(Long id) {
         return courseRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("课程不存在，ID: " + id));
     }
     
     @Override
     @Transactional(readOnly = true)
-    public Page<Course> getCoursesByInstitution(Long institutionId, Pageable pageable) {
-        // 获取机构
+    public Page<CourseVO> getCoursesByInstitution(Long institutionId, Pageable pageable) {
+        // 验证机构是否存在
         Institution institution = institutionRepository.findById(institutionId)
                 .orElseThrow(() -> new ResourceNotFoundException("机构不存在，ID: " + institutionId));
         
-        return courseRepository.findByInstitution(institution, pageable);
+        Page<Course> coursePage = courseRepository.findByInstitution(institution, pageable);
+        
+        // 转换为VO列表
+        List<CourseVO> courseVOs = coursePage.getContent().stream()
+                .map(CourseVO::fromEntity)
+                .collect(Collectors.toList());
+        
+        // 创建新的VO分页对象
+        return new PageImpl<>(courseVOs, pageable, coursePage.getTotalElements());
     }
     
     @Override
     @Transactional
     public void deleteCourse(Long id) {
-        Course course = getCourseById(id);
+        // 获取课程
+        Course course = findCourseById(id);
         
         // 只有草稿状态的课程才能删除
         if (!course.getStatusEnum().equals(CourseStatus.DRAFT)) {
@@ -256,8 +288,9 @@ public class CourseServiceImpl implements CourseService {
     
     @Override
     @Transactional
-    public Course updateCourseCover(Long id, MultipartFile file) throws IOException {
-        Course course = getCourseById(id);
+    public CourseVO updateCourseCover(Long id, MultipartFile file) throws IOException {
+        // 获取课程
+        Course course = findCourseById(id);
         
         // 检查课程状态，只有草稿或已拒绝状态的课程才能更新封面
         if (!course.getStatusEnum().equals(CourseStatus.DRAFT) && 
@@ -308,7 +341,8 @@ public class CourseServiceImpl implements CourseService {
             }
         }
         
-        return updatedCourse;
+        // 转换为VO并返回
+        return CourseVO.fromEntity(updatedCourse);
     }
     
     /**
@@ -348,8 +382,9 @@ public class CourseServiceImpl implements CourseService {
     
     @Override
     @Transactional
-    public Course submitForReview(Long id) {
-        Course course = getCourseById(id);
+    public CourseVO submitForReview(Long id) {
+        // 获取课程
+        Course course = findCourseById(id);
         
         // 检查课程状态，只有草稿状态的课程才能提交审核
         if (!course.getStatusEnum().equals(CourseStatus.DRAFT)) {
@@ -365,13 +400,17 @@ public class CourseServiceImpl implements CourseService {
         course.setStatusEnum(CourseStatus.PENDING_REVIEW);
         course.setVersionTypeEnum(CourseVersion.REVIEW);
         
-        return courseRepository.save(course);
+        Course updatedCourse = courseRepository.save(course);
+        
+        // 转换为VO并返回
+        return CourseVO.fromEntity(updatedCourse);
     }
     
     @Override
     @Transactional
-    public Course startReview(Long id, Long reviewerId) {
-        Course course = getCourseById(id);
+    public CourseVO startReview(Long id, Long reviewerId) {
+        // 获取课程
+        Course course = findCourseById(id);
         
         // 检查课程状态，只有待审核状态的课程才能开始审核
         if (!course.getStatusEnum().equals(CourseStatus.PENDING_REVIEW)) {
@@ -382,13 +421,17 @@ public class CourseServiceImpl implements CourseService {
         course.setStatusEnum(CourseStatus.REVIEWING);
         course.setReviewerId(reviewerId);
         
-        return courseRepository.save(course);
+        Course updatedCourse = courseRepository.save(course);
+        
+        // 转换为VO并返回
+        return CourseVO.fromEntity(updatedCourse);
     }
     
     @Override
     @Transactional
-    public Course approveCourse(Long id, String comment, Long reviewerId) {
-        Course course = getCourseById(id);
+    public CourseVO approveCourse(Long id, String comment, Long reviewerId) {
+        // 获取课程
+        Course course = findCourseById(id);
         
         // 检查课程状态，只有审核中状态的课程才能审核通过
         if (!course.getStatusEnum().equals(CourseStatus.REVIEWING)) {
@@ -423,7 +466,10 @@ public class CourseServiceImpl implements CourseService {
             
             // 更新原课程的已发布版本ID
             savedCourse.setPublishedVersionId(savedPublishedVersion.getId());
-            return courseRepository.save(savedCourse);
+            Course updatedCourse = courseRepository.save(savedCourse);
+            
+            // 转换为VO并返回
+            return CourseVO.fromEntity(updatedCourse);
         } else {
             // 如果已有发布版本，更新发布版本
             Optional<Course> publishedVersionOpt = courseRepository.findById(course.getPublishedVersionId());
@@ -435,14 +481,18 @@ public class CourseServiceImpl implements CourseService {
                 courseRepository.save(publishedVersion);
             }
             
-            return courseRepository.save(course);
+            Course updatedCourse = courseRepository.save(course);
+            
+            // 转换为VO并返回
+            return CourseVO.fromEntity(updatedCourse);
         }
     }
     
     @Override
     @Transactional
-    public Course rejectCourse(Long id, String reason, Long reviewerId) {
-        Course course = getCourseById(id);
+    public CourseVO rejectCourse(Long id, String reason, Long reviewerId) {
+        // 获取课程
+        Course course = findCourseById(id);
         
         // 检查课程状态，只有审核中状态的课程才能被拒绝
         if (!course.getStatusEnum().equals(CourseStatus.REVIEWING)) {
@@ -460,13 +510,17 @@ public class CourseServiceImpl implements CourseService {
         course.setReviewedAt(LocalDateTime.now());
         course.setVersionTypeEnum(CourseVersion.DRAFT);
         
-        return courseRepository.save(course);
+        Course updatedCourse = courseRepository.save(course);
+        
+        // 转换为VO并返回
+        return CourseVO.fromEntity(updatedCourse);
     }
     
     @Override
     @Transactional
-    public Course unpublishCourse(Long id) {
-        Course course = getCourseById(id);
+    public CourseVO unpublishCourse(Long id) {
+        // 获取课程
+        Course course = findCourseById(id);
         
         // 检查课程状态，只有已发布状态的课程才能下线
         if (!course.getStatusEnum().equals(CourseStatus.PUBLISHED)) {
@@ -476,13 +530,17 @@ public class CourseServiceImpl implements CourseService {
         // 更新课程状态为已下线
         course.setStatusEnum(CourseStatus.UNPUBLISHED);
         
-        return courseRepository.save(course);
+        Course updatedCourse = courseRepository.save(course);
+        
+        // 转换为VO并返回
+        return CourseVO.fromEntity(updatedCourse);
     }
     
     @Override
     @Transactional
-    public Course republishCourse(Long id) {
-        Course course = getCourseById(id);
+    public CourseVO republishCourse(Long id) {
+        // 获取课程
+        Course course = findCourseById(id);
         
         // 检查课程状态，只有已下线状态的课程才能重新上线
         if (!course.getStatusEnum().equals(CourseStatus.UNPUBLISHED)) {
@@ -492,13 +550,17 @@ public class CourseServiceImpl implements CourseService {
         // 更新课程状态为已发布
         course.setStatusEnum(CourseStatus.PUBLISHED);
         
-        return courseRepository.save(course);
+        Course updatedCourse = courseRepository.save(course);
+        
+        // 转换为VO并返回
+        return CourseVO.fromEntity(updatedCourse);
     }
     
     @Override
     @Transactional
-    public Course reEditRejectedCourse(Long id) {
-        Course course = getCourseById(id);
+    public CourseVO reEditRejectedCourse(Long id) {
+        // 获取课程
+        Course course = findCourseById(id);
         
         // 检查课程状态，只有已拒绝状态的课程才能重新编辑
         if (!course.getStatusEnum().equals(CourseStatus.REJECTED)) {
@@ -508,12 +570,17 @@ public class CourseServiceImpl implements CourseService {
         // 更新课程状态为草稿
         course.setStatusEnum(CourseStatus.DRAFT);
         
-        return courseRepository.save(course);
+        Course updatedCourse = courseRepository.save(course);
+        
+        // 转换为VO并返回
+        return CourseVO.fromEntity(updatedCourse);
     }
     
     @Override
+    @Transactional(readOnly = true)
     public PreviewUrlVO generatePreviewUrl(Long id) {
-        Course course = getCourseById(id);
+        // 获取课程
+        Course course = findCourseById(id);
         
         // 生成随机预览token
         String previewToken = UUID.randomUUID().toString();
@@ -543,7 +610,7 @@ public class CourseServiceImpl implements CourseService {
     }
     
     @Override
-    public Course getCourseByPreviewToken(String token) {
+    public CourseVO getCourseByPreviewToken(String token) {
         // 从Redis中获取token对应的课程ID
         String courseIdStr = redisTemplate.opsForValue().get(PREVIEW_TOKEN_KEY_PREFIX + token);
         
@@ -555,7 +622,10 @@ public class CourseServiceImpl implements CourseService {
         try {
             Long courseId = Long.parseLong(courseIdStr);
             log.info("通过预览token获取课程 - token: {}, 课程ID: {}", token, courseId);
-            return getCourseById(courseId);
+            Course course = findCourseById(courseId);
+            
+            // 转换为VO并返回
+            return CourseVO.fromEntity(course);
         } catch (NumberFormatException e) {
             log.error("Redis中存储的课程ID格式错误: {}", courseIdStr, e);
             throw new BusinessException(500, "系统错误，无法获取预览课程");
@@ -564,8 +634,9 @@ public class CourseServiceImpl implements CourseService {
     
     @Override
     @Transactional
-    public Course updatePaymentSettings(Long id, Integer paymentType, BigDecimal price, BigDecimal discountPrice) {
-        Course course = getCourseById(id);
+    public CourseVO updatePaymentSettings(Long id, Integer paymentType, BigDecimal price, BigDecimal discountPrice) {
+        // 获取课程
+        Course course = findCourseById(id);
         
         // 检查课程状态，只有草稿或已拒绝状态的课程才能更新支付设置
         if (!course.getStatusEnum().equals(CourseStatus.DRAFT) && 
@@ -590,6 +661,9 @@ public class CourseServiceImpl implements CourseService {
         course.setPrice(price);
         course.setDiscountPrice(discountPrice);
         
-        return courseRepository.save(course);
+        Course updatedCourse = courseRepository.save(course);
+        
+        // 转换为VO并返回
+        return CourseVO.fromEntity(updatedCourse);
     }
 } 

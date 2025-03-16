@@ -1,12 +1,9 @@
 package com.zhangziqi.online_course_mine.controller;
 
-import com.zhangziqi.online_course_mine.model.dto.section.SectionCreateDTO;
-import com.zhangziqi.online_course_mine.model.dto.section.SectionOrderDTO;
-import com.zhangziqi.online_course_mine.model.dto.section.SectionQuestionGroupDTO;
-import com.zhangziqi.online_course_mine.model.dto.section.SectionResourceDTO;
-import com.zhangziqi.online_course_mine.model.entity.Section;
-import com.zhangziqi.online_course_mine.model.entity.SectionQuestionGroup;
-import com.zhangziqi.online_course_mine.model.entity.SectionResource;
+import com.zhangziqi.online_course_mine.model.dto.section.*;
+import com.zhangziqi.online_course_mine.model.vo.SectionQuestionGroupVO;
+import com.zhangziqi.online_course_mine.model.vo.SectionResourceVO;
+import com.zhangziqi.online_course_mine.model.vo.SectionVO;
 import com.zhangziqi.online_course_mine.model.vo.Result;
 import com.zhangziqi.online_course_mine.security.SecurityUtil;
 import com.zhangziqi.online_course_mine.service.SectionService;
@@ -42,13 +39,13 @@ public class SectionController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
     @Operation(summary = "创建小节", description = "创建一个新的小节")
-    public Result<Section> createSection(@Valid @RequestBody SectionCreateDTO dto) {
+    public Result<SectionVO> createSection(@Valid @RequestBody SectionCreateDTO dto) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
         
         log.info("创建小节, 章节ID: {}, 机构ID: {}, 小节标题: {}", 
                 dto.getChapterId(), institutionId, dto.getTitle());
         
-        Section section = sectionService.createSection(dto);
+        SectionVO section = sectionService.createSection(dto);
         
         return Result.success(section);
     }
@@ -60,13 +57,13 @@ public class SectionController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
     @Operation(summary = "获取小节详情", description = "获取指定小节的详细信息")
-    public Result<Section> getSectionById(
+    public Result<SectionVO> getSectionById(
             @Parameter(description = "小节ID") @PathVariable("id") Long sectionId) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
         
         log.info("获取小节详情, 小节ID: {}, 机构ID: {}", sectionId, institutionId);
         
-        Section section = sectionService.getSectionById(sectionId);
+        SectionVO section = sectionService.getSectionById(sectionId);
         
         return Result.success(section);
     }
@@ -78,7 +75,7 @@ public class SectionController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
     @Operation(summary = "更新小节", description = "更新指定小节的信息")
-    public Result<Section> updateSection(
+    public Result<SectionVO> updateSection(
             @Parameter(description = "小节ID") @PathVariable("id") Long sectionId,
             @Valid @RequestBody SectionCreateDTO dto) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
@@ -86,7 +83,7 @@ public class SectionController {
         log.info("更新小节, 小节ID: {}, 机构ID: {}, 小节标题: {}", 
                 sectionId, institutionId, dto.getTitle());
         
-        Section section = sectionService.updateSection(sectionId, dto);
+        SectionVO section = sectionService.updateSection(sectionId, dto);
         
         return Result.success(section);
     }
@@ -116,13 +113,13 @@ public class SectionController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
     @Operation(summary = "获取章节下的小节列表", description = "获取指定章节下的所有小节")
-    public Result<List<Section>> getSectionsByChapter(
+    public Result<List<SectionVO>> getSectionsByChapter(
             @Parameter(description = "章节ID") @PathVariable("chapterId") Long chapterId) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
         
         log.info("获取章节下的小节列表, 章节ID: {}, 机构ID: {}", chapterId, institutionId);
         
-        List<Section> sections = sectionService.getSectionsByChapter(chapterId);
+        List<SectionVO> sections = sectionService.getSectionsByChapter(chapterId);
         
         return Result.success(sections);
     }
@@ -134,13 +131,13 @@ public class SectionController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
     @Operation(summary = "获取课程下的所有小节", description = "获取指定课程下的所有小节")
-    public Result<List<Section>> getSectionsByCourse(
+    public Result<List<SectionVO>> getSectionsByCourse(
             @Parameter(description = "课程ID") @PathVariable("courseId") Long courseId) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
         
         log.info("获取课程下的所有小节, 课程ID: {}, 机构ID: {}", courseId, institutionId);
         
-        List<Section> sections = sectionService.getSectionsByCourse(courseId);
+        List<SectionVO> sections = sectionService.getSectionsByCourse(courseId);
         
         return Result.success(sections);
     }
@@ -152,7 +149,7 @@ public class SectionController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
     @Operation(summary = "调整小节顺序", description = "调整章节中小节的顺序")
-    public Result<List<Section>> reorderSections(
+    public Result<List<SectionVO>> reorderSections(
             @Parameter(description = "章节ID") @PathVariable("chapterId") Long chapterId,
             @Valid @RequestBody List<SectionOrderDTO> sectionOrders) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
@@ -160,139 +157,86 @@ public class SectionController {
         log.info("调整小节顺序, 章节ID: {}, 机构ID: {}, 小节数量: {}", 
                 chapterId, institutionId, sectionOrders.size());
         
-        List<Section> sections = sectionService.reorderSections(chapterId, sectionOrders);
+        List<SectionVO> sections = sectionService.reorderSections(chapterId, sectionOrders);
         
         return Result.success(sections);
     }
     
     /**
-     * 添加小节资源
+     * 设置小节媒体资源（直接关联）
      */
-    @PostMapping("/resources")
-    @ResponseStatus(HttpStatus.CREATED)
+    @PutMapping("/{id}/media/{mediaId}")
+    @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
-    @Operation(summary = "添加小节资源", description = "为小节添加媒体资源")
-    public Result<SectionResource> addSectionResource(@Valid @RequestBody SectionResourceDTO dto) {
+    @Operation(summary = "设置小节媒体资源", description = "为小节设置直接关联的媒体资源")
+    public Result<SectionVO> setMediaResource(
+            @Parameter(description = "小节ID") @PathVariable("id") Long sectionId,
+            @Parameter(description = "媒体资源ID") @PathVariable("mediaId") Long mediaId,
+            @Parameter(description = "资源类型") @RequestParam(required = true) String resourceType) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
         
-        log.info("添加小节资源, 小节ID: {}, 媒体ID: {}, 机构ID: {}", 
-                dto.getSectionId(), dto.getMediaId(), institutionId);
+        log.info("设置小节媒体资源, 小节ID: {}, 媒体ID: {}, 资源类型: {}, 机构ID: {}", 
+                sectionId, mediaId, resourceType, institutionId);
         
-        SectionResource resource = sectionService.addSectionResource(dto);
+        SectionVO section = sectionService.setMediaResource(sectionId, mediaId, resourceType);
         
-        return Result.success(resource);
+        return Result.success(section);
     }
     
     /**
-     * 获取小节资源列表
+     * 移除小节媒体资源（直接关联）
      */
-    @GetMapping("/{id}/resources")
+    @DeleteMapping("/{id}/media")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
-    @Operation(summary = "获取小节资源列表", description = "获取指定小节的所有资源")
-    public Result<List<SectionResource>> getSectionResources(
+    @Operation(summary = "移除小节媒体资源", description = "移除小节直接关联的媒体资源")
+    public Result<SectionVO> removeMediaResource(
             @Parameter(description = "小节ID") @PathVariable("id") Long sectionId) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
         
-        log.info("获取小节资源列表, 小节ID: {}, 机构ID: {}", sectionId, institutionId);
+        log.info("移除小节媒体资源, 小节ID: {}, 机构ID: {}", sectionId, institutionId);
         
-        List<SectionResource> resources = sectionService.getSectionResources(sectionId);
+        SectionVO section = sectionService.removeMediaResource(sectionId);
         
-        return Result.success(resources);
+        return Result.success(section);
     }
     
     /**
-     * 删除小节资源
+     * 设置小节题目组（直接关联）
      */
-    @DeleteMapping("/resources/{resourceId}")
+    @PutMapping("/{id}/question-group/{questionGroupId}")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
-    @Operation(summary = "删除小节资源", description = "删除指定的小节资源")
-    public Result<Void> deleteSectionResource(
-            @Parameter(description = "资源ID") @PathVariable("resourceId") Long resourceId) {
-        Long institutionId = SecurityUtil.getCurrentInstitutionId();
-        
-        log.info("删除小节资源, 资源ID: {}, 机构ID: {}", resourceId, institutionId);
-        
-        sectionService.deleteSectionResource(resourceId);
-        
-        return Result.success();
-    }
-    
-    /**
-     * 添加小节题目组
-     */
-    @PostMapping("/question-groups")
-    @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
-    @Operation(summary = "添加小节题目组", description = "为小节添加题目组")
-    public Result<SectionQuestionGroup> addSectionQuestionGroup(@Valid @RequestBody SectionQuestionGroupDTO dto) {
-        Long institutionId = SecurityUtil.getCurrentInstitutionId();
-        
-        log.info("添加小节题目组, 小节ID: {}, 题目组ID: {}, 机构ID: {}", 
-                dto.getSectionId(), dto.getQuestionGroupId(), institutionId);
-        
-        SectionQuestionGroup questionGroup = sectionService.addSectionQuestionGroup(dto);
-        
-        return Result.success(questionGroup);
-    }
-    
-    /**
-     * 获取小节题目组列表
-     */
-    @GetMapping("/{id}/question-groups")
-    @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
-    @Operation(summary = "获取小节题目组列表", description = "获取指定小节的所有题目组")
-    public Result<List<SectionQuestionGroup>> getSectionQuestionGroups(
-            @Parameter(description = "小节ID") @PathVariable("id") Long sectionId) {
-        Long institutionId = SecurityUtil.getCurrentInstitutionId();
-        
-        log.info("获取小节题目组列表, 小节ID: {}, 机构ID: {}", sectionId, institutionId);
-        
-        List<SectionQuestionGroup> questionGroups = sectionService.getSectionQuestionGroups(sectionId);
-        
-        return Result.success(questionGroups);
-    }
-    
-    /**
-     * 更新小节题目组
-     */
-    @PutMapping("/{sectionId}/question-groups/{questionGroupId}")
-    @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
-    @Operation(summary = "更新小节题目组", description = "更新小节的题目组设置")
-    public Result<SectionQuestionGroup> updateSectionQuestionGroup(
-            @Parameter(description = "小节ID") @PathVariable("sectionId") Long sectionId,
+    @Operation(summary = "设置小节题目组", description = "为小节设置直接关联的题目组")
+    public Result<SectionVO> setQuestionGroup(
+            @Parameter(description = "小节ID") @PathVariable("id") Long sectionId,
             @Parameter(description = "题目组ID") @PathVariable("questionGroupId") Long questionGroupId,
-            @Valid @RequestBody SectionQuestionGroupDTO dto) {
+            @Valid @RequestBody(required = false) SectionQuestionGroupConfigDTO dto) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
         
-        log.info("更新小节题目组, 小节ID: {}, 题目组ID: {}, 机构ID: {}", 
+        log.info("设置小节题目组, 小节ID: {}, 题目组ID: {}, 机构ID: {}", 
                 sectionId, questionGroupId, institutionId);
         
-        SectionQuestionGroup questionGroup = sectionService.updateSectionQuestionGroup(sectionId, questionGroupId, dto);
+        SectionVO section = sectionService.setQuestionGroup(sectionId, questionGroupId, dto);
         
-        return Result.success(questionGroup);
+        return Result.success(section);
     }
     
     /**
-     * 删除小节题目组
+     * 移除小节题目组（直接关联）
      */
-    @DeleteMapping("/{sectionId}/question-groups/{questionGroupId}")
+    @DeleteMapping("/{id}/question-group")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
-    @Operation(summary = "删除小节题目组", description = "删除小节的题目组关联")
-    public Result<Void> deleteSectionQuestionGroup(
-            @Parameter(description = "小节ID") @PathVariable("sectionId") Long sectionId,
-            @Parameter(description = "题目组ID") @PathVariable("questionGroupId") Long questionGroupId) {
+    @Operation(summary = "移除小节题目组", description = "移除小节直接关联的题目组")
+    public Result<SectionVO> removeQuestionGroup(
+            @Parameter(description = "小节ID") @PathVariable("id") Long sectionId) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
         
-        log.info("删除小节题目组, 小节ID: {}, 题目组ID: {}, 机构ID: {}", 
-                sectionId, questionGroupId, institutionId);
+        log.info("移除小节题目组, 小节ID: {}, 机构ID: {}", sectionId, institutionId);
         
-        sectionService.deleteSectionQuestionGroup(sectionId, questionGroupId);
+        SectionVO section = sectionService.removeQuestionGroup(sectionId);
         
-        return Result.success();
+        return Result.success(section);
     }
 } 

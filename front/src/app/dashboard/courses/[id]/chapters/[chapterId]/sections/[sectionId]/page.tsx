@@ -12,11 +12,13 @@ import {
   FileText,
   BookOpen,
   Grip,
-  Plus
+  Plus,
+  Save,
+  Package
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
@@ -50,11 +52,11 @@ export default function SectionDetailsPage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [chapter, setChapter] = useState<Chapter | null>(null);
   const [section, setSection] = useState<Section | null>(null);
-  const [activeTab, setActiveTab] = useState('resources');
-  const [showResourceDialog, setShowResourceDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [resourceUpdated, setResourceUpdated] = useState(false);
   
   // 加载数据
   useEffect(() => {
@@ -95,6 +97,7 @@ export default function SectionDetailsPage() {
       setError(null);
       const data = await sectionService.getSectionById(sectionId);
       setSection(data);
+      setResourceUpdated(false);
     } catch (err: any) {
       console.error('加载小节失败:', err);
       setError(err.message || '加载小节数据失败');
@@ -109,7 +112,8 @@ export default function SectionDetailsPage() {
   
   // 刷新资源列表
   const handleResourceUpdated = () => {
-    // 由于资源列表在子组件中管理，这里可以处理通知或其他操作
+    setResourceUpdated(true);
+    loadSection(); // 重新加载小节数据，包括资源信息
     toast.success('资源已更新', {
       description: '小节资源列表已更新'
     });
@@ -291,25 +295,65 @@ export default function SectionDetailsPage() {
         {/* 内容选项卡 */}
         <div className="container mx-auto">
           <Tabs 
-            defaultValue="resources" 
+            defaultValue="overview" 
             value={activeTab} 
             onValueChange={setActiveTab}
             className="w-full"
           >
             <TabsList className="mb-4">
-              <TabsTrigger value="resources" className="flex items-center">
+              <TabsTrigger value="overview" className="flex items-center">
                 <FileText className="mr-2 h-4 w-4" />
+                基本信息
+              </TabsTrigger>
+              <TabsTrigger value="resources" className="flex items-center">
+                <Package className="mr-2 h-4 w-4" />
                 资源管理
               </TabsTrigger>
-              <TabsTrigger value="content" className="flex items-center">
+              <TabsTrigger value="preview" className="flex items-center">
                 <BookOpen className="mr-2 h-4 w-4" />
                 内容预览
               </TabsTrigger>
-              <TabsTrigger value="questions" className="flex items-center">
-                <Video className="mr-2 h-4 w-4" />
-                练习题
-              </TabsTrigger>
             </TabsList>
+            
+            {/* 基本信息选项卡 */}
+            <TabsContent value="overview" className="min-h-[400px]">
+              <Card>
+                <CardHeader>
+                  <CardTitle>小节信息</CardTitle>
+                  <CardDescription>小节的基本信息和设置</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground mb-1">标题</h3>
+                      <p className="text-base">{section.title}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground mb-1">内容类型</h3>
+                      <p className="text-base">{section.contentType || '未指定'}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground mb-1">访问权限</h3>
+                      <p className="text-base">{section.accessType === 0 ? '免费试看' : '付费访问'}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground mb-1">预计学习时间</h3>
+                      <p className="text-base">{section.estimatedMinutes ? `${section.estimatedMinutes} 分钟` : '未设置'}</p>
+                    </div>
+                    <div className="md:col-span-2">
+                      <h3 className="text-sm font-medium text-muted-foreground mb-1">描述</h3>
+                      <p className="text-base">{section.description || '无描述'}</p>
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button variant="outline" onClick={handleEdit}>
+                    <PencilIcon className="mr-2 h-4 w-4" />
+                    编辑信息
+                  </Button>
+                </CardFooter>
+              </Card>
+            </TabsContent>
             
             {/* 资源管理选项卡 */}
             <TabsContent value="resources" className="min-h-[400px]">
@@ -317,13 +361,13 @@ export default function SectionDetailsPage() {
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
                     <CardTitle>小节资源</CardTitle>
-                    <CardDescription>管理小节的媒体资源</CardDescription>
+                    <CardDescription>管理小节的媒体资源和题目组</CardDescription>
                   </div>
                   <AddResourceDialog 
-                    sectionId={sectionId} 
+                    sectionId={sectionId}
                     onResourceAdded={handleResourceUpdated}
                     trigger={
-                      <Button>
+                      <Button id="add-resource-button">
                         <Plus className="mr-2 h-4 w-4" />
                         添加资源
                       </Button>
@@ -331,13 +375,19 @@ export default function SectionDetailsPage() {
                   />
                 </CardHeader>
                 <CardContent>
-                  <SectionResourceList sectionId={sectionId} />
+                  <SectionResourceList 
+                    sectionId={sectionId} 
+                    onAddResource={() => {
+                      document.getElementById('add-resource-button')?.click();
+                    }} 
+                    key={resourceUpdated ? 'updated' : 'initial'}
+                  />
                 </CardContent>
               </Card>
             </TabsContent>
             
             {/* 内容预览选项卡 */}
-            <TabsContent value="content" className="min-h-[400px]">
+            <TabsContent value="preview" className="min-h-[400px]">
               <Card>
                 <CardHeader>
                   <CardTitle>内容预览</CardTitle>
@@ -346,27 +396,6 @@ export default function SectionDetailsPage() {
                 <CardContent>
                   <div className="text-center p-8 border rounded-md">
                     <p className="text-muted-foreground">内容预览功能开发中...</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            {/* 练习题选项卡 */}
-            <TabsContent value="questions" className="min-h-[400px]">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle>练习题</CardTitle>
-                    <CardDescription>管理小节的练习题</CardDescription>
-                  </div>
-                  <Button disabled>
-                    <Plus className="mr-2 h-4 w-4" />
-                    添加题组
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center p-8 border rounded-md">
-                    <p className="text-muted-foreground">题组管理功能开发中...</p>
                   </div>
                 </CardContent>
               </Card>
@@ -387,18 +416,6 @@ export default function SectionDetailsPage() {
           mode="edit"
         />
       )}
-      
-      {/* 添加资源按钮和对话框 */}
-      <AddResourceDialog 
-        sectionId={sectionId}
-        onResourceAdded={handleResourceUpdated}
-        trigger={
-          <Button variant="outline" size="sm" className="flex items-center">
-            <Plus className="h-4 w-4 mr-2" />
-            添加资源
-          </Button>
-        }
-      />
     </>
   );
 } 

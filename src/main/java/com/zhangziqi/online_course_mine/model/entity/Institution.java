@@ -1,16 +1,17 @@
 package com.zhangziqi.online_course_mine.model.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 机构实体类
@@ -21,7 +22,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "institutions")
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@EqualsAndHashCode(callSuper = true)
 public class Institution extends BaseEntity {
 
     /**
@@ -79,7 +80,6 @@ public class Institution extends BaseEntity {
     /**
      * 机构媒体资源
      */
-    @JsonIgnore
     @OneToMany(mappedBy = "institution", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<Media> mediaList = new ArrayList<>();
@@ -87,7 +87,6 @@ public class Institution extends BaseEntity {
     /**
      * 机构存储配额
      */
-    @JsonIgnore
     @OneToMany(mappedBy = "institution", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<StorageQuota> quotas = new ArrayList<>();
@@ -95,8 +94,21 @@ public class Institution extends BaseEntity {
     /**
      * 机构课程列表
      */
-    @JsonIgnore
     @OneToMany(mappedBy = "institution", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<Course> courses = new ArrayList<>();
+
+    /**
+     * 机构用户
+     */
+    @OneToMany(mappedBy = "institution", cascade = CascadeType.ALL)
+    @Builder.Default
+    private Set<User> users = new HashSet<>();
+
+    /**
+     * 关联的题库
+     */
+    @OneToMany(mappedBy = "institution", cascade = CascadeType.ALL)
+    @Builder.Default
+    private Set<Question> questions = new HashSet<>();
 } 

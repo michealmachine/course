@@ -13,7 +13,9 @@ import {
   Plus,
   Upload,
   ArrowRight,
-  X
+  X,
+  ListChecks,
+  ClipboardList
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -38,10 +40,13 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 import { mediaService } from '@/services/media-service';
-import sectionService from '@/services/section';
+import questionGroupService from '@/services/question-group';
+import { sectionService } from '@/services/section';
 import { Empty } from '@/components/ui/empty';
+import { QuestionGroup } from '@/types/question';
 
 // 媒体类型映射
 const mediaTypeIcons = {
@@ -77,22 +82,32 @@ interface AddResourceDialogProps {
 }
 
 export function AddResourceDialog({ sectionId, onResourceAdded, trigger }: AddResourceDialogProps) {
+  // 共享状态
   const [isOpen, setIsOpen] = useState(false);
-  const [mediaList, setMediaList] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('media'); // 'media' or 'questionGroup'
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 媒体资源状态
+  const [mediaList, setMediaList] = useState<any[]>([]);
+  const [isLoadingMedia, setIsLoadingMedia] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [mediaSearchQuery, setMediaSearchQuery] = useState('');
   const [selectedTab, setSelectedTab] = useState('all');
   const [selectedMedia, setSelectedMedia] = useState<any | null>(null);
   const [selectedResourceType, setSelectedResourceType] = useState('primary');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // 题组状态
+  const [questionGroups, setQuestionGroups] = useState<QuestionGroup[]>([]);
+  const [isLoadingGroups, setIsLoadingGroups] = useState(false);
+  const [groupSearchQuery, setGroupSearchQuery] = useState('');
+  const [selectedQuestionGroup, setSelectedQuestionGroup] = useState<QuestionGroup | null>(null);
   
   // 加载媒体列表
   const loadMediaList = async () => {
     try {
-      setIsLoading(true);
+      setIsLoadingMedia(true);
       setError(null);
       
       // 构建查询参数
@@ -102,8 +117,8 @@ export function AddResourceDialog({ sectionId, onResourceAdded, trigger }: AddRe
       };
       
       // 添加搜索条件
-      if (searchQuery) {
-        params.search = searchQuery;
+      if (mediaSearchQuery) {
+        params.search = mediaSearchQuery;
       }
       
       // 添加媒体类型过滤
@@ -125,67 +140,157 @@ export function AddResourceDialog({ sectionId, onResourceAdded, trigger }: AddRe
       console.error('加载媒体列表失败:', err);
       setError(err.message || '无法加载媒体列表');
     } finally {
-      setIsLoading(false);
+      setIsLoadingMedia(false);
+    }
+  };
+  
+  // 加载题组列表
+  const loadQuestionGroups = async () => {
+    try {
+      setIsLoadingGroups(true);
+      setError(null);
+      
+      // 构建查询参数
+      const params: any = {
+        page: 0,
+        pageSize: 20
+      };
+      
+      // 添加搜索条件
+      if (groupSearchQuery) {
+        params.name = groupSearchQuery;
+      }
+      
+      // 调用API获取题组列表
+      const response = await questionGroupService.getQuestionGroupList(params);
+      
+      if (response && response.content) {
+        setQuestionGroups(response.content || []);
+      } else {
+        setQuestionGroups([]);
+      }
+    } catch (err: any) {
+      console.error('加载题组列表失败:', err);
+      setError(err.message || '无法加载题组列表');
+    } finally {
+      setIsLoadingGroups(false);
     }
   };
   
   // 选择媒体资源
   const handleSelectMedia = (media: any) => {
     setSelectedMedia(media.id === selectedMedia?.id ? null : media);
+    // 选择媒体时清除题组选择
+    setSelectedQuestionGroup(null);
+  };
+  
+  // 选择题组
+  const handleSelectQuestionGroup = (group: QuestionGroup) => {
+    setSelectedQuestionGroup(group.id === selectedQuestionGroup?.id ? null : group);
+    // 选择题组时清除媒体选择
+    setSelectedMedia(null);
   };
   
   // 添加资源到小节
   const handleAddResource = async () => {
-    if (!selectedMedia || !selectedResourceType) {
-      toast.error('请选择媒体资源和资源类型');
-      return;
-    }
-    
-    try {
-      setIsSubmitting(true);
-      setError(null);
-      
-      // 构建资源对象
-      const resourceData = {
-        sectionId,
-        mediaId: selectedMedia.id,
-        resourceType: selectedResourceType
-      };
-      
-      // 调用API添加资源
-      await sectionService.addSectionResource(resourceData);
-      
-      toast.success('资源添加成功', {
-        description: '媒体资源已成功添加到小节'
-      });
-      
-      // 重置表单
-      setSelectedMedia(null);
-      
-      // 通知父组件刷新
-      if (onResourceAdded) {
-        onResourceAdded();
+    // 选择了媒体资源
+    if (activeTab === 'media' && selectedMedia) {
+      if (!selectedResourceType) {
+        toast.error('请选择资源类型');
+        return;
       }
       
-      // 关闭对话框
-      setIsOpen(false);
-    } catch (err: any) {
-      console.error('添加资源失败:', err);
-      setError(err.message || '添加资源失败');
-      toast.error('添加资源失败', {
-        description: err.message || '请稍后重试'
+      try {
+        setIsSubmitting(true);
+        setError(null);
+        
+        // 使用新的API添加资源
+        await sectionService.setMediaResource(sectionId, selectedMedia.id, selectedResourceType);
+        
+        toast.success('资源添加成功', {
+          description: '媒体资源已成功添加到小节'
+        });
+        
+        // 重置表单
+        setSelectedMedia(null);
+        
+        // 通知父组件刷新
+        if (onResourceAdded) {
+          onResourceAdded();
+        }
+        
+        // 关闭对话框
+        setIsOpen(false);
+      } catch (err: any) {
+        console.error('添加资源失败:', err);
+        setError(err.message || '添加资源失败');
+        toast.error('添加资源失败', {
+          description: err.message || '请稍后重试'
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
+    } 
+    // 选择了题组
+    else if (activeTab === 'questionGroup' && selectedQuestionGroup) {
+      try {
+        setIsSubmitting(true);
+        setError(null);
+        
+        // 使用新的API添加题组
+        await sectionService.setQuestionGroup(sectionId, selectedQuestionGroup.id);
+        
+        toast.success('题组添加成功', {
+          description: '题组已成功添加到小节'
+        });
+        
+        // 重置表单
+        setSelectedQuestionGroup(null);
+        
+        // 通知父组件刷新
+        if (onResourceAdded) {
+          onResourceAdded();
+        }
+        
+        // 关闭对话框
+        setIsOpen(false);
+      } catch (err: any) {
+        console.error('添加题组失败:', err);
+        setError(err.message || '添加题组失败');
+        toast.error('添加题组失败', {
+          description: err.message || '请稍后重试'
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else {
+      toast.error('请选择要添加的内容', {
+        description: activeTab === 'media' ? '请选择一个媒体资源' : '请选择一个题组'
       });
-    } finally {
-      setIsSubmitting(false);
     }
   };
   
-  // 当对话框打开时加载媒体列表
+  // 当对话框打开或标签切换时加载相应数据
   useEffect(() => {
     if (isOpen) {
-      loadMediaList();
+      if (activeTab === 'media') {
+        loadMediaList();
+      } else if (activeTab === 'questionGroup') {
+        loadQuestionGroups();
+      }
     }
-  }, [isOpen, currentPage, selectedTab, searchQuery]);
+  }, [isOpen, activeTab, currentPage, selectedTab, mediaSearchQuery]);
+  
+  // 当题组搜索查询变更时加载题组
+  useEffect(() => {
+    if (isOpen && activeTab === 'questionGroup') {
+      const timer = setTimeout(() => {
+        loadQuestionGroups();
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [groupSearchQuery]);
   
   // 媒体项目组件
   const MediaItem = ({ media }: { media: any }) => {
@@ -223,6 +328,42 @@ export function AddResourceDialog({ sectionId, onResourceAdded, trigger }: AddRe
     );
   };
   
+  // 题组项目组件
+  const QuestionGroupItem = ({ group }: { group: QuestionGroup }) => {
+    const isSelected = selectedQuestionGroup?.id === group.id;
+    
+    return (
+      <div 
+        className={cn(
+          'border rounded-md p-3 cursor-pointer transition-all hover:border-primary',
+          isSelected ? 'border-primary ring-1 ring-primary' : ''
+        )}
+        onClick={() => handleSelectQuestionGroup(group)}
+      >
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-md">
+            <ClipboardList className="h-5 w-5" />
+          </div>
+          
+          <div className="flex-1 min-w-0">
+            <h4 className="font-medium text-sm truncate">{group.name}</h4>
+            <div className="flex flex-col mt-1">
+              <span className="text-xs text-muted-foreground">
+                {group.questionCount || 0} 题 • {group.description ? group.description.substring(0, 20) + (group.description.length > 20 ? '...' : '') : '无描述'}
+              </span>
+            </div>
+          </div>
+          
+          {isSelected && (
+            <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
+              <Plus className="h-3 w-3" />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+  
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       {trigger ? (
@@ -240,173 +381,176 @@ export function AddResourceDialog({ sectionId, onResourceAdded, trigger }: AddRe
       
       <DialogContent className="sm:max-w-[700px] max-h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>添加媒体资源</DialogTitle>
+          <DialogTitle>添加内容到小节</DialogTitle>
           <DialogDescription>
-            从媒体库中选择资源添加到小节
+            选择媒体资源或题组添加到小节
           </DialogDescription>
         </DialogHeader>
         
-        {/* 标签页和搜索框 */}
-        <div className="flex flex-col gap-4 my-4">
-          <div className="flex items-center gap-4">
-            <Tabs defaultValue="all" value={selectedTab} onValueChange={setSelectedTab} className="flex-1">
-              <TabsList className="grid grid-cols-5">
-                <TabsTrigger value="all">全部</TabsTrigger>
-                <TabsTrigger value="VIDEO">视频</TabsTrigger>
-                <TabsTrigger value="AUDIO">音频</TabsTrigger>
-                <TabsTrigger value="DOCUMENT">文档</TabsTrigger>
-                <TabsTrigger value="IMAGE">图片</TabsTrigger>
-              </TabsList>
-            </Tabs>
-            
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="搜索资源..."
-                className="pl-8 w-60"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    loadMediaList();
-                  }
-                }}
-              />
-            </div>
-          </div>
-        </div>
-        
-        {/* 媒体列表 */}
-        <div className="flex-1 overflow-hidden">
-          <ScrollArea className="h-[300px] pr-4">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-full">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <span className="ml-2 text-lg">加载中...</span>
-              </div>
-            ) : error ? (
-              <div className="text-center py-8 text-destructive">
-                <p>{error}</p>
-                <Button variant="outline" onClick={loadMediaList} className="mt-2">
-                  重试
+        {/* 主标签页：媒体 vs 题组 */}
+        <Tabs 
+          defaultValue="media"
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="mt-2"
+        >
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="media" className="flex items-center">
+              <File className="mr-2 h-4 w-4" />
+              媒体资源
+            </TabsTrigger>
+            <TabsTrigger value="questionGroup" className="flex items-center">
+              <ListChecks className="mr-2 h-4 w-4" />
+              题组
+            </TabsTrigger>
+          </TabsList>
+          
+          {/* 媒体标签内容 */}
+          <TabsContent value="media">
+            {/* 媒体类型选择和搜索框 */}
+            <div className="flex flex-col gap-4 my-4">
+              <Tabs defaultValue="all" value={selectedTab} onValueChange={setSelectedTab}>
+                <TabsList className="flex w-full overflow-x-auto">
+                  <TabsTrigger value="all">全部</TabsTrigger>
+                  <TabsTrigger value="VIDEO">视频</TabsTrigger>
+                  <TabsTrigger value="AUDIO">音频</TabsTrigger>
+                  <TabsTrigger value="DOCUMENT">文档</TabsTrigger>
+                  <TabsTrigger value="IMAGE">图片</TabsTrigger>
+                  <TabsTrigger value="OTHER">其他</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="搜索媒体资源..."
+                  value={mediaSearchQuery}
+                  onChange={(e) => setMediaSearchQuery(e.target.value)}
+                  className="flex-1"
+                />
+                <Button variant="outline" onClick={() => loadMediaList()}>
+                  <Search className="h-4 w-4" />
                 </Button>
               </div>
-            ) : mediaList.length === 0 ? (
-              <Empty
-                icon={<Upload className="h-10 w-10" />}
-                title="没有找到资源"
-                description="尝试使用其他搜索条件，或前往媒体库上传新资源"
-                action={
-                  <Button variant="outline" asChild>
-                    <a href="/dashboard/media" target="_blank" rel="noopener noreferrer">
-                      转到媒体库
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </a>
+            </div>
+            
+            {/* 媒体列表 */}
+            <div className="relative">
+              {isLoadingMedia ? (
+                <div className="flex flex-col items-center justify-center p-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+                  <p className="text-sm text-muted-foreground">加载媒体资源...</p>
+                </div>
+              ) : error ? (
+                <div className="text-center py-8">
+                  <p className="text-destructive">{error}</p>
+                  <Button variant="outline" onClick={loadMediaList} className="mt-4">
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                    重试
                   </Button>
-                }
-              />
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {mediaList.map((media) => (
-                  <MediaItem key={media.id} media={media} />
-                ))}
+                </div>
+              ) : mediaList.length === 0 ? (
+                <Empty 
+                  icon={<Upload className="h-10 w-10" />}
+                  title="未找到媒体资源" 
+                  description="尝试其他搜索条件或上传新的媒体资源"
+                />
+              ) : (
+                <ScrollArea className="h-[300px] rounded-md border p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {mediaList.map((media) => (
+                      <MediaItem key={media.id} media={media} />
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </div>
+            
+            {/* 媒体资源类型选择 */}
+            {selectedMedia && (
+              <div className="mt-4 p-4 border rounded-md bg-muted/20">
+                <h4 className="font-medium mb-2">资源类型</h4>
+                <Select value={selectedResourceType} onValueChange={setSelectedResourceType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="选择资源类型" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {resourceTypes.map(type => (
+                      <SelectItem key={type.value} value={type.value}>
+                        <div className="flex flex-col">
+                          <span>{type.label}</span>
+                          <span className="text-xs text-muted-foreground">{type.description}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-2">
+                  选择资源类型以分类课程内容
+                </p>
               </div>
             )}
-          </ScrollArea>
-        </div>
-        
-        {/* 分页按钮 */}
-        {mediaList.length > 0 && (
-          <div className="flex justify-between items-center py-2">
-            <div className="text-sm text-muted-foreground">
-              显示 {mediaList.length} 个结果
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
-                disabled={currentPage === 0 || isLoading}
-              >
-                上一页
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(currentPage + 1)}
-                disabled={currentPage >= totalPages - 1 || isLoading}
-              >
-                下一页
-              </Button>
-            </div>
-          </div>
-        )}
-        
-        {/* 资源类型选择器 */}
-        {selectedMedia && (
-          <div className="border-t pt-4 mt-4">
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">已选择资源</span>
-                <span className="text-xs text-muted-foreground">
-                  {selectedMedia.title}
-                </span>
-              </div>
-              
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSelectedMedia(null)}
-              >
-                <X className="h-4 w-4" />
+          </TabsContent>
+          
+          {/* 题组标签内容 */}
+          <TabsContent value="questionGroup">
+            {/* 题组搜索框 */}
+            <div className="flex items-center gap-2 my-4">
+              <Input
+                placeholder="搜索题组..."
+                value={groupSearchQuery}
+                onChange={(e) => setGroupSearchQuery(e.target.value)}
+                className="flex-1"
+              />
+              <Button variant="outline" onClick={() => loadQuestionGroups()}>
+                <Search className="h-4 w-4" />
               </Button>
             </div>
             
-            <div className="mt-4">
-              <Label htmlFor="resource-type">资源类型</Label>
-              <Select
-                value={selectedResourceType}
-                onValueChange={setSelectedResourceType}
-              >
-                <SelectTrigger id="resource-type">
-                  <SelectValue placeholder="选择资源类型" />
-                </SelectTrigger>
-                <SelectContent>
-                  {resourceTypes.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      <div className="flex flex-col">
-                        <span>{type.label}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {type.description}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* 题组列表 */}
+            <div className="relative">
+              {isLoadingGroups ? (
+                <div className="flex flex-col items-center justify-center p-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+                  <p className="text-sm text-muted-foreground">加载题组...</p>
+                </div>
+              ) : error ? (
+                <div className="text-center py-8">
+                  <p className="text-destructive">{error}</p>
+                  <Button variant="outline" onClick={loadQuestionGroups} className="mt-4">
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                    重试
+                  </Button>
+                </div>
+              ) : questionGroups.length === 0 ? (
+                <Empty 
+                  icon={<ListChecks className="h-10 w-10" />}
+                  title="未找到题组" 
+                  description="尝试其他搜索条件或创建新的题组"
+                />
+              ) : (
+                <ScrollArea className="h-[350px] rounded-md border p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {questionGroups.map((group) => (
+                      <QuestionGroupItem key={group.id} group={group} />
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
             </div>
-          </div>
-        )}
+          </TabsContent>
+        </Tabs>
         
-        <DialogFooter className="pt-4">
-          <Button variant="outline" onClick={() => setIsOpen(false)}>
+        {/* 错误提示和操作按钮 */}
+        <DialogFooter className="mt-6">
+          {error && (
+            <div className="text-destructive text-sm mb-2 w-full">{error}</div>
+          )}
+          <Button variant="outline" onClick={() => setIsOpen(false)} disabled={isSubmitting}>
             取消
           </Button>
-          <Button 
-            onClick={handleAddResource} 
-            disabled={!selectedMedia || !selectedResourceType || isSubmitting}
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                添加中...
-              </>
-            ) : (
-              <>
-                <Plus className="mr-2 h-4 w-4" />
-                添加资源
-              </>
-            )}
+          <Button onClick={handleAddResource} disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {activeTab === 'media' ? '添加媒体资源' : '添加题组'}
           </Button>
         </DialogFooter>
       </DialogContent>

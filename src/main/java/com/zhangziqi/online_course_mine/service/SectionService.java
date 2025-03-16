@@ -4,6 +4,9 @@ import com.zhangziqi.online_course_mine.model.dto.section.*;
 import com.zhangziqi.online_course_mine.model.entity.Section;
 import com.zhangziqi.online_course_mine.model.entity.SectionResource;
 import com.zhangziqi.online_course_mine.model.entity.SectionQuestionGroup;
+import com.zhangziqi.online_course_mine.model.vo.SectionQuestionGroupVO;
+import com.zhangziqi.online_course_mine.model.vo.SectionResourceVO;
+import com.zhangziqi.online_course_mine.model.vo.SectionVO;
 
 import java.util.List;
 
@@ -18,7 +21,7 @@ public interface SectionService {
      * @param dto 小节创建DTO
      * @return 创建的小节
      */
-    Section createSection(SectionCreateDTO dto);
+    SectionVO createSection(SectionCreateDTO dto);
 
     /**
      * 更新小节
@@ -27,7 +30,7 @@ public interface SectionService {
      * @param dto 小节更新DTO
      * @return 更新后的小节
      */
-    Section updateSection(Long id, SectionCreateDTO dto);
+    SectionVO updateSection(Long id, SectionCreateDTO dto);
 
     /**
      * 获取小节详情
@@ -35,7 +38,7 @@ public interface SectionService {
      * @param id 小节ID
      * @return 小节
      */
-    Section getSectionById(Long id);
+    SectionVO getSectionById(Long id);
 
     /**
      * 获取章节下的小节列表
@@ -43,7 +46,7 @@ public interface SectionService {
      * @param chapterId 章节ID
      * @return 小节列表
      */
-    List<Section> getSectionsByChapter(Long chapterId);
+    List<SectionVO> getSectionsByChapter(Long chapterId);
 
     /**
      * 获取课程下的所有小节
@@ -51,7 +54,7 @@ public interface SectionService {
      * @param courseId 课程ID
      * @return 小节列表
      */
-    List<Section> getSectionsByCourse(Long courseId);
+    List<SectionVO> getSectionsByCourse(Long courseId);
 
     /**
      * 删除小节
@@ -67,62 +70,41 @@ public interface SectionService {
      * @param sectionOrders 小节顺序列表，包含ID和顺序
      * @return 更新后的小节列表
      */
-    List<Section> reorderSections(Long chapterId, List<SectionOrderDTO> sectionOrders);
+    List<SectionVO> reorderSections(Long chapterId, List<SectionOrderDTO> sectionOrders);
 
     /**
-     * 添加小节资源
-     *
-     * @param dto 小节资源DTO
-     * @return 创建的小节资源
-     */
-    SectionResource addSectionResource(SectionResourceDTO dto);
-
-    /**
-     * 获取小节资源列表
+     * 设置小节媒体资源（直接关联）
      *
      * @param sectionId 小节ID
-     * @return 小节资源列表
+     * @param mediaId 媒体资源ID
+     * @param resourceType 资源类型
+     * @return 更新后的小节
      */
-    List<SectionResource> getSectionResources(Long sectionId);
+    SectionVO setMediaResource(Long sectionId, Long mediaId, String resourceType);
 
     /**
-     * 删除小节资源
-     *
-     * @param resourceId 资源ID
-     */
-    void deleteSectionResource(Long resourceId);
-
-    /**
-     * 添加小节题目组
-     *
-     * @param dto 小节题目组DTO
-     * @return 创建的小节题目组
-     */
-    SectionQuestionGroup addSectionQuestionGroup(SectionQuestionGroupDTO dto);
-
-    /**
-     * 获取小节题目组列表
+     * 移除小节媒体资源（直接关联）
      *
      * @param sectionId 小节ID
-     * @return 小节题目组列表
+     * @return 更新后的小节
      */
-    List<SectionQuestionGroup> getSectionQuestionGroups(Long sectionId);
+    SectionVO removeMediaResource(Long sectionId);
 
     /**
-     * 更新小节题目组设置
+     * 设置小节题目组（直接关联）
      *
      * @param sectionId 小节ID
      * @param questionGroupId 题目组ID
-     * @param dto 小节题目组DTO
-     * @return 更新后的小节题目组
+     * @param dto 题目组配置DTO
+     * @return 更新后的小节
      */
-    SectionQuestionGroup updateSectionQuestionGroup(Long sectionId, Long questionGroupId, SectionQuestionGroupDTO dto);
+    SectionVO setQuestionGroup(Long sectionId, Long questionGroupId, SectionQuestionGroupConfigDTO dto);
 
     /**
-     * 删除小节题目组
+     * 移除小节题目组（直接关联）
      *
      * @param sectionId 小节ID
-     * @param questionGroupId 题目组ID
+     * @return 更新后的小节
      */
-    void deleteSectionQuestionGroup(Long sectionId, Long questionGroupId);
+    SectionVO removeQuestionGroup(Long sectionId);
 } 

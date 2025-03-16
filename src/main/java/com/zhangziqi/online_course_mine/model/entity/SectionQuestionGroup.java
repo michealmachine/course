@@ -1,5 +1,6 @@
 package com.zhangziqi.online_course_mine.model.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;

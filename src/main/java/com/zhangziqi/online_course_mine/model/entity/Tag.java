@@ -1,7 +1,6 @@
 package com.zhangziqi.online_course_mine.model.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,6 +10,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -22,9 +22,27 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "tags")
-@EqualsAndHashCode(callSuper = true)
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class Tag extends BaseEntity {
+
+    /**
+     * 重写equals方法，只基于ID比较
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Tag tag = (Tag) o;
+        return Objects.equals(getId(), tag.getId());
+    }
+
+    /**
+     * 重写hashCode方法，只基于ID计算
+     */
+    @Override
+    public int hashCode() {
+        return Objects.hash(getId());
+    }
 
     /**
      * 标签名称
@@ -45,11 +63,11 @@ public class Tag extends BaseEntity {
     private Integer useCount = 0;
 
     /**
-     * 关联的课程
+     * 标签关联的课程
      */
-    @JsonIgnore
     @ManyToMany(mappedBy = "tags")
     @Builder.Default
+    @JsonIgnore
     private Set<Course> courses = new HashSet<>();
     
     /**

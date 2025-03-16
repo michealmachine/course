@@ -318,11 +318,11 @@ public class CategoryServiceImpl implements CategoryService {
         
         // 获取课程数量
         long courseCount = categoryRepository.countCoursesByCategoryId(category.getId());
-        vo.setCourseCount(courseCount);
+        vo.setCourseCount((int) courseCount);
         
         // 获取子分类数量
         long childrenCount = categoryRepository.countByParentId(category.getId());
-        vo.setChildrenCount(childrenCount);
+        vo.setChildrenCount((int) childrenCount);
         
         return vo;
     }

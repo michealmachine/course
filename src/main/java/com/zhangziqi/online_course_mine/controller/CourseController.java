@@ -2,7 +2,7 @@ package com.zhangziqi.online_course_mine.controller;
 
 import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.model.dto.course.CourseCreateDTO;
-import com.zhangziqi.online_course_mine.model.entity.Course;
+import com.zhangziqi.online_course_mine.model.vo.CourseVO;
 import com.zhangziqi.online_course_mine.model.vo.PreviewUrlVO;
 import com.zhangziqi.online_course_mine.model.vo.Result;
 import com.zhangziqi.online_course_mine.security.SecurityUtil;
@@ -45,14 +45,14 @@ public class CourseController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
     @Operation(summary = "创建课程", description = "创建一个新的课程")
-    public Result<Course> createCourse(@Valid @RequestBody CourseCreateDTO dto) {
+    public Result<CourseVO> createCourse(@Valid @RequestBody CourseCreateDTO dto) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
         Long userId = SecurityUtil.getCurrentUserId();
         
         log.info("创建课程, 用户ID: {}, 机构ID: {}, 课程标题: {}", 
                 userId, institutionId, dto.getTitle());
         
-        Course course = courseService.createCourse(dto, userId, institutionId);
+        CourseVO course = courseService.createCourse(dto, userId, institutionId);
         
         return Result.success(course);
     }
@@ -64,13 +64,13 @@ public class CourseController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
     @Operation(summary = "获取课程详情", description = "获取指定课程的详细信息")
-    public Result<Course> getCourseById(
+    public Result<CourseVO> getCourseById(
             @Parameter(description = "课程ID") @PathVariable("id") Long courseId) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
         
         log.info("获取课程详情, 课程ID: {}, 机构ID: {}", courseId, institutionId);
         
-        Course course = courseService.getCourseById(courseId);
+        CourseVO course = courseService.getCourseById(courseId);
         
         return Result.success(course);
     }
@@ -82,7 +82,7 @@ public class CourseController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
     @Operation(summary = "更新课程", description = "更新指定课程的信息")
-    public Result<Course> updateCourse(
+    public Result<CourseVO> updateCourse(
             @Parameter(description = "课程ID") @PathVariable("id") Long courseId,
             @Valid @RequestBody CourseCreateDTO dto) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
@@ -90,7 +90,7 @@ public class CourseController {
         log.info("更新课程, 课程ID: {}, 机构ID: {}, 课程标题: {}", 
                 courseId, institutionId, dto.getTitle());
         
-        Course course = courseService.updateCourse(courseId, dto, institutionId);
+        CourseVO course = courseService.updateCourse(courseId, dto, institutionId);
         
         return Result.success(course);
     }
@@ -120,13 +120,13 @@ public class CourseController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
     @Operation(summary = "获取机构课程列表", description = "分页获取当前机构的课程列表")
-    public Result<Page<Course>> getCoursesByInstitution(
+    public Result<Page<CourseVO>> getCoursesByInstitution(
             @PageableDefault(size = 10) Pageable pageable) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
         
         log.info("获取机构课程列表, 机构ID: {}", institutionId);
         
-        Page<Course> courses = courseService.getCoursesByInstitution(institutionId, pageable);
+        Page<CourseVO> courses = courseService.getCoursesByInstitution(institutionId, pageable);
         
         return Result.success(courses);
     }
@@ -138,13 +138,13 @@ public class CourseController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
     @Operation(summary = "提交课程审核", description = "将课程提交审核")
-    public Result<Course> submitForReview(
+    public Result<CourseVO> submitForReview(
             @Parameter(description = "课程ID") @PathVariable("id") Long courseId) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
         
         log.info("提交课程审核, 课程ID: {}, 机构ID: {}", courseId, institutionId);
         
-        Course course = courseService.submitForReview(courseId);
+        CourseVO course = courseService.submitForReview(courseId);
         
         return Result.success(course);
     }
@@ -156,7 +156,7 @@ public class CourseController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
     @Operation(summary = "更新课程封面", description = "上传课程封面图片")
-    public Result<Course> updateCourseCover(
+    public Result<CourseVO> updateCourseCover(
             @Parameter(description = "课程ID") @PathVariable("id") Long courseId,
             @Parameter(description = "封面图片文件") @RequestParam("file") MultipartFile file) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
@@ -165,7 +165,7 @@ public class CourseController {
                 courseId, institutionId, file.getSize());
         
         try {
-            Course course = courseService.updateCourseCover(courseId, file);
+            CourseVO course = courseService.updateCourseCover(courseId, file);
             return Result.success(course);
         } catch (BusinessException e) {
             return Result.fail(e.getCode(), e.getMessage());
@@ -182,7 +182,7 @@ public class CourseController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
     @Operation(summary = "更新课程支付设置", description = "更新指定课程的支付类型和价格")
-    public Result<Course> updatePaymentSettings(
+    public Result<CourseVO> updatePaymentSettings(
             @Parameter(description = "课程ID") @PathVariable("id") Long courseId,
             @Parameter(description = "支付类型") @RequestParam Integer paymentType,
             @Parameter(description = "价格") @RequestParam(required = false) BigDecimal price,
@@ -192,7 +192,7 @@ public class CourseController {
         log.info("更新课程支付设置, 课程ID: {}, 机构ID: {}, 支付类型: {}, 价格: {}, 折扣价格: {}", 
                 courseId, institutionId, paymentType, price, discountPrice);
         
-        Course course = courseService.updatePaymentSettings(courseId, paymentType, price, discountPrice);
+        CourseVO course = courseService.updatePaymentSettings(courseId, paymentType, price, discountPrice);
         
         return Result.success(course);
     }
@@ -221,11 +221,11 @@ public class CourseController {
     @GetMapping("/preview/{token}")
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "访问课程预览", description = "通过预览令牌访问课程")
-    public Result<Course> previewCourse(
+    public Result<CourseVO> previewCourse(
             @Parameter(description = "预览令牌") @PathVariable("token") String token) {
         log.info("访问课程预览, 令牌: {}", token);
         
-        Course course = courseService.getCourseByPreviewToken(token);
+        CourseVO course = courseService.getCourseByPreviewToken(token);
         
         return Result.success(course);
     }
@@ -237,13 +237,13 @@ public class CourseController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "开始审核课程", description = "管理员开始审核课程")
-    public Result<Course> startReview(
+    public Result<CourseVO> startReview(
             @Parameter(description = "课程ID") @PathVariable("id") Long courseId) {
         Long reviewerId = SecurityUtil.getCurrentUserId();
         
         log.info("开始审核课程, 课程ID: {}, 审核员ID: {}", courseId, reviewerId);
         
-        Course course = courseService.startReview(courseId, reviewerId);
+        CourseVO course = courseService.startReview(courseId, reviewerId);
         
         return Result.success(course);
     }
@@ -255,14 +255,14 @@ public class CourseController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "通过课程审核", description = "管理员通过课程审核")
-    public Result<Course> approveCourse(
+    public Result<CourseVO> approveCourse(
             @Parameter(description = "课程ID") @PathVariable("id") Long courseId,
             @Parameter(description = "审核意见") @RequestParam(required = false) String comment) {
         Long reviewerId = SecurityUtil.getCurrentUserId();
         
-        log.info("通过课程审核, 课程ID: {}, 审核员ID: {}, 审核意见: {}", courseId, reviewerId, comment);
+        log.info("通过课程审核, 课程ID: {}, 审核员ID: {}", courseId, reviewerId);
         
-        Course course = courseService.approveCourse(courseId, comment, reviewerId);
+        CourseVO course = courseService.approveCourse(courseId, comment, reviewerId);
         
         return Result.success(course);
     }
@@ -274,14 +274,14 @@ public class CourseController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     @Operation(summary = "拒绝课程审核", description = "管理员拒绝课程审核")
-    public Result<Course> rejectCourse(
+    public Result<CourseVO> rejectCourse(
             @Parameter(description = "课程ID") @PathVariable("id") Long courseId,
             @Parameter(description = "拒绝原因") @RequestParam String reason) {
         Long reviewerId = SecurityUtil.getCurrentUserId();
         
-        log.info("拒绝课程审核, 课程ID: {}, 审核员ID: {}, 拒绝原因: {}", courseId, reviewerId, reason);
+        log.info("拒绝课程审核, 课程ID: {}, 审核员ID: {}", courseId, reviewerId);
         
-        Course course = courseService.rejectCourse(courseId, reason, reviewerId);
+        CourseVO course = courseService.rejectCourse(courseId, reason, reviewerId);
         
         return Result.success(course);
     }
@@ -293,13 +293,13 @@ public class CourseController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
     @Operation(summary = "重新编辑被拒绝的课程", description = "将被拒绝的课程重新变为草稿状态进行编辑")
-    public Result<Course> reEditRejectedCourse(
+    public Result<CourseVO> reEditRejectedCourse(
             @Parameter(description = "课程ID") @PathVariable("id") Long courseId) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
         
         log.info("重新编辑被拒绝的课程, 课程ID: {}, 机构ID: {}", courseId, institutionId);
         
-        Course course = courseService.reEditRejectedCourse(courseId);
+        CourseVO course = courseService.reEditRejectedCourse(courseId);
         
         return Result.success(course);
     }
