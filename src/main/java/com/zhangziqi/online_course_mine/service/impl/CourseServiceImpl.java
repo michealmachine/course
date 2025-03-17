@@ -17,6 +17,8 @@ import com.zhangziqi.online_course_mine.repository.InstitutionRepository;
 import com.zhangziqi.online_course_mine.repository.TagRepository;
 import com.zhangziqi.online_course_mine.service.CourseService;
 import com.zhangziqi.online_course_mine.service.MinioService;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +26,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -906,5 +909,110 @@ public class CourseServiceImpl implements CourseService {
     public CourseVO getPublishedVersionByWorkspaceId(Long workspaceId) {
         Optional<Course> publishedVersionOpt = courseRepository.findPublishedVersionByWorkspaceId(workspaceId);
         return publishedVersionOpt.map(CourseVO::fromEntity).orElse(null);
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public Page<CourseVO> searchCourses(CourseSearchDTO searchDTO, Pageable pageable) {
+        log.info("搜索课程，参数: {}", searchDTO);
+        
+        Specification<Course> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            
+            // 只搜索已发布状态的课程
+            predicates.add(cb.equal(root.get("status"), CourseStatus.PUBLISHED.getValue()));
+            predicates.add(cb.equal(root.get("isPublishedVersion"), true));
+            
+            // 关键字搜索（标题和描述）
+            if (searchDTO.getKeyword() != null && !searchDTO.getKeyword().isEmpty()) {
+                String likePattern = "%" + searchDTO.getKeyword() + "%";
+                predicates.add(cb.or(
+                    cb.like(root.get("title"), likePattern),
+                    cb.like(root.get("description"), likePattern)
+                ));
+            }
+            
+            // 分类筛选
+            if (searchDTO.getCategoryId() != null) {
+                predicates.add(cb.equal(root.get("category").get("id"), searchDTO.getCategoryId()));
+            }
+            
+            // 标签筛选
+            if (searchDTO.getTagIds() != null && !searchDTO.getTagIds().isEmpty()) {
+                // 创建一个子查询，找到同时包含所有指定标签的课程
+                Join<Course, Tag> tagJoin = root.join("tags", JoinType.INNER);
+                predicates.add(tagJoin.get("id").in(searchDTO.getTagIds()));
+            }
+            
+            // 难度筛选
+            if (searchDTO.getDifficulty() != null) {
+                predicates.add(cb.equal(root.get("difficulty"), searchDTO.getDifficulty()));
+            }
+            
+            // 价格范围筛选
+            if (searchDTO.getMinPrice() != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("price"), searchDTO.getMinPrice()));
+            }
+            if (searchDTO.getMaxPrice() != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("price"), searchDTO.getMaxPrice()));
+            }
+            
+            // 付费类型筛选
+            if (searchDTO.getPaymentType() != null) {
+                predicates.add(cb.equal(root.get("paymentType"), searchDTO.getPaymentType()));
+            }
+            
+            // 机构筛选
+            if (searchDTO.getInstitutionId() != null) {
+                predicates.add(cb.equal(root.get("institution").get("id"), searchDTO.getInstitutionId()));
+            }
+            
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+        
+        Page<Course> coursePage = courseRepository.findAll(spec, pageable);
+        
+        log.info("搜索结果: 共{}条记录", coursePage.getTotalElements());
+        
+        // 转换为VO
+        return coursePage.map(CourseVO::fromEntity);
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<CourseVO> getHotCourses(int limit) {
+        log.info("获取热门课程，数量限制: {}", limit);
+        
+        Pageable pageable = PageRequest.of(0, limit);
+        List<Course> courses = courseRepository.findHotCourses(
+            CourseStatus.PUBLISHED.getValue(),
+            true,
+            pageable
+        );
+        
+        log.info("获取到{}门热门课程", courses.size());
+        
+        return courses.stream()
+            .map(CourseVO::fromEntity)
+            .collect(Collectors.toList());
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<CourseVO> getLatestCourses(int limit) {
+        log.info("获取最新课程，数量限制: {}", limit);
+        
+        Pageable pageable = PageRequest.of(0, limit);
+        List<Course> courses = courseRepository.findLatestCourses(
+            CourseStatus.PUBLISHED.getValue(),
+            true,
+            pageable
+        );
+        
+        log.info("获取到{}门最新课程", courses.size());
+        
+        return courses.stream()
+            .map(CourseVO::fromEntity)
+            .collect(Collectors.toList());
     }
 } 

@@ -3,6 +3,7 @@ package com.zhangziqi.online_course_mine.service;
 import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.exception.ResourceNotFoundException;
 import com.zhangziqi.online_course_mine.model.dto.course.CourseCreateDTO;
+import com.zhangziqi.online_course_mine.model.dto.course.CourseSearchDTO;
 import com.zhangziqi.online_course_mine.model.entity.*;
 import com.zhangziqi.online_course_mine.model.enums.ChapterAccessType;
 import com.zhangziqi.online_course_mine.model.enums.CoursePaymentType;
@@ -922,5 +923,90 @@ public class CourseServiceTest {
         // 验证方法调用
         verify(institutionRepository).findById(testInstitution.getId());
         verify(courseRepository).findByInstitutionAndIsPublishedVersion(testInstitution, false, pageable);
+    }
+
+    @Test
+    @DisplayName("搜索课程 - 成功")
+    void searchCourses_Success() {
+        // 准备测试数据
+        CourseSearchDTO searchDTO = CourseSearchDTO.builder()
+                .keyword("测试")
+                .categoryId(1L)
+                .tagIds(List.of(1L))
+                .difficulty(1)
+                .build();
+        
+        Pageable pageable = PageRequest.of(0, 10);
+        
+        // 设置课程为已发布状态
+        testCourse.setStatus(CourseStatus.PUBLISHED.getValue());
+        testCourse.setIsPublishedVersion(true);
+        
+        when(courseRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(testCourse), pageable, 1));
+        
+        // 执行方法
+        Page<CourseVO> result = courseService.searchCourses(searchDTO, pageable);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(testCourse.getId(), result.getContent().get(0).getId());
+        assertEquals(testCourse.getTitle(), result.getContent().get(0).getTitle());
+        
+        // 验证方法调用
+        verify(courseRepository).findAll(any(Specification.class), eq(pageable));
+    }
+    
+    @Test
+    @DisplayName("获取热门课程 - 成功")
+    void getHotCourses_Success() {
+        // 准备测试数据
+        int limit = 5;
+        
+        // 设置课程为已发布状态
+        testCourse.setStatus(CourseStatus.PUBLISHED.getValue());
+        testCourse.setIsPublishedVersion(true);
+        
+        when(courseRepository.findHotCourses(eq(CourseStatus.PUBLISHED.getValue()), eq(true), any(Pageable.class)))
+                .thenReturn(List.of(testCourse));
+        
+        // 执行方法
+        List<CourseVO> result = courseService.getHotCourses(limit);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals(testCourse.getId(), result.get(0).getId());
+        assertEquals(testCourse.getTitle(), result.get(0).getTitle());
+        
+        // 验证方法调用
+        verify(courseRepository).findHotCourses(eq(CourseStatus.PUBLISHED.getValue()), eq(true), any(Pageable.class));
+    }
+    
+    @Test
+    @DisplayName("获取最新课程 - 成功")
+    void getLatestCourses_Success() {
+        // 准备测试数据
+        int limit = 5;
+        
+        // 设置课程为已发布状态
+        testCourse.setStatus(CourseStatus.PUBLISHED.getValue());
+        testCourse.setIsPublishedVersion(true);
+        
+        when(courseRepository.findLatestCourses(eq(CourseStatus.PUBLISHED.getValue()), eq(true), any(Pageable.class)))
+                .thenReturn(List.of(testCourse));
+        
+        // 执行方法
+        List<CourseVO> result = courseService.getLatestCourses(limit);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals(testCourse.getId(), result.get(0).getId());
+        assertEquals(testCourse.getTitle(), result.get(0).getTitle());
+        
+        // 验证方法调用
+        verify(courseRepository).findLatestCourses(eq(CourseStatus.PUBLISHED.getValue()), eq(true), any(Pageable.class));
     }
 } 

@@ -2,6 +2,7 @@ package com.zhangziqi.online_course_mine.controller;
 
 import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.model.dto.course.CourseCreateDTO;
+import com.zhangziqi.online_course_mine.model.dto.course.CourseSearchDTO;
 import com.zhangziqi.online_course_mine.model.vo.CourseVO;
 import com.zhangziqi.online_course_mine.model.vo.CourseStructureVO;
 import com.zhangziqi.online_course_mine.model.vo.PreviewUrlVO;
@@ -25,6 +26,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 课程控制器
@@ -343,5 +345,55 @@ public class CourseController {
         CourseVO course = courseService.reEditRejectedCourse(courseId);
         
         return Result.success(course);
+    }
+
+    /**
+     * 搜索课程（公开API，任何人都可以访问）
+     */
+    @PostMapping("/search")
+    @ResponseStatus(HttpStatus.OK)
+    @Operation(summary = "搜索课程", description = "根据多种条件搜索已发布的课程")
+    public Result<Page<CourseVO>> searchCourses(
+            @Valid @RequestBody CourseSearchDTO searchDTO,
+            @PageableDefault(size = 10) Pageable pageable) {
+        
+        log.info("搜索课程, 关键词: {}, 分类ID: {}, 标签IDs: {}", 
+                searchDTO.getKeyword(), searchDTO.getCategoryId(), searchDTO.getTagIds());
+        
+        Page<CourseVO> courses = courseService.searchCourses(searchDTO, pageable);
+        
+        return Result.success(courses);
+    }
+    
+    /**
+     * 获取热门课程（公开API，任何人都可以访问）
+     */
+    @GetMapping("/hot")
+    @ResponseStatus(HttpStatus.OK)
+    @Operation(summary = "获取热门课程", description = "获取指定数量的热门课程")
+    public Result<List<CourseVO>> getHotCourses(
+            @Parameter(description = "限制数量") @RequestParam(defaultValue = "10") int limit) {
+        
+        log.info("获取热门课程, 限制数量: {}", limit);
+        
+        List<CourseVO> courses = courseService.getHotCourses(limit);
+        
+        return Result.success(courses);
+    }
+    
+    /**
+     * 获取最新课程（公开API，任何人都可以访问）
+     */
+    @GetMapping("/latest")
+    @ResponseStatus(HttpStatus.OK)
+    @Operation(summary = "获取最新课程", description = "获取指定数量的最新课程")
+    public Result<List<CourseVO>> getLatestCourses(
+            @Parameter(description = "限制数量") @RequestParam(defaultValue = "10") int limit) {
+        
+        log.info("获取最新课程, 限制数量: {}", limit);
+        
+        List<CourseVO> courses = courseService.getLatestCourses(limit);
+        
+        return Result.success(courses);
     }
 } 

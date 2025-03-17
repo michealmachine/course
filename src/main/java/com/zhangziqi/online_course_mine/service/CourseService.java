@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
+import java.util.List;
 
 /**
  * 课程服务接口
@@ -217,4 +218,32 @@ public interface CourseService {
      * @return 发布版本课程，如果不存在则返回null
      */
     CourseVO getPublishedVersionByWorkspaceId(Long workspaceId);
+
+    /**
+     * 搜索课程
+     * 只返回已发布状态的课程
+     *
+     * @param searchDTO 搜索参数
+     * @param pageable 分页参数
+     * @return 分页课程结果
+     */
+    Page<CourseVO> searchCourses(CourseSearchDTO searchDTO, Pageable pageable);
+    
+    /**
+     * 获取热门课程
+     * 按学习人数排序，只返回已发布状态的课程
+     *
+     * @param limit 数量限制
+     * @return 热门课程列表
+     */
+    List<CourseVO> getHotCourses(int limit);
+    
+    /**
+     * 获取最新课程
+     * 按创建时间排序，只返回已发布状态的课程
+     *
+     * @param limit 数量限制
+     * @return 最新课程列表
+     */
+    List<CourseVO> getLatestCourses(int limit);
 } 
