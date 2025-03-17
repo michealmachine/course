@@ -30,8 +30,6 @@ public class SectionServiceImpl implements SectionService {
     private final CourseRepository courseRepository;
     private final MediaRepository mediaRepository;
     private final QuestionGroupRepository questionGroupRepository;
-    private final SectionResourceRepository sectionResourceRepository;
-    private final SectionQuestionGroupRepository sectionQuestionGroupRepository;
 
     @Override
     @Transactional
@@ -90,7 +88,18 @@ public class SectionServiceImpl implements SectionService {
     @Override
     @Transactional(readOnly = true)
     public SectionVO getSectionById(Long id) {
-        Section section = findSectionById(id);
+        log.info("获取小节信息, sectionId: {}", id);
+        
+        // 验证小节是否存在
+        Section section = sectionRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.error("小节不存在, sectionId: {}", id);
+                    return new ResourceNotFoundException("小节不存在，ID: " + id);
+                });
+        
+        log.info("成功获取小节信息: {}", section.getTitle());
+        
+        // 转换为VO
         return SectionVO.fromEntity(section);
     }
     
@@ -135,14 +144,9 @@ public class SectionServiceImpl implements SectionService {
     @Override
     @Transactional
     public void deleteSection(Long id) {
-        // 获取小节
-        Section section = findSectionById(id);
-        
-        // 删除关联的资源
-        sectionResourceRepository.deleteBySection_Id(section.getId());
-        
-        // 删除关联的题目组
-        sectionQuestionGroupRepository.deleteBySectionId(section.getId());
+        // 验证小节是否存在
+        Section section = sectionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("小节不存在，ID: " + id));
         
         // 删除小节
         sectionRepository.delete(section);

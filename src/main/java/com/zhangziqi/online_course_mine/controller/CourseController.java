@@ -3,6 +3,7 @@ package com.zhangziqi.online_course_mine.controller;
 import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.model.dto.course.CourseCreateDTO;
 import com.zhangziqi.online_course_mine.model.vo.CourseVO;
+import com.zhangziqi.online_course_mine.model.vo.CourseStructureVO;
 import com.zhangziqi.online_course_mine.model.vo.PreviewUrlVO;
 import com.zhangziqi.online_course_mine.model.vo.Result;
 import com.zhangziqi.online_course_mine.security.SecurityUtil;
@@ -119,16 +120,56 @@ public class CourseController {
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
-    @Operation(summary = "获取机构课程列表", description = "分页获取当前机构的课程列表")
+    @Operation(summary = "获取机构工作区课程列表", description = "分页获取当前机构的工作区课程列表（非发布版本）")
     public Result<Page<CourseVO>> getCoursesByInstitution(
             @PageableDefault(size = 10) Pageable pageable) {
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
         
-        log.info("获取机构课程列表, 机构ID: {}", institutionId);
+        log.info("获取机构工作区课程列表, 机构ID: {}", institutionId);
         
-        Page<CourseVO> courses = courseService.getCoursesByInstitution(institutionId, pageable);
+        Page<CourseVO> courses = courseService.getWorkspaceCoursesByInstitution(institutionId, pageable);
         
         return Result.success(courses);
+    }
+    
+    /**
+     * 获取机构发布版本课程列表
+     */
+    @GetMapping("/published")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
+    @Operation(summary = "获取机构发布版本课程列表", description = "分页获取当前机构的发布版本课程列表")
+    public Result<Page<CourseVO>> getPublishedCoursesByInstitution(
+            @PageableDefault(size = 10) Pageable pageable) {
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+        
+        log.info("获取机构发布版本课程列表, 机构ID: {}", institutionId);
+        
+        Page<CourseVO> courses = courseService.getPublishedCoursesByInstitution(institutionId, pageable);
+        
+        return Result.success(courses);
+    }
+    
+    /**
+     * 获取课程的发布版本
+     */
+    @GetMapping("/{id}/published-version")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
+    @Operation(summary = "获取课程的发布版本", description = "根据工作区版本ID获取对应的发布版本")
+    public Result<CourseVO> getPublishedVersion(
+            @Parameter(description = "工作区版本课程ID") @PathVariable("id") Long courseId) {
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+        
+        log.info("获取课程发布版本, 工作区课程ID: {}, 机构ID: {}", courseId, institutionId);
+        
+        CourseVO publishedVersion = courseService.getPublishedVersionByWorkspaceId(courseId);
+        
+        if (publishedVersion == null) {
+            return Result.fail(404, "该课程尚未发布");
+        }
+        
+        return Result.success(publishedVersion);
     }
     
     /**
@@ -220,14 +261,14 @@ public class CourseController {
      */
     @GetMapping("/preview/{token}")
     @ResponseStatus(HttpStatus.OK)
-    @Operation(summary = "访问课程预览", description = "通过预览令牌访问课程")
-    public Result<CourseVO> previewCourse(
+    @Operation(summary = "访问课程预览", description = "通过预览令牌访问课程结构")
+    public Result<CourseStructureVO> previewCourse(
             @Parameter(description = "预览令牌") @PathVariable("token") String token) {
         log.info("访问课程预览, 令牌: {}", token);
         
-        CourseVO course = courseService.getCourseByPreviewToken(token);
+        CourseStructureVO courseStructure = courseService.getCourseStructureByPreviewToken(token);
         
-        return Result.success(course);
+        return Result.success(courseStructure);
     }
 
     /**
@@ -235,8 +276,8 @@ public class CourseController {
      */
     @PostMapping("/{id}/review/start")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
-    @Operation(summary = "开始审核课程", description = "管理员开始审核课程")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_REVIEWER')")
+    @Operation(summary = "开始审核课程", description = "管理员或审核员开始审核课程")
     public Result<CourseVO> startReview(
             @Parameter(description = "课程ID") @PathVariable("id") Long courseId) {
         Long reviewerId = SecurityUtil.getCurrentUserId();
@@ -253,8 +294,8 @@ public class CourseController {
      */
     @PostMapping("/{id}/review/approve")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
-    @Operation(summary = "通过课程审核", description = "管理员通过课程审核")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_REVIEWER')")
+    @Operation(summary = "通过课程审核", description = "管理员或审核员通过课程审核")
     public Result<CourseVO> approveCourse(
             @Parameter(description = "课程ID") @PathVariable("id") Long courseId,
             @Parameter(description = "审核意见") @RequestParam(required = false) String comment) {
@@ -272,8 +313,8 @@ public class CourseController {
      */
     @PostMapping("/{id}/review/reject")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
-    @Operation(summary = "拒绝课程审核", description = "管理员拒绝课程审核")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_REVIEWER')")
+    @Operation(summary = "拒绝课程审核", description = "管理员或审核员拒绝课程审核")
     public Result<CourseVO> rejectCourse(
             @Parameter(description = "课程ID") @PathVariable("id") Long courseId,
             @Parameter(description = "拒绝原因") @RequestParam String reason) {

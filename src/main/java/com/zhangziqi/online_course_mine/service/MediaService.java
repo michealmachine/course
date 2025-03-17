@@ -59,6 +59,14 @@ public interface MediaService {
     MediaVO getMediaInfo(Long mediaId, Long institutionId);
     
     /**
+     * 获取媒体信息（预览模式，不验证机构ID）
+     *
+     * @param mediaId 媒体ID
+     * @return 包含临时访问URL的媒体信息
+     */
+    MediaVO getMediaByIdForPreview(Long mediaId);
+    
+    /**
      * 分页获取机构媒体列表
      *
      * @param institutionId 机构ID

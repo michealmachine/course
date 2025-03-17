@@ -5,14 +5,15 @@ import { useParams, useRouter } from 'next/navigation';
 import { ChapterList } from '@/components/dashboard/courses/chapter-list';
 import { ChapterSections } from '@/components/dashboard/courses/chapter-sections';
 import { courseService, chapterService } from '@/services';
-import { Course, Chapter } from '@/types/course';
+import { Course, Chapter, CourseStatus } from '@/types/course';
 import { Button } from '@/components/ui/button';
 import { 
   ArrowLeft, 
   Loader2, 
   BookOpen,
   AlertCircle,
-  Plus
+  Plus,
+  Info
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
@@ -194,12 +195,24 @@ export default function CourseChaptersPage() {
         </div>
       </div>
       
+      {course.status === CourseStatus.REVIEWING && (
+        <Alert className="mb-6 bg-amber-50 border-amber-200">
+          <Info className="h-4 w-4 text-amber-600" />
+          <AlertTitle className="text-amber-800">课程正在审核中</AlertTitle>
+          <AlertDescription className="text-amber-700">
+            课程正在审核中，不能修改章节内容。您可以查看课程章节结构，但无法进行编辑。
+            如需编辑，请等待审核完成或联系审核员。
+          </AlertDescription>
+        </Alert>
+      )}
+      
       {/* 使用ChapterList组件显示和管理章节 */}
       <ChapterList 
         courseId={courseId}
         onChapterClick={handleChapterClick}
         onChapterCreated={handleChapterUpdated}
         onChapterUpdated={handleChapterUpdated}
+        readOnly={course.status === CourseStatus.REVIEWING}
       />
     </div>
   );

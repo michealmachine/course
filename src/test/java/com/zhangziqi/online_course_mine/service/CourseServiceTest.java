@@ -9,6 +9,7 @@ import com.zhangziqi.online_course_mine.model.enums.CourseStatus;
 import com.zhangziqi.online_course_mine.model.enums.CourseVersion;
 import com.zhangziqi.online_course_mine.model.vo.CourseVO;
 import com.zhangziqi.online_course_mine.model.vo.PreviewUrlVO;
+import com.zhangziqi.online_course_mine.model.vo.CourseStructureVO;
 import com.zhangziqi.online_course_mine.repository.CategoryRepository;
 import com.zhangziqi.online_course_mine.repository.CourseRepository;
 import com.zhangziqi.online_course_mine.repository.InstitutionRepository;
@@ -25,6 +26,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.web.multipart.MultipartFile;
@@ -434,5 +436,125 @@ public class CourseServiceTest {
         verify(mockFile).getContentType();
         verify(mockFile).getSize();
         verify(mockFile, never()).getInputStream();
+    }
+
+    @Test
+    @DisplayName("获取指定状态的课程 - 成功")
+    void getCoursesByStatus_Success() {
+        // 准备测试数据
+        Pageable pageable = PageRequest.of(0, 10);
+        List<Course> courseList = List.of(testCourse);
+        Page<Course> coursePage = new PageImpl<>(courseList, pageable, courseList.size());
+        
+        when(courseRepository.findByStatus(anyInt(), any(Pageable.class))).thenReturn(coursePage);
+        
+        // 执行方法
+        Page<CourseVO> result = courseService.getCoursesByStatus(CourseStatus.PENDING_REVIEW.getValue(), pageable);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(testCourse.getId(), result.getContent().get(0).getId());
+        
+        // 验证方法调用
+        verify(courseRepository).findByStatus(CourseStatus.PENDING_REVIEW.getValue(), pageable);
+    }
+    
+    @Test
+    @DisplayName("获取审核员正在审核的课程 - 成功")
+    void getCoursesByStatusAndReviewer_Success() {
+        // 准备测试数据
+        Long reviewerId = 2L;
+        testCourse.setReviewerId(reviewerId);
+        testCourse.setStatus(CourseStatus.REVIEWING.getValue());
+        
+        Pageable pageable = PageRequest.of(0, 10);
+        List<Course> courseList = List.of(testCourse);
+        Page<Course> coursePage = new PageImpl<>(courseList, pageable, courseList.size());
+        
+        when(courseRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(coursePage);
+        
+        // 执行方法
+        Page<CourseVO> result = courseService.getCoursesByStatusAndReviewer(
+                CourseStatus.REVIEWING.getValue(), reviewerId, pageable);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(testCourse.getId(), result.getContent().get(0).getId());
+        assertEquals(reviewerId, result.getContent().get(0).getReviewerId());
+        assertEquals(CourseStatus.REVIEWING.getValue(), result.getContent().get(0).getStatus());
+        
+        // 验证方法调用
+        verify(courseRepository).findAll(any(Specification.class), eq(pageable));
+    }
+    
+    @Test
+    @DisplayName("获取课程结构 - 成功")
+    void getCourseStructure_Success() {
+        // 准备测试数据
+        // 为课程添加章节和小节
+        Chapter chapter = new Chapter();
+        chapter.setId(1L);
+        chapter.setTitle("测试章节");
+        chapter.setDescription("这是一个测试章节");
+        chapter.setOrderIndex(1);
+        chapter.setCourse(testCourse);
+        
+        Section section = new Section();
+        section.setId(1L);
+        section.setTitle("测试小节");
+        section.setDescription("这是一个测试小节");
+        section.setOrderIndex(1);
+        section.setContentType("video");
+        section.setChapter(chapter);
+        
+        List<Section> sections = List.of(section);
+        chapter.setSections(sections);
+        
+        List<Chapter> chapters = List.of(chapter);
+        testCourse.setChapters(chapters);
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
+        
+        // 执行方法
+        CourseStructureVO result = courseService.getCourseStructure(testCourse.getId());
+        
+        // 验证结果
+        assertNotNull(result);
+        assertNotNull(result.getCourse());
+        assertEquals(testCourse.getId(), result.getCourse().getId());
+        assertEquals(testCourse.getTitle(), result.getCourse().getTitle());
+        
+        // 验证章节信息
+        assertNotNull(result.getChapters());
+        assertEquals(1, result.getChapters().size());
+        assertEquals(chapter.getId(), result.getChapters().get(0).getId());
+        assertEquals(chapter.getTitle(), result.getChapters().get(0).getTitle());
+        
+        // 验证小节信息
+        assertNotNull(result.getChapters().get(0).getSections());
+        assertEquals(1, result.getChapters().get(0).getSections().size());
+        assertEquals(section.getId(), result.getChapters().get(0).getSections().get(0).getId());
+        assertEquals(section.getTitle(), result.getChapters().get(0).getSections().get(0).getTitle());
+        
+        // 验证方法调用
+        verify(courseRepository).findById(testCourse.getId());
+    }
+    
+    @Test
+    @DisplayName("获取课程结构 - 课程不存在")
+    void getCourseStructure_CourseNotFound() {
+        // 准备测试数据
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.empty());
+        
+        // 验证抛出异常
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, 
+                () -> courseService.getCourseStructure(1L));
+        
+        assertTrue(exception.getMessage().contains("课程不存在"));
+        
+        // 验证方法调用
+        verify(courseRepository).findById(1L);
     }
 } 

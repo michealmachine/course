@@ -36,10 +36,19 @@ public interface QuestionGroupService {
      *
      * @param groupId 题目组ID
      * @param institutionId 机构ID
-     * @param includeItems 是否包含题目项
+     * @param includeItems 是否包含题目
      * @return 题目组详情
      */
     QuestionGroupVO getGroupById(Long groupId, Long institutionId, boolean includeItems);
+    
+    /**
+     * 根据ID查询题目组详情（预览模式，不验证机构ID）
+     *
+     * @param groupId 题目组ID
+     * @param includeItems 是否包含题目
+     * @return 题目组详情
+     */
+    QuestionGroupVO getGroupByIdForPreview(Long groupId, boolean includeItems);
     
     /**
      * 删除题目组
@@ -112,35 +121,8 @@ public interface QuestionGroupService {
      */
     boolean updateItemsOrder(Long groupId, List<QuestionGroupItemDTO> itemDTOs, Long institutionId);
     
-    /**
-     * 根据课程小节ID获取相关题目组
-     *
-     * @param sectionId 课程小节ID
-     * @param institutionId 机构ID
-     * @return 题目组列表
-     */
-    List<QuestionGroupVO> getGroupsBySectionId(Long sectionId, Long institutionId);
-    
-    /**
-     * 关联题目组到课程小节
-     *
-     * @param groupId 题目组ID
-     * @param sectionId 课程小节ID
-     * @param institutionId 机构ID
-     * @return 是否关联成功
-     */
-    boolean associateGroupToSection(Long groupId, Long sectionId, Long institutionId);
-    
-    /**
-     * 解除题目组与课程小节的关联
-     *
-     * @param sectionId 课程小节ID
-     * @param groupId 题目组ID
-     * @param institutionId 机构ID
-     * @return 是否解除成功
-     */
-    boolean dissociateGroupFromSection(Long groupId, Long sectionId, Long institutionId);
-    
+
+
     /**
      * 批量添加题目到题目组
      *

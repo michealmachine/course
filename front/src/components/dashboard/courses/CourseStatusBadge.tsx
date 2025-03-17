@@ -1,5 +1,5 @@
 import { CourseStatus } from '@/types/course';
-import { FileEdit, Clock, CheckCircle, Ban } from 'lucide-react';
+import { FileEdit, Clock, CheckCircle, Ban, HourglassIcon, XCircle } from 'lucide-react';
 
 interface CourseStatusBadgeProps {
   status: CourseStatus | number;
@@ -13,6 +13,13 @@ export const CourseStatusBadge = ({ status, showIcon = true }: CourseStatusBadge
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
           {showIcon && <FileEdit className="h-3.5 w-3.5 mr-1" />}
           草稿
+        </span>
+      );
+    case CourseStatus.PENDING_REVIEW:
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+          {showIcon && <HourglassIcon className="h-3.5 w-3.5 mr-1" />}
+          待审核
         </span>
       );
     case CourseStatus.REVIEWING:
@@ -34,6 +41,13 @@ export const CourseStatusBadge = ({ status, showIcon = true }: CourseStatusBadge
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
           {showIcon && <Ban className="h-3.5 w-3.5 mr-1" />}
           已拒绝
+        </span>
+      );
+    case CourseStatus.UNPUBLISHED:
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+          {showIcon && <XCircle className="h-3.5 w-3.5 mr-1" />}
+          已下线
         </span>
       );
     default:

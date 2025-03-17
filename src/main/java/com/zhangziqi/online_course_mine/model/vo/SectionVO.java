@@ -100,21 +100,8 @@ public class SectionVO {
      */
     private Boolean showAnalysis;
     
-    /**
-     * 小节资源列表（可选，详情查询时返回）
-     * @deprecated 使用直接关联的媒体资源或题目组替代
-     */
-    @Deprecated
-    @Builder.Default
-    private List<SectionResourceVO> resources = new ArrayList<>();
-    
-    /**
-     * 小节题目组列表（可选，详情查询时返回）
-     * @deprecated 使用直接关联的媒体资源或题目组替代
-     */
-    @Deprecated
-    @Builder.Default
-    private List<SectionQuestionGroupVO> questionGroups = new ArrayList<>();
+
+
     
     /**
      * 创建时间
@@ -189,21 +176,7 @@ public class SectionVO {
         
         return builder.build();
     }
-    
-    /**
-     * 将实体转换为VO（包含资源信息）
-     * @deprecated 使用fromEntity方法代替，直接关联的资源已包含在基本信息中
-     */
-    @Deprecated
-    public static SectionVO fromEntityWithResources(Section entity) {
-        SectionVO vo = fromEntity(entity);
-        if (vo != null && entity.getResources() != null) {
-            vo.setResources(entity.getResources().stream()
-                .map(SectionResourceVO::fromEntity)
-                .collect(Collectors.toList()));
-        }
-        return vo;
-    }
+
     
     /**
      * 获取内容类型枚举

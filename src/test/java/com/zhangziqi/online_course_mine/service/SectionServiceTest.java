@@ -43,11 +43,7 @@ public class SectionServiceTest {
     @Mock
     private QuestionGroupRepository questionGroupRepository;
 
-    @Mock
-    private SectionResourceRepository sectionResourceRepository;
 
-    @Mock
-    private SectionQuestionGroupRepository sectionQuestionGroupRepository;
 
     @InjectMocks
     private SectionServiceImpl sectionService;
@@ -58,8 +54,6 @@ public class SectionServiceTest {
     private Section testSection;
     private Media testMedia;
     private QuestionGroup testQuestionGroup;
-    private SectionResource testSectionResource;
-    private SectionQuestionGroup testSectionQuestionGroup;
     private SectionCreateDTO testSectionCreateDTO;
     private SectionQuestionGroupConfigDTO testQuestionGroupConfigDTO;
     private String testResourceType = "primary";
@@ -117,25 +111,7 @@ public class SectionServiceTest {
                 .description("这是一个测试题目组")
                 .build();
 
-        // 创建测试小节资源
-        testSectionResource = SectionResource.builder()
-                .id(1L)
-                .section(testSection)
-                .media(testMedia)
-                .resourceType("primary")
-                .orderIndex(0)
-                .build();
 
-        // 创建测试小节题目组
-        testSectionQuestionGroup = SectionQuestionGroup.builder()
-                .id(1L)
-                .sectionId(testSection.getId())
-                .questionGroup(testQuestionGroup)
-                .orderIndex(0)
-                .randomOrder(false)
-                .orderByDifficulty(false)
-                .showAnalysis(true)
-                .build();
 
         // 创建测试小节创建DTO
         testSectionCreateDTO = SectionCreateDTO.builder()
@@ -290,8 +266,6 @@ public class SectionServiceTest {
         
         // 验证方法调用
         verify(sectionRepository).findById(testSection.getId());
-        verify(sectionResourceRepository).deleteBySection_Id(testSection.getId());
-        verify(sectionQuestionGroupRepository).deleteBySectionId(testSection.getId());
         verify(sectionRepository).delete(testSection);
     }
 

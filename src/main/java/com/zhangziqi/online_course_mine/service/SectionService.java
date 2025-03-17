@@ -1,11 +1,6 @@
 package com.zhangziqi.online_course_mine.service;
 
 import com.zhangziqi.online_course_mine.model.dto.section.*;
-import com.zhangziqi.online_course_mine.model.entity.Section;
-import com.zhangziqi.online_course_mine.model.entity.SectionResource;
-import com.zhangziqi.online_course_mine.model.entity.SectionQuestionGroup;
-import com.zhangziqi.online_course_mine.model.vo.SectionQuestionGroupVO;
-import com.zhangziqi.online_course_mine.model.vo.SectionResourceVO;
 import com.zhangziqi.online_course_mine.model.vo.SectionVO;
 
 import java.util.List;
@@ -107,4 +102,5 @@ public interface SectionService {
      * @return 更新后的小节
      */
     SectionVO removeQuestionGroup(Long sectionId);
+
 } 

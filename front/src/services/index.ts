@@ -9,6 +9,7 @@ import questionService from './question';
 import questionTagService from './question-tag';
 import userService from './user';
 import authService from './auth';
+import reviewService from './review-service';
 
 export {
   courseService,
@@ -21,5 +22,6 @@ export {
   questionService,
   questionTagService,
   userService,
-  authService
+  authService,
+  reviewService
 }; 

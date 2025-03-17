@@ -313,14 +313,25 @@ export default function CourseDetailPage() {
           <TabsList>
             <TabsTrigger value="info">基本信息</TabsTrigger>
             <TabsTrigger value="cover">封面图片</TabsTrigger>
-            <TabsTrigger value="content" disabled={course.status === CourseStatus.REVIEWING}>
+            <TabsTrigger value="content">
               课程内容
             </TabsTrigger>
           </TabsList>
           
           <TabsContent value="info" className="mt-6">
-            {(course.status === CourseStatus.DRAFT || course.status === CourseStatus.REJECTED) ? (
-              <CourseForm course={course} onSuccess={handleUpdateSuccess} />
+            {course.status !== CourseStatus.REVIEWING ? (
+              <>
+                {course.status === CourseStatus.PUBLISHED || course.status === CourseStatus.UNPUBLISHED ? (
+                  <Alert className="mb-4 bg-blue-50 border-blue-200">
+                    <Info className="h-4 w-4 text-blue-600" />
+                    <AlertTitle className="text-blue-800">课程已发布或已下线</AlertTitle>
+                    <AlertDescription className="text-blue-700">
+                      您正在编辑已发布或已下线状态的课程。请注意，修改后的内容不会立即对学员可见，需要重新提交审核。
+                    </AlertDescription>
+                  </Alert>
+                ) : null}
+                <CourseForm course={course} onSuccess={handleUpdateSuccess} />
+              </>
             ) : (
               <div className="rounded-md bg-amber-50 p-4">
                 <div className="flex">
@@ -328,9 +339,9 @@ export default function CourseDetailPage() {
                     <Info className="h-5 w-5 text-amber-400" />
                   </div>
                   <div className="ml-3">
-                    <h3 className="text-sm font-medium text-amber-800">课程审核中</h3>
+                    <h3 className="text-sm font-medium text-amber-800">课程信息</h3>
                     <div className="mt-2 text-sm text-amber-700">
-                      <p>课程正在审核中，无法编辑信息。审核通过后可以添加内容。</p>
+                      <p>审核中状态的课程暂不支持编辑。您可以使用预览功能查看课程内容。</p>
                     </div>
                   </div>
                 </div>
@@ -373,8 +384,16 @@ export default function CourseDetailPage() {
                   )}
                 </div>
                 
-                {(course.status === CourseStatus.DRAFT || course.status === CourseStatus.REJECTED) && (
+                {course.status !== CourseStatus.REVIEWING && (
                   <div className="space-y-4">
+                    {course.status === CourseStatus.PUBLISHED || course.status === CourseStatus.UNPUBLISHED ? (
+                      <Alert className="mb-4 bg-blue-50 border-blue-200">
+                        <Info className="h-4 w-4 text-blue-600" />
+                        <AlertDescription className="text-blue-700">
+                          您正在编辑已发布或已下线状态的课程封面。请注意，修改后的内容不会立即对学员可见，需要重新提交审核。
+                        </AlertDescription>
+                      </Alert>
+                    ) : null}
                     <div className="flex flex-col space-y-4">
                       <div className="flex items-center space-x-4">
                         <Button 
@@ -448,6 +467,16 @@ export default function CourseDetailPage() {
               </CardHeader>
               
               <CardContent>
+                {course.status === CourseStatus.REVIEWING && (
+                  <Alert className="mb-4 bg-amber-50 border-amber-200">
+                    <Info className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-amber-700">
+                      请注意：课程正在审核中，您对课程信息的任何修改都会直接影响审核人员看到的内容。
+                      建议在审核完成前谨慎修改，除非是为了完善审核人员提出的问题。
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
                 {isLoadingPreview ? (
                   <div className="flex items-center justify-center h-64">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />

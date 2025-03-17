@@ -3,27 +3,27 @@ package com.zhangziqi.online_course_mine.service.impl;
 import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.exception.ResourceNotFoundException;
 import com.zhangziqi.online_course_mine.model.dto.course.*;
-import com.zhangziqi.online_course_mine.model.entity.Category;
-import com.zhangziqi.online_course_mine.model.entity.Course;
-import com.zhangziqi.online_course_mine.model.entity.Institution;
-import com.zhangziqi.online_course_mine.model.entity.Tag;
+import com.zhangziqi.online_course_mine.model.entity.*;
 import com.zhangziqi.online_course_mine.model.enums.CourseStatus;
 import com.zhangziqi.online_course_mine.model.enums.CourseVersion;
 import com.zhangziqi.online_course_mine.model.enums.CoursePaymentType;
 import com.zhangziqi.online_course_mine.model.vo.CourseVO;
 import com.zhangziqi.online_course_mine.model.vo.PreviewUrlVO;
+import com.zhangziqi.online_course_mine.model.vo.CourseStructureVO;
 import com.zhangziqi.online_course_mine.repository.CategoryRepository;
 import com.zhangziqi.online_course_mine.repository.CourseRepository;
 import com.zhangziqi.online_course_mine.repository.InstitutionRepository;
 import com.zhangziqi.online_course_mine.repository.TagRepository;
 import com.zhangziqi.online_course_mine.service.CourseService;
 import com.zhangziqi.online_course_mine.service.MinioService;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -238,12 +238,23 @@ public class CourseServiceImpl implements CourseService {
         return CourseVO.fromEntity(course);
     }
     
+    @Override
+    @Transactional(readOnly = true)
+    public CourseStructureVO getCourseStructure(Long id) {
+        // 获取课程实体（带关联对象）
+        Course course = courseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("课程不存在，ID：" + id));
+        
+        // 使用CourseStructureVO的工厂方法创建结构对象
+        return CourseStructureVO.fromEntity(course);
+    }
+    
     /**
      * 查找课程实体（内部使用）
      */
     private Course findCourseById(Long id) {
         return courseRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("课程不存在，ID: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("课程不存在，ID：" + id));
     }
     
     @Override
@@ -253,7 +264,34 @@ public class CourseServiceImpl implements CourseService {
         Institution institution = institutionRepository.findById(institutionId)
                 .orElseThrow(() -> new ResourceNotFoundException("机构不存在，ID: " + institutionId));
         
-        Page<Course> coursePage = courseRepository.findByInstitution(institution, pageable);
+        // 只返回工作区版本的课程（非发布版本）
+        Page<Course> coursePage = courseRepository.findByInstitutionAndIsPublishedVersion(institution, false, pageable);
+        
+        // 转换为VO列表
+        List<CourseVO> courseVOs = coursePage.getContent().stream()
+                .map(CourseVO::fromEntity)
+                .collect(Collectors.toList());
+        
+        // 创建新的VO分页对象
+        return new PageImpl<>(courseVOs, pageable, coursePage.getTotalElements());
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public Page<CourseVO> getWorkspaceCoursesByInstitution(Long institutionId, Pageable pageable) {
+        // 直接调用更新后的getCoursesByInstitution方法，它现在只返回工作区版本
+        return getCoursesByInstitution(institutionId, pageable);
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public Page<CourseVO> getPublishedCoursesByInstitution(Long institutionId, Pageable pageable) {
+        // 验证机构是否存在
+        Institution institution = institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new ResourceNotFoundException("机构不存在，ID: " + institutionId));
+        
+        // 只返回发布版本的课程
+        Page<Course> coursePage = courseRepository.findByInstitutionAndIsPublishedVersion(institution, true, pageable);
         
         // 转换为VO列表
         List<CourseVO> courseVOs = coursePage.getContent().stream()
@@ -443,23 +481,87 @@ public class CourseServiceImpl implements CourseService {
             throw new BusinessException(400, "只有分配的审核人才能审核课程");
         }
         
-        // 更新课程状态为已发布
-        course.setStatusEnum(CourseStatus.PUBLISHED);
+        // 更新课程状态为草稿（工作区版本）
+        course.setStatusEnum(CourseStatus.DRAFT); // 修改为草稿而不是已发布
         course.setReviewComment(comment);
         course.setReviewedAt(LocalDateTime.now());
-        course.setVersionTypeEnum(CourseVersion.PUBLISHED);
+        course.setVersionTypeEnum(CourseVersion.DRAFT); // 工作区版本类型也变为草稿
         
         // 如果是首次发布，创建一个已发布版本
         if (course.getPublishedVersionId() == null) {
-            // 保存新发布的课程，获取ID
+            // 保存工作区版本课程，获取ID
             Course savedCourse = courseRepository.save(course);
             
             // 创建已发布版本
             Course publishedVersion = new Course();
-            BeanUtils.copyProperties(savedCourse, publishedVersion, "id", "dataVersion");
+            // 只复制基本属性，排除集合和关联实体
+            BeanUtils.copyProperties(savedCourse, publishedVersion, 
+                "id", "dataVersion", "chapters", "tags", "category", "institution");
             publishedVersion.setId(null); // 确保新对象没有ID
-            publishedVersion.setIsPublishedVersion(true);
+            publishedVersion.setIsPublishedVersion(true); // 标记为发布版本
             publishedVersion.setPublishedVersionId(savedCourse.getId());
+            publishedVersion.setStatusEnum(CourseStatus.PUBLISHED); // 发布版本状态设为已发布
+            publishedVersion.setVersionTypeEnum(CourseVersion.PUBLISHED); // 发布版本的版本类型为已发布
+            
+            // 设置关联的分类（只复制引用）
+            if (savedCourse.getCategory() != null) {
+                publishedVersion.setCategory(savedCourse.getCategory());
+            }
+            
+            // 设置关联的机构（只复制引用）
+            if (savedCourse.getInstitution() != null) {
+                publishedVersion.setInstitution(savedCourse.getInstitution());
+            }
+            
+            // 复制标签关联（不复制标签实体）
+            if (savedCourse.getTags() != null && !savedCourse.getTags().isEmpty()) {
+                publishedVersion.setTags(new HashSet<>(savedCourse.getTags()));
+            }
+            
+            // 深度复制章节和小节
+            if (savedCourse.getChapters() != null && !savedCourse.getChapters().isEmpty()) {
+                List<Chapter> copiedChapters = new ArrayList<>();
+                
+                for (Chapter originalChapter : savedCourse.getChapters()) {
+                    // 创建新章节对象
+                    Chapter copiedChapter = new Chapter();
+                    // 复制基本属性（排除集合和关联实体）
+                    BeanUtils.copyProperties(originalChapter, copiedChapter, 
+                        "id", "course", "sections", "dataVersion");
+                    copiedChapter.setCourse(publishedVersion);
+                    
+                    // 深度复制小节
+                    if (originalChapter.getSections() != null && !originalChapter.getSections().isEmpty()) {
+                        List<Section> copiedSections = new ArrayList<>();
+                        
+                        for (Section originalSection : originalChapter.getSections()) {
+                            // 创建新小节对象
+                            Section copiedSection = new Section();
+                            // 复制基本属性（排除关联实体）
+                            BeanUtils.copyProperties(originalSection, copiedSection, 
+                                "id", "chapter", "media", "questionGroup", "dataVersion");
+                            copiedSection.setChapter(copiedChapter);
+                            
+                            // 设置媒体资源和题库引用（不复制这些实体）
+                            if (originalSection.getMediaId() != null) {
+                                copiedSection.setMediaId(originalSection.getMediaId());
+                            }
+                            
+                            if (originalSection.getQuestionGroupId() != null) {
+                                copiedSection.setQuestionGroupId(originalSection.getQuestionGroupId());
+                            }
+                            
+                            copiedSections.add(copiedSection);
+                        }
+                        
+                        copiedChapter.setSections(copiedSections);
+                    }
+                    
+                    copiedChapters.add(copiedChapter);
+                }
+                
+                publishedVersion.setChapters(copiedChapters);
+            }
             
             // 保存已发布版本
             Course savedPublishedVersion = courseRepository.save(publishedVersion);
@@ -476,8 +578,85 @@ public class CourseServiceImpl implements CourseService {
             
             if (publishedVersionOpt.isPresent()) {
                 Course publishedVersion = publishedVersionOpt.get();
-                BeanUtils.copyProperties(course, publishedVersion, "id", "dataVersion", 
-                        "isPublishedVersion", "publishedVersionId");
+                // 只更新基本属性，不更新集合或关联实体
+                BeanUtils.copyProperties(course, publishedVersion, 
+                    "id", "dataVersion", "chapters", "tags", "category", "institution",
+                    "isPublishedVersion", "publishedVersionId", "status", "versionType");
+                
+                // 确保发布版本的状态为已发布
+                publishedVersion.setStatusEnum(CourseStatus.PUBLISHED);
+                publishedVersion.setVersionTypeEnum(CourseVersion.PUBLISHED);
+                publishedVersion.setReviewComment(comment);
+                publishedVersion.setReviewedAt(LocalDateTime.now());
+                
+                // 设置关联的分类和机构（只复制引用）
+                if (course.getCategory() != null) {
+                    publishedVersion.setCategory(course.getCategory());
+                }
+                
+                if (course.getInstitution() != null) {
+                    publishedVersion.setInstitution(course.getInstitution());
+                }
+                
+                // 复制标签关联（不复制标签实体）
+                if (course.getTags() != null) {
+                    publishedVersion.setTags(new HashSet<>(course.getTags()));
+                } else {
+                    publishedVersion.setTags(new HashSet<>());
+                }
+                
+                // 清空现有章节 - 依赖JPA级联删除
+                // 由于配置了cascade=CascadeType.ALL和orphanRemoval=true，
+                // 清空集合会自动删除数据库中的章节和关联的小节
+                if (publishedVersion.getChapters() != null) {
+                    publishedVersion.getChapters().clear();
+                } else {
+                    publishedVersion.setChapters(new ArrayList<>());
+                }
+                
+                // 持久化变更，确保级联删除执行
+                courseRepository.saveAndFlush(publishedVersion);
+                
+                // 深度复制章节和小节
+                if (course.getChapters() != null && !course.getChapters().isEmpty()) {
+                    for (Chapter originalChapter : course.getChapters()) {
+                        // 创建新章节对象
+                        Chapter copiedChapter = new Chapter();
+                        // 复制基本属性（排除集合和关联实体）
+                        BeanUtils.copyProperties(originalChapter, copiedChapter, 
+                            "id", "course", "sections", "dataVersion");
+                        copiedChapter.setCourse(publishedVersion);
+                        
+                        // 为小节集合初始化
+                        copiedChapter.setSections(new ArrayList<>());
+                        
+                        // 深度复制小节
+                        if (originalChapter.getSections() != null && !originalChapter.getSections().isEmpty()) {
+                            for (Section originalSection : originalChapter.getSections()) {
+                                // 创建新小节对象
+                                Section copiedSection = new Section();
+                                // 复制基本属性（排除关联实体）
+                                BeanUtils.copyProperties(originalSection, copiedSection, 
+                                    "id", "chapter", "media", "questionGroup", "dataVersion");
+                                copiedSection.setChapter(copiedChapter);
+                                
+                                // 设置媒体资源和题库引用（不复制这些实体）
+                                if (originalSection.getMediaId() != null) {
+                                    copiedSection.setMediaId(originalSection.getMediaId());
+                                }
+                                
+                                if (originalSection.getQuestionGroupId() != null) {
+                                    copiedSection.setQuestionGroupId(originalSection.getQuestionGroupId());
+                                }
+                                
+                                copiedChapter.getSections().add(copiedSection);
+                            }
+                        }
+                        
+                        publishedVersion.getChapters().add(copiedChapter);
+                    }
+                }
+                
                 courseRepository.save(publishedVersion);
             }
             
@@ -633,6 +812,28 @@ public class CourseServiceImpl implements CourseService {
     }
     
     @Override
+    public CourseStructureVO getCourseStructureByPreviewToken(String token) {
+        // 从Redis中获取token对应的课程ID
+        String courseIdStr = redisTemplate.opsForValue().get(PREVIEW_TOKEN_KEY_PREFIX + token);
+        
+        if (courseIdStr == null) {
+            log.warn("预览token不存在或已过期: {}", token);
+            throw new BusinessException(403, "预览链接不存在或已过期");
+        }
+        
+        try {
+            Long courseId = Long.parseLong(courseIdStr);
+            log.info("通过预览token获取课程结构 - token: {}, 课程ID: {}", token, courseId);
+            
+            // 直接调用获取课程结构的方法
+            return getCourseStructure(courseId);
+        } catch (NumberFormatException e) {
+            log.error("Redis中存储的课程ID格式错误: {}", courseIdStr, e);
+            throw new BusinessException(500, "系统错误，无法获取预览课程");
+        }
+    }
+    
+    @Override
     @Transactional
     public CourseVO updatePaymentSettings(Long id, Integer paymentType, BigDecimal price, BigDecimal discountPrice) {
         // 获取课程
@@ -665,5 +866,35 @@ public class CourseServiceImpl implements CourseService {
         
         // 转换为VO并返回
         return CourseVO.fromEntity(updatedCourse);
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public Page<CourseVO> getCoursesByStatus(Integer status, Pageable pageable) {
+        // 获取指定状态的课程列表
+        Page<Course> coursePage = courseRepository.findByStatus(status, pageable);
+        
+        // 转换为VO
+        return coursePage.map(CourseVO::fromEntity);
+    }
+    
+    @Override
+    public Page<CourseVO> getCoursesByStatusAndReviewer(Integer status, Long reviewerId, Pageable pageable) {
+        Specification<Course> spec = (root, query, cb) -> {
+            return cb.and(
+                cb.equal(root.get("status"), status),
+                cb.equal(root.get("reviewerId"), reviewerId)
+            );
+        };
+        
+        Page<Course> coursePage = courseRepository.findAll(spec, pageable);
+        return coursePage.map(CourseVO::fromEntity);
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public CourseVO getPublishedVersionByWorkspaceId(Long workspaceId) {
+        Optional<Course> publishedVersionOpt = courseRepository.findPublishedVersionByWorkspaceId(workspaceId);
+        return publishedVersionOpt.map(CourseVO::fromEntity).orElse(null);
     }
 } 

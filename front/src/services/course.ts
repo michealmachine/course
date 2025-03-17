@@ -5,10 +5,30 @@ import {
   Course, CourseCreateDTO, 
   PreviewUrlVO, 
   CourseStatus,
-  CoursePaymentType
+  CoursePaymentType,
+  CourseQueryParams,
+  CourseListResponse
 } from '@/types/course';
 import { ApiResponse, PaginationResult } from '@/types/api';
 import { AxiosResponse } from 'axios';
+
+/**
+ * 构建查询参数
+ */
+const buildQueryParams = (params?: CourseQueryParams): any => {
+  if (!params) return {};
+  
+  const queryParams: any = {};
+  if (params.page !== undefined) queryParams.page = params.page;
+  if (params.size !== undefined) queryParams.size = params.size;
+  if (params.keyword) queryParams.keyword = params.keyword;
+  if (params.status !== undefined) queryParams.status = params.status;
+  if (params.categoryId) queryParams.categoryId = params.categoryId;
+  if (params.difficulty !== undefined) queryParams.difficulty = params.difficulty;
+  if (params.sortBy) queryParams.sort = `${params.sortBy},${params.sortDir || 'asc'}`;
+  
+  return queryParams;
+};
 
 /**
  * 课程管理服务
@@ -296,6 +316,38 @@ const courseService = {
       return response.data.data;
     } catch (error) {
       console.error(`重新编辑被拒绝的课程失败, ID: ${id}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * 获取机构发布版本课程列表
+   */
+  getPublishedCoursesByInstitution: async (params?: CourseQueryParams): Promise<CourseListResponse> => {
+    try {
+      const queryParams = buildQueryParams(params);
+      const response: AxiosResponse<ApiResponse<CourseListResponse>> = await request.get<CourseListResponse>(
+        '/courses/published',
+        { params: queryParams }
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error('获取机构发布版本课程列表失败:', error);
+      throw error;
+    }
+  },
+  
+  /**
+   * 获取课程的发布版本
+   */
+  getPublishedVersion: async (courseId: number): Promise<Course> => {
+    try {
+      const response: AxiosResponse<ApiResponse<Course>> = await request.get<Course>(
+        `/courses/${courseId}/published-version`
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error(`获取课程发布版本失败, ID: ${courseId}:`, error);
       throw error;
     }
   }

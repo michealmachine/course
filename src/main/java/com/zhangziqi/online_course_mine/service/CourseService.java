@@ -1,6 +1,7 @@
 package com.zhangziqi.online_course_mine.service;
 
 import com.zhangziqi.online_course_mine.model.dto.course.*;
+import com.zhangziqi.online_course_mine.model.vo.CourseStructureVO;
 import com.zhangziqi.online_course_mine.model.vo.CourseVO;
 import com.zhangziqi.online_course_mine.model.vo.PreviewUrlVO;
 import org.springframework.data.domain.Page;
@@ -40,6 +41,14 @@ public interface CourseService {
      * @return 课程
      */
     CourseVO getCourseById(Long id);
+    
+    /**
+     * 获取课程完整结构（包括章节和小节）
+     *
+     * @param id 课程ID
+     * @return 课程结构（含章节和小节）
+     */
+    CourseStructureVO getCourseStructure(Long id);
 
     /**
      * 获取机构下的课程列表
@@ -145,6 +154,14 @@ public interface CourseService {
     CourseVO getCourseByPreviewToken(String token);
 
     /**
+     * 通过预览令牌获取课程结构
+     *
+     * @param token 预览令牌
+     * @return 课程结构（含章节和小节）
+     */
+    CourseStructureVO getCourseStructureByPreviewToken(String token);
+
+    /**
      * 更新课程支付设置
      *
      * @param id 课程ID
@@ -155,4 +172,49 @@ public interface CourseService {
      */
     CourseVO updatePaymentSettings(Long id, Integer paymentType, 
         java.math.BigDecimal price, java.math.BigDecimal discountPrice);
+
+    /**
+     * 获取指定状态的课程列表
+     *
+     * @param status 课程状态
+     * @param pageable 分页参数
+     * @return 课程分页
+     */
+    Page<CourseVO> getCoursesByStatus(Integer status, Pageable pageable);
+    
+    /**
+     * 获取指定状态且由特定审核员负责的课程列表
+     *
+     * @param status 课程状态
+     * @param reviewerId 审核员ID
+     * @param pageable 分页参数
+     * @return 课程分页
+     */
+    Page<CourseVO> getCoursesByStatusAndReviewer(Integer status, Long reviewerId, Pageable pageable);
+
+    /**
+     * 获取机构的工作区课程列表（非发布版本）
+     * 
+     * @param institutionId 机构ID
+     * @param pageable 分页参数
+     * @return 课程VO分页
+     */
+    Page<CourseVO> getWorkspaceCoursesByInstitution(Long institutionId, Pageable pageable);
+
+    /**
+     * 获取机构的发布课程列表
+     * 
+     * @param institutionId 机构ID
+     * @param pageable 分页参数
+     * @return 课程VO分页
+     */
+    Page<CourseVO> getPublishedCoursesByInstitution(Long institutionId, Pageable pageable);
+    
+    /**
+     * 根据工作区版本ID获取发布版本
+     * 
+     * @param workspaceId 工作区版本ID
+     * @return 发布版本课程，如果不存在则返回null
+     */
+    CourseVO getPublishedVersionByWorkspaceId(Long workspaceId);
 } 

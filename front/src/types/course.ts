@@ -61,10 +61,12 @@ export interface CategoryTree {
 
 // 课程状态枚举
 export enum CourseStatus {
-  DRAFT = 0,         // 草稿
-  REVIEWING = 1,     // 审核中
-  PUBLISHED = 2,     // 已发布
-  REJECTED = 3       // 已拒绝
+  DRAFT = 0,              // 草稿
+  PENDING_REVIEW = 1,     // 待审核
+  REVIEWING = 2,          // 审核中
+  REJECTED = 3,           // 已拒绝
+  PUBLISHED = 4,          // 已发布
+  UNPUBLISHED = 5         // 已下线
 }
 
 // 付费类型枚举
@@ -102,6 +104,7 @@ export interface Course {
   status: number;
   versionType: number;
   isPublishedVersion?: boolean;
+  publishedVersionId?: number; // 指向发布版本的ID
   creatorId?: number;
   creatorName?: string;
   institution?: InstitutionVO;
@@ -323,4 +326,77 @@ export interface PreviewUrlVO {
   expireTime: string;
   courseId: number;
   courseTitle: string;
+}
+
+/**
+ * 课程结构视图对象
+ */
+export interface CourseStructureVO {
+  course: Course;
+  chapters: ChapterVO[];
+}
+
+/**
+ * 章节视图对象
+ */
+export interface ChapterVO {
+  id: number;
+  title: string;
+  description?: string;
+  order: number;
+  accessType: number;
+  estimatedMinutes?: number;
+  sections: SectionVO[];
+}
+
+/**
+ * 小节视图对象
+ */
+export interface SectionVO {
+  id: number;
+  title: string;
+  description?: string;
+  order: number;
+  duration?: number;
+  resourceTypeDiscriminator: 'MEDIA' | 'QUESTION_GROUP' | 'NONE';
+  mediaId?: number;
+  questionGroupId?: number;
+  accessType?: number;
+}
+
+// 课程查询参数
+export interface CourseQueryParams {
+  page?: number;
+  size?: number;
+  keyword?: string;
+  status?: CourseStatus;
+  categoryId?: number;
+  difficulty?: CourseDifficulty;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
+}
+
+// 课程列表响应
+export interface CourseListResponse {
+  content: Course[];
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  number: number;
+  empty: boolean;
+  first: boolean;
+  last: boolean;
+  numberOfElements: number;
+  pageable: {
+    pageNumber: number;
+    pageSize: number;
+    sort?: {
+      sorted: boolean;
+      unsorted: boolean;
+      empty: boolean;
+    };
+    offset: number;
+    paged: boolean;
+    unpaged: boolean;
+  };
 } 

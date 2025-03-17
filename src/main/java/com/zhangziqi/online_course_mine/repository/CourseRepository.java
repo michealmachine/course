@@ -67,6 +67,15 @@ public interface CourseRepository extends JpaRepository<Course, Long>, JpaSpecif
     Optional<Course> findByPublishedVersionId(Long publishedVersionId);
     
     /**
+     * 查找工作区版本对应的发布版本
+     * 
+     * @param workspaceId 工作区版本ID
+     * @return 发布版本
+     */
+    @Query("SELECT c FROM Course c WHERE c.publishedVersionId = :workspaceId AND c.isPublishedVersion = true")
+    Optional<Course> findPublishedVersionByWorkspaceId(@Param("workspaceId") Long workspaceId);
+    
+    /**
      * 根据课程状态查找课程（分页）
      * 
      * @param status 课程状态
@@ -111,4 +120,35 @@ public interface CourseRepository extends JpaRepository<Course, Long>, JpaSpecif
      * @return 课程分页
      */
     Page<Course> findByIsPublishedVersion(Boolean isPublishedVersion, Pageable pageable);
+    
+    /**
+     * 根据机构ID和isPublishedVersion字段查询课程
+     * 
+     * @param institution 机构
+     * @param isPublishedVersion 是否为发布版本
+     * @param pageable 分页参数
+     * @return 课程分页
+     */
+    Page<Course> findByInstitutionAndIsPublishedVersion(Institution institution, Boolean isPublishedVersion, Pageable pageable);
+    
+    /**
+     * 根据机构ID和发布版本状态查询课程
+     * 
+     * @param institutionId 机构ID
+     * @param isPublishedVersion 发布版本状态
+     * @param pageable 分页参数
+     * @return 课程分页
+     */
+    @Query("SELECT c FROM Course c WHERE c.institution.id = :institutionId AND c.isPublishedVersion = :isPublishedVersion")
+    Page<Course> findByInstitutionIdAndIsPublishedVersion(Long institutionId, Boolean isPublishedVersion, Pageable pageable);
+    
+    /**
+     * 根据状态和是否为发布版本查询课程
+     * 
+     * @param status 课程状态
+     * @param isPublishedVersion 是否为发布版本
+     * @param pageable 分页参数
+     * @return 课程分页
+     */
+    Page<Course> findByStatusAndIsPublishedVersion(Integer status, Boolean isPublishedVersion, Pageable pageable);
 } 

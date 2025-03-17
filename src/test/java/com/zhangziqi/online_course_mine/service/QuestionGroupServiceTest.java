@@ -42,9 +42,6 @@ public class QuestionGroupServiceTest {
     private QuestionGroupItemRepository groupItemRepository;
 
     @Mock
-    private SectionQuestionGroupRepository sectionGroupRepository;
-
-    @Mock
     private QuestionRepository questionRepository;
 
     @Mock
@@ -383,51 +380,6 @@ public class QuestionGroupServiceTest {
     }
 
     @Test
-    @DisplayName("关联题目组到章节 - 成功")
-    void associateGroupToSection_Success() {
-        // 设置模拟行为
-        when(groupRepository.findByIdAndInstitutionId(anyLong(), anyLong())).thenReturn(Optional.of(testGroup));
-        when(sectionGroupRepository.existsByGroupIdAndSectionId(anyLong(), anyLong())).thenReturn(false);
-        when(sectionGroupRepository.save(any(SectionQuestionGroup.class))).thenReturn(new SectionQuestionGroup());
-
-        // 执行测试
-        boolean result = questionGroupService.associateGroupToSection(testGroup.getId(), 1L, testInstitution.getId());
-
-        // 验证结果
-        assertTrue(result);
-
-        // 验证方法调用
-        verify(groupRepository).findByIdAndInstitutionId(testGroup.getId(), testInstitution.getId());
-        verify(sectionGroupRepository).existsByGroupIdAndSectionId(testGroup.getId(), 1L);
-        verify(sectionGroupRepository).save(any(SectionQuestionGroup.class));
-    }
-
-    @Test
-    @DisplayName("根据章节ID获取关联的题目组 - 成功")
-    void getGroupsBySectionId_Success() {
-        // 设置模拟行为
-        when(sectionGroupRepository.findGroupIdsBySectionId(anyLong())).thenReturn(List.of(testGroup.getId()));
-        when(groupRepository.findByIdInAndInstitutionId(anyList(), anyLong())).thenReturn(List.of(testGroup));
-        when(groupRepository.countQuestionsByGroupIds(anyList())).thenReturn(testQuestionCountResult);
-
-        // 执行测试
-        List<QuestionGroupVO> results = questionGroupService.getGroupsBySectionId(1L, testInstitution.getId());
-
-        // 验证结果
-        assertNotNull(results);
-        assertEquals(1, results.size());
-        assertEquals(testGroup.getId(), results.get(0).getId());
-        assertEquals(testGroup.getName(), results.get(0).getName());
-        assertEquals(testGroup.getDescription(), results.get(0).getDescription());
-        assertEquals(5L, results.get(0).getQuestionCount());
-
-        // 验证方法调用
-        verify(sectionGroupRepository).findGroupIdsBySectionId(1L);
-        verify(groupRepository).findByIdInAndInstitutionId(List.of(testGroup.getId()), testInstitution.getId());
-        verify(groupRepository).countQuestionsByGroupIds(List.of(testGroup.getId()));
-    }
-
-    @Test
     @DisplayName("更新题目组 - 成功")
     void updateGroup_Success() {
         // 设置模拟行为
@@ -486,7 +438,6 @@ public class QuestionGroupServiceTest {
         // 设置模拟行为
         when(groupRepository.findByIdAndInstitutionId(anyLong(), anyLong())).thenReturn(Optional.of(testGroup));
         doNothing().when(groupItemRepository).deleteByGroupId(anyLong());
-        doNothing().when(sectionGroupRepository).deleteByGroupId(anyLong());
         doNothing().when(groupRepository).delete(any(QuestionGroup.class));
 
         // 执行测试
@@ -497,7 +448,6 @@ public class QuestionGroupServiceTest {
         // 验证方法调用
         verify(groupRepository).findByIdAndInstitutionId(testGroup.getId(), testInstitution.getId());
         verify(groupItemRepository).deleteByGroupId(testGroup.getId());
-        verify(sectionGroupRepository).deleteByGroupId(testGroup.getId());
         verify(groupRepository).delete(testGroup);
     }
 
@@ -515,7 +465,6 @@ public class QuestionGroupServiceTest {
         // 验证方法调用
         verify(groupRepository).findByIdAndInstitutionId(999L, testInstitution.getId());
         verify(groupItemRepository, never()).deleteByGroupId(anyLong());
-        verify(sectionGroupRepository, never()).deleteByGroupId(anyLong());
         verify(groupRepository, never()).delete(any(QuestionGroup.class));
     }
 
@@ -562,56 +511,7 @@ public class QuestionGroupServiceTest {
         verify(groupItemRepository, never()).findByGroupIdOrderByOrderIndex(anyLong());
     }
 
-    @Test
-    @DisplayName("取消题目组与章节的关联 - 成功")
-    void dissociateGroupFromSection_Success() {
-        // 设置模拟行为
-        when(groupRepository.findByIdAndInstitutionId(anyLong(), anyLong())).thenReturn(Optional.of(testGroup));
-        doNothing().when(sectionGroupRepository).deleteByGroupIdAndSectionId(anyLong(), anyLong());
 
-        // 执行测试
-        boolean result = questionGroupService.dissociateGroupFromSection(testGroup.getId(), 1L, testInstitution.getId());
-
-        // 验证结果
-        assertTrue(result);
-
-        // 验证方法调用
-        verify(groupRepository).findByIdAndInstitutionId(testGroup.getId(), testInstitution.getId());
-        verify(sectionGroupRepository).deleteByGroupIdAndSectionId(testGroup.getId(), 1L);
-    }
-
-    @Test
-    @DisplayName("取消题目组与章节的关联 - 题目组不存在")
-    void dissociateGroupFromSection_GroupNotFound() {
-        // 设置模拟行为
-        when(groupRepository.findByIdAndInstitutionId(anyLong(), anyLong())).thenReturn(Optional.empty());
-
-        // 执行测试并验证异常
-        assertThrows(ResourceNotFoundException.class, () -> {
-            questionGroupService.dissociateGroupFromSection(999L, 1L, testInstitution.getId());
-        });
-
-        // 验证方法调用
-        verify(groupRepository).findByIdAndInstitutionId(999L, testInstitution.getId());
-        verify(sectionGroupRepository, never()).deleteByGroupIdAndSectionId(anyLong(), anyLong());
-    }
-
-    @Test
-    @DisplayName("取消题目组与章节的关联 - 异常情况")
-    void dissociateGroupFromSection_Exception() {
-        // 设置模拟行为
-        when(groupRepository.findByIdAndInstitutionId(anyLong(), anyLong())).thenReturn(Optional.of(testGroup));
-        doThrow(new RuntimeException("删除失败")).when(sectionGroupRepository).deleteByGroupIdAndSectionId(anyLong(), anyLong());
-
-        // 执行测试并验证异常
-        assertThrows(BusinessException.class, () -> {
-            questionGroupService.dissociateGroupFromSection(testGroup.getId(), 1L, testInstitution.getId());
-        });
-
-        // 验证方法调用
-        verify(groupRepository).findByIdAndInstitutionId(testGroup.getId(), testInstitution.getId());
-        verify(sectionGroupRepository).deleteByGroupIdAndSectionId(testGroup.getId(), 1L);
-    }
 
     @Test
     @DisplayName("添加不同类型的题目到题目组")

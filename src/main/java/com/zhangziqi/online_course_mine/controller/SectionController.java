@@ -1,8 +1,6 @@
 package com.zhangziqi.online_course_mine.controller;
 
 import com.zhangziqi.online_course_mine.model.dto.section.*;
-import com.zhangziqi.online_course_mine.model.vo.SectionQuestionGroupVO;
-import com.zhangziqi.online_course_mine.model.vo.SectionResourceVO;
 import com.zhangziqi.online_course_mine.model.vo.SectionVO;
 import com.zhangziqi.online_course_mine.model.vo.Result;
 import com.zhangziqi.online_course_mine.security.SecurityUtil;

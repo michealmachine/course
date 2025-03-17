@@ -32,6 +32,7 @@ public class CourseVO {
     private Integer status;
     private Integer versionType;
     private Boolean isPublishedVersion;
+    private Long publishedVersionId;
     private Long creatorId;
     private String creatorName;
     private InstitutionVO institution;
@@ -74,6 +75,7 @@ public class CourseVO {
                 .status(course.getStatus())
                 .versionType(course.getVersionType())
                 .isPublishedVersion(course.getIsPublishedVersion())
+                .publishedVersionId(course.getPublishedVersionId())
                 .creatorId(course.getCreatorId())
                 .creatorName("")
                 .paymentType(course.getPaymentType())
@@ -141,5 +143,41 @@ public class CourseVO {
      */
     public CoursePaymentType getPaymentTypeEnum() {
         return CoursePaymentType.getByValue(this.paymentType);
+    }
+
+    /**
+     * 获取版本类型显示文本
+     */
+    public String getVersionTypeText() {
+        if (Boolean.TRUE.equals(isPublishedVersion)) {
+            return "发布版本";
+        } else {
+            // 工作区版本，返回当前状态
+            String statusText = "";
+            if (status != null) {
+                switch (status) {
+                    case 1: return "草稿版本";
+                    case 2: return "待审核版本";
+                    case 3: return "审核中版本";
+                    case 4: return "已拒绝版本";
+                    case 5: return "已发布版本";
+                    case 6: return "已下线版本";
+                    default: statusText = "未知状态";
+                }
+            }
+            return "工作区" + (statusText.isEmpty() ? "" : " - " + statusText);
+        }
+    }
+    
+    /**
+     * 获取发布状态文本
+     * @return 文本说明课程是否已发布
+     */
+    public String getPublishStateText() {
+        if (publishedVersionId != null) {
+            return "已发布";
+        } else {
+            return "未发布";
+        }
     }
 } 

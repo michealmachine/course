@@ -115,7 +115,7 @@ const menuItems: MenuItem[] = [
     title: '内容审核',
     href: '/dashboard/reviews',
     icon: <FileText className="w-5 h-5" />,
-    roles: [UserRole.ADMIN],
+    roles: [UserRole.ADMIN, UserRole.REVIEWER],
   },
   {
     title: '统计数据',

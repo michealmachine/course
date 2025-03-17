@@ -99,14 +99,6 @@ public class Section extends BaseEntity {
     @Builder.Default
     private Boolean showAnalysis = true;
 
-    /**
-     * 小节资源 (已弃用，保留向后兼容)
-     * @deprecated 使用直接关联的媒体资源或题目组替代
-     */
-    @Deprecated
-    @OneToMany(mappedBy = "section", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<SectionResource> resources = new ArrayList<>();
 
     /**
      * 获取章节ID

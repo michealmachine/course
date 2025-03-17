@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AlertCircle, FileEdit, Plus, Search, Trash2 } from 'lucide-react';
+import { AlertCircle, FileEdit, Plus, Search, Trash2, Eye, ExternalLink } from 'lucide-react';
 import useCourseStore from '@/stores/course-store';
 import { courseService } from '@/services';
 import { CourseStatus, CoursePaymentType, Course } from '@/types/course';
@@ -44,9 +44,13 @@ import {
   DialogTrigger 
 } from '@/components/ui/dialog';
 import CourseStatusBadge from '@/components/dashboard/courses/CourseStatusBadge';
+import CoursePublishBadge from '@/components/dashboard/courses/CoursePublishBadge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/components/ui/use-toast';
 
 export default function CoursesPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const {
     courses,
     totalCourses,
@@ -68,6 +72,10 @@ export default function CoursesPage() {
     courseId: null
   });
   
+  // 当前视图类型: workspace-工作区课程，published-已发布课程
+  const [viewType, setViewType] = useState<'workspace' | 'published'>('workspace');
+  const [isLoadingPublishedVersion, setIsLoadingPublishedVersion] = useState(false);
+  
   // 课程状态选项
   const statusOptions = [
     { value: null, label: '全部状态' },
@@ -79,10 +87,14 @@ export default function CoursesPage() {
   
   // 初始加载
   useEffect(() => {
-    loadCourses();
-  }, [currentPage, pageSize, filterTitle, filterStatus]);
+    if (viewType === 'workspace') {
+      loadCourses();
+    } else {
+      loadPublishedCourses();
+    }
+  }, [currentPage, pageSize, filterTitle, filterStatus, viewType]);
   
-  // 加载课程列表
+  // 加载工作区课程列表
   const loadCourses = async () => {
     try {
       setLoading(true);
@@ -123,6 +135,47 @@ export default function CoursesPage() {
     }
   };
   
+  // 加载已发布版本课程列表
+  const loadPublishedCourses = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const result = await courseService.getPublishedCoursesByInstitution({
+        page: currentPage - 1, 
+        size: pageSize,
+        keyword: filterTitle,
+        status: filterStatus as CourseStatus
+      });
+      
+      // 检查返回结果格式并安全处理
+      if (result && typeof result === 'object') {
+        if (Array.isArray(result)) {
+          // 如果直接返回数组
+          setCourses(result, result.length);
+        } else if (result.content && Array.isArray(result.content)) {
+          // 如果返回分页对象
+          setCourses(result.content, result.totalElements || result.content.length);
+        } else {
+          // 格式不匹配
+          setCourses([], 0);
+          setError('返回数据格式不正确');
+          console.error('API返回格式不匹配:', result);
+        }
+      } else {
+        setCourses([], 0);
+        setError('未能获取课程数据');
+        console.error('API返回格式不匹配或为空:', result);
+      }
+    } catch (error: any) {
+      console.error('加载已发布课程列表失败:', error);
+      setError(error.message || '加载已发布课程列表失败');
+      setCourses([], 0);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   // 创建新课程
   const handleCreateCourse = () => {
     router.push('/dashboard/courses/create');
@@ -131,6 +184,28 @@ export default function CoursesPage() {
   // 编辑课程
   const handleEditCourse = (id: number) => {
     router.push(`/dashboard/courses/${id}`);
+  };
+  
+  // 查看课程
+  const handleViewCourse = (id: number) => {
+    router.push(`/dashboard/courses/${id}`);
+  };
+  
+  // 查看发布版本
+  const handleViewPublishedVersion = async (courseId: number) => {
+    try {
+      setIsLoadingPublishedVersion(true);
+      const publishedVersion = await courseService.getPublishedVersion(courseId);
+      router.push(`/dashboard/courses/${publishedVersion.id}`);
+    } catch (error: any) {
+      console.error('获取发布版本失败:', error);
+      toast({
+        title: '获取发布版本失败',
+        description: error.message || '无法获取发布版本',
+      } as any);
+    } finally {
+      setIsLoadingPublishedVersion(false);
+    }
   };
   
   // 删除课程
@@ -231,149 +306,289 @@ export default function CoursesPage() {
         </Alert>
       )}
       
-      {/* 搜索和筛选 */}
-      <div className="flex gap-4 items-center">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="搜索课程..."
-            value={filterTitle}
-            onChange={(e) => setFilter({ title: e.target.value })}
-            className="pl-8"
-          />
-        </div>
+      {/* 版本切换 */}
+      <Tabs value={viewType} onValueChange={(value) => setViewType(value as 'workspace' | 'published')}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="workspace">工作区课程</TabsTrigger>
+          <TabsTrigger value="published">已发布课程</TabsTrigger>
+        </TabsList>
         
-        <Select
-          value={filterStatus?.toString() || 'null'}
-          onValueChange={(value) => setFilter({ 
-            status: value === 'null' ? null : parseInt(value) as CourseStatus 
-          })}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="选择状态" />
-          </SelectTrigger>
-          <SelectContent>
-            {statusOptions.map((option) => (
-              <SelectItem 
-                key={option.value === null ? 'null' : option.value} 
-                value={option.value === null ? 'null' : option.value.toString()}
-              >
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      
-      {/* 课程列表 */}
-      <Card className="p-6">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>课程名称</TableHead>
-              <TableHead>类型</TableHead>
-              <TableHead>创建时间</TableHead>
-              <TableHead>状态</TableHead>
-              <TableHead className="w-[150px]">操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {courses.map((course) => (
-              <TableRow key={course.id}>
-                <TableCell className="font-medium">{course.title}</TableCell>
-                <TableCell>{renderPaymentType(course.paymentType, course.price)}</TableCell>
-                <TableCell>{course.createdAt ? formatDate(course.createdAt) : '未知时间'}</TableCell>
-                <TableCell><CourseStatusBadge status={course.status} /></TableCell>
-                <TableCell>
-                  <div className="flex space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEditCourse(course.id)}
-                    >
-                      <FileEdit className="h-4 w-4" />
-                    </Button>
-                    
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDeleteClick(course.id)}
-                      disabled={course.status !== CourseStatus.DRAFT}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+        <TabsContent value="workspace" className="space-y-4">
+          {/* 搜索和筛选 */}
+          <div className="flex gap-4 items-center">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="搜索课程..."
+                value={filterTitle}
+                onChange={(e) => setFilter({ title: e.target.value })}
+                className="pl-8"
+              />
+            </div>
             
-            {/* 空状态 */}
-            {courses.length === 0 && !isLoading && (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center py-10">
-                  <div className="flex flex-col items-center justify-center space-y-3">
-                    <div className="text-muted-foreground">暂无课程数据</div>
-                    <Button onClick={handleCreateCourse} variant="outline">
-                      <Plus className="mr-2 h-4 w-4" />
-                      创建第一个课程
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
-            
-            {/* 加载状态 */}
-            {isLoading && (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center py-10">
-                  <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
-                    <span className="ml-2">加载中...</span>
-                  </div>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-        
-        {/* 分页 */}
-        {totalPages > 1 && (
-          <div className="mt-4">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious 
-                    onClick={() => setPage(Math.max(1, currentPage - 1))}
-                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                  />
-                </PaginationItem>
-                
-                {getPaginationItems().map((item, index) => (
-                  <PaginationItem key={index}>
-                    {item === '...' ? (
-                      <span className="px-4 py-2">...</span>
-                    ) : (
-                      <PaginationLink
-                        onClick={() => typeof item === 'number' && setPage(item)}
-                        isActive={currentPage === item}
-                      >
-                        {item}
-                      </PaginationLink>
-                    )}
-                  </PaginationItem>
+            <Select
+              value={filterStatus?.toString() || 'null'}
+              onValueChange={(value) => setFilter({ 
+                status: value === 'null' ? null : parseInt(value) as CourseStatus 
+              })}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="选择状态" />
+              </SelectTrigger>
+              <SelectContent>
+                {statusOptions.map((option) => (
+                  <SelectItem 
+                    key={option.value === null ? 'null' : option.value} 
+                    value={option.value === null ? 'null' : option.value.toString()}
+                  >
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* 工作区课程列表 */}
+          <Card className="p-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>课程名称</TableHead>
+                  <TableHead>类型</TableHead>
+                  <TableHead>创建时间</TableHead>
+                  <TableHead>状态</TableHead>
+                  <TableHead>发布状态</TableHead>
+                  <TableHead className="w-[200px]">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {courses.map((course) => (
+                  <TableRow key={course.id}>
+                    <TableCell className="font-medium">{course.title}</TableCell>
+                    <TableCell>{renderPaymentType(course.paymentType, course.price)}</TableCell>
+                    <TableCell>{course.createdAt ? formatDate(course.createdAt) : '未知时间'}</TableCell>
+                    <TableCell><CourseStatusBadge status={course.status} /></TableCell>
+                    <TableCell><CoursePublishBadge course={course} /></TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditCourse(course.id)}
+                          title={course.status === CourseStatus.REVIEWING ? "只能预览，不能编辑" : "编辑课程"}
+                        >
+                          {course.status === CourseStatus.REVIEWING 
+                            ? <Eye className="h-4 w-4" /> 
+                            : <FileEdit className="h-4 w-4" />}
+                        </Button>
+                        
+                        {course.publishedVersionId && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewPublishedVersion(course.id)}
+                            disabled={isLoadingPublishedVersion}
+                            title="查看发布版本"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        )}
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteClick(course.id)}
+                          disabled={course.status !== CourseStatus.DRAFT}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 ))}
                 
-                <PaginationItem>
-                  <PaginationNext 
-                    onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-                    className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
+                {/* 空状态 */}
+                {courses.length === 0 && !isLoading && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-10">
+                      <div className="flex flex-col items-center justify-center space-y-3">
+                        <div className="text-muted-foreground">暂无课程数据</div>
+                        <Button onClick={handleCreateCourse} variant="outline">
+                          <Plus className="mr-2 h-4 w-4" />
+                          创建第一个课程
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+                
+                {/* 加载状态 */}
+                {isLoading && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-10">
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+                        <span className="ml-2">加载中...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+            
+            {/* 分页 */}
+            {totalPages > 1 && (
+              <div className="mt-4">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious 
+                        onClick={() => setPage(Math.max(1, currentPage - 1))}
+                        className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                      />
+                    </PaginationItem>
+                    
+                    {getPaginationItems().map((item, index) => (
+                      <PaginationItem key={index}>
+                        {item === '...' ? (
+                          <span className="px-4 py-2">...</span>
+                        ) : (
+                          <PaginationLink
+                            onClick={() => typeof item === 'number' && setPage(item)}
+                            isActive={currentPage === item}
+                          >
+                            {item}
+                          </PaginationLink>
+                        )}
+                      </PaginationItem>
+                    ))}
+                    
+                    <PaginationItem>
+                      <PaginationNext 
+                        onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+                        className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="published" className="space-y-4">
+          {/* 搜索和筛选 */}
+          <div className="flex gap-4 items-center">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="搜索已发布课程..."
+                value={filterTitle}
+                onChange={(e) => setFilter({ title: e.target.value })}
+                className="pl-8"
+              />
+            </div>
           </div>
-        )}
-      </Card>
+          
+          {/* 已发布课程列表 */}
+          <Card className="p-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>课程名称</TableHead>
+                  <TableHead>类型</TableHead>
+                  <TableHead>创建时间</TableHead>
+                  <TableHead>状态</TableHead>
+                  <TableHead className="w-[150px]">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {courses.map((course) => (
+                  <TableRow key={course.id}>
+                    <TableCell className="font-medium">{course.title}</TableCell>
+                    <TableCell>{renderPaymentType(course.paymentType, course.price)}</TableCell>
+                    <TableCell>{course.createdAt ? formatDate(course.createdAt) : '未知时间'}</TableCell>
+                    <TableCell><CourseStatusBadge status={course.status} /></TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewCourse(course.id)}
+                          title="查看发布版本"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                
+                {/* 空状态 */}
+                {courses.length === 0 && !isLoading && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-10">
+                      <div className="flex flex-col items-center justify-center space-y-3">
+                        <div className="text-muted-foreground">暂无已发布课程</div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+                
+                {/* 加载状态 */}
+                {isLoading && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-10">
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+                        <span className="ml-2">加载中...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+            
+            {/* 分页 */}
+            {totalPages > 1 && (
+              <div className="mt-4">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious 
+                        onClick={() => setPage(Math.max(1, currentPage - 1))}
+                        className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                      />
+                    </PaginationItem>
+                    
+                    {getPaginationItems().map((item, index) => (
+                      <PaginationItem key={index}>
+                        {item === '...' ? (
+                          <span className="px-4 py-2">...</span>
+                        ) : (
+                          <PaginationLink
+                            onClick={() => typeof item === 'number' && setPage(item)}
+                            isActive={currentPage === item}
+                          >
+                            {item}
+                          </PaginationLink>
+                        )}
+                      </PaginationItem>
+                    ))}
+                    
+                    <PaginationItem>
+                      <PaginationNext 
+                        onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+                        className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
+          </Card>
+        </TabsContent>
+      </Tabs>
       
       {/* 删除确认对话框 */}
       <Dialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>

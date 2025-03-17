@@ -245,61 +245,6 @@ public class QuestionGroupController {
     }
 
     /**
-     * 根据章节ID获取关联的题目组
-     */
-    @GetMapping("/section/{sectionId}")
-    @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
-    @Operation(summary = "获取章节关联的题目组", description = "获取与指定章节关联的所有题目组")
-    public Result<List<QuestionGroupVO>> getGroupsBySectionId(
-            @Parameter(description = "章节ID") @PathVariable("sectionId") Long sectionId) {
-        Long institutionId = SecurityUtil.getCurrentInstitutionId();
-        
-        log.info("获取章节关联的题目组, 章节ID: {}, 机构ID: {}", sectionId, institutionId);
-        
-        List<QuestionGroupVO> groups = groupService.getGroupsBySectionId(sectionId, institutionId);
-        return Result.success(groups);
-    }
-
-    /**
-     * 将题目组关联到章节
-     */
-    @PostMapping("/{groupId}/section/{sectionId}")
-    @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
-    @Operation(summary = "关联题目组到章节", description = "将题目组关联到指定章节")
-    public Result<Boolean> associateGroupToSection(
-            @Parameter(description = "题目组ID") @PathVariable("groupId") Long groupId,
-            @Parameter(description = "章节ID") @PathVariable("sectionId") Long sectionId) {
-        Long institutionId = SecurityUtil.getCurrentInstitutionId();
-        
-        log.info("关联题目组到章节, 题目组ID: {}, 章节ID: {}, 机构ID: {}", 
-                groupId, sectionId, institutionId);
-        
-        boolean result = groupService.associateGroupToSection(groupId, sectionId, institutionId);
-        return Result.success(result);
-    }
-
-    /**
-     * 取消题目组与章节的关联
-     */
-    @DeleteMapping("/{groupId}/section/{sectionId}")
-    @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
-    @Operation(summary = "取消题目组与章节的关联", description = "取消题目组与指定章节的关联")
-    public Result<Boolean> dissociateGroupFromSection(
-            @Parameter(description = "题目组ID") @PathVariable("groupId") Long groupId,
-            @Parameter(description = "章节ID") @PathVariable("sectionId") Long sectionId) {
-        Long institutionId = SecurityUtil.getCurrentInstitutionId();
-        
-        log.info("取消题目组与章节的关联, 题目组ID: {}, 章节ID: {}, 机构ID: {}", 
-                groupId, sectionId, institutionId);
-        
-        boolean result = groupService.dissociateGroupFromSection(groupId, sectionId, institutionId);
-        return Result.success(result);
-    }
-
-    /**
      * 批量添加题目到题目组
      */
     @PostMapping("/{groupId}/questions")

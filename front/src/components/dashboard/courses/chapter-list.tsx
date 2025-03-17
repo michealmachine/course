@@ -162,6 +162,7 @@ interface ChapterListProps {
   setIsDialogOpen?: React.Dispatch<React.SetStateAction<boolean>>;
   onChapterCreated?: () => void;
   onChapterUpdated?: () => void;
+  readOnly?: boolean;
 }
 
 export function ChapterList({ 
@@ -170,7 +171,8 @@ export function ChapterList({
   isDialogOpen: externalIsDialogOpen, 
   setIsDialogOpen: externalSetIsDialogOpen,
   onChapterCreated,
-  onChapterUpdated
+  onChapterUpdated,
+  readOnly = false
 }: ChapterListProps) {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -215,6 +217,12 @@ export function ChapterList({
   }, [courseId]);
   
   const openCreateDialog = () => {
+    if (readOnly) {
+      toast.warning('课程审核中，不能修改内容', {
+        description: '课程正在审核中，不能添加或修改章节内容'
+      });
+      return;
+    }
     form.reset({
       title: '',
       description: '',
@@ -226,17 +234,29 @@ export function ChapterList({
   };
   
   const openEditDialog = (chapter: Chapter) => {
+    if (readOnly) {
+      toast.warning('课程审核中，不能修改内容', {
+        description: '课程正在审核中，不能编辑章节内容'
+      });
+      return;
+    }
     form.reset({
       title: chapter.title,
       description: chapter.description || '',
       accessType: chapter.accessType === 0 ? 'FREE' : 'PREMIUM',
-      estimatedMinutes: chapter.estimatedMinutes || 30,
+      estimatedMinutes: 30, // 使用默认值，因为Chapter类型中没有estimatedMinutes字段
     });
     setEditingChapter(chapter);
     setDialogOpen(true);
   };
   
   const onDragEnd = async (result: any) => {
+    if (readOnly) {
+      toast.warning('课程审核中，不能修改内容', {
+        description: '课程正在审核中，不能调整章节顺序'
+      });
+      return;
+    }
     setIsDragging(false);
     
     if (!result.destination) {
@@ -348,6 +368,12 @@ export function ChapterList({
   };
   
   const handleDeleteChapter = async (chapterId: number) => {
+    if (readOnly) {
+      toast.warning('课程审核中，不能修改内容', {
+        description: '课程正在审核中，不能删除章节'
+      });
+      return;
+    }
     if (!confirm('确定要删除这个章节吗？删除后无法恢复。')) {
       return;
     }
@@ -382,10 +408,12 @@ export function ChapterList({
         <CardHeader className="px-6 pt-6 pb-2">
           <div className="flex justify-between items-center">
             <CardTitle>章节管理</CardTitle>
-            <Button onClick={openCreateDialog}>
-              <Plus className="mr-2 h-4 w-4" />
-              添加章节
-            </Button>
+            {!readOnly && (
+              <Button onClick={openCreateDialog}>
+                <Plus className="mr-2 h-4 w-4" />
+                添加章节
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className="p-6">
@@ -413,18 +441,17 @@ export function ChapterList({
               </Button>
             </div>
           ) : chapters.length === 0 ? (
-            <div className="text-center text-muted-foreground py-8 border border-dashed rounded-lg">
-              <BookOpen className="mx-auto h-10 w-10 mb-2" />
-              <p>还没有章节</p>
-              <p className="text-sm">点击"添加章节"按钮创建第一个章节</p>
-              <Button 
-                onClick={openCreateDialog} 
-                variant="secondary" 
-                className="mt-4"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                添加章节
-              </Button>
+            <div className="text-center py-12 border-2 border-dashed rounded-md">
+              <BookOpen className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">尚未添加章节</h3>
+              <p className="text-muted-foreground mb-4">点击下方按钮创建第一个章节</p>
+              
+              {!readOnly && (
+                <Button onClick={openCreateDialog}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  添加章节
+                </Button>
+              )}
             </div>
           ) : (
             <DragDropContext

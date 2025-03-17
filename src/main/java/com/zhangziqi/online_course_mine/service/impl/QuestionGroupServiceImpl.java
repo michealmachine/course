@@ -36,7 +36,6 @@ public class QuestionGroupServiceImpl implements QuestionGroupService {
 
     private final QuestionGroupRepository groupRepository;
     private final QuestionGroupItemRepository groupItemRepository;
-    private final SectionQuestionGroupRepository sectionGroupRepository;
     private final QuestionRepository questionRepository;
     private final InstitutionRepository institutionRepository;
     private final QuestionService questionService;
@@ -142,8 +141,6 @@ public class QuestionGroupServiceImpl implements QuestionGroupService {
                 .orElseThrow(() -> new ResourceNotFoundException("题目组不存在"));
         
         try {
-            // 删除与章节的关联关系
-            sectionGroupRepository.deleteByGroupId(groupId);
             
             // 删除题目组的所有题目项
             groupItemRepository.deleteByGroupId(groupId);
@@ -394,93 +391,6 @@ public class QuestionGroupServiceImpl implements QuestionGroupService {
     }
 
     /**
-     * 根据章节ID获取关联的题目组
-     */
-    @Override
-    public List<QuestionGroupVO> getGroupsBySectionId(Long sectionId, Long institutionId) {
-        // 获取章节关联的所有题目组ID
-        List<Long> groupIds = sectionGroupRepository.findGroupIdsBySectionId(sectionId);
-        
-        if (groupIds.isEmpty()) {
-            return new ArrayList<>();
-        }
-        
-        // 查询题目组
-        List<QuestionGroup> groups = groupRepository.findByIdInAndInstitutionId(groupIds, institutionId);
-        
-        // 批量查询题目组的题目数量
-        Map<Long, Long> questionCountMap = groupRepository.countQuestionsByGroupIds(groupIds)
-                .stream()
-                .collect(Collectors.toMap(
-                        result -> (Long) result[0],
-                        result -> (Long) result[1],
-                        (v1, v2) -> v1
-                ));
-        
-        // 转换为VO对象
-        return groups.stream()
-                .map(group -> {
-                    long questionCount = questionCountMap.getOrDefault(group.getId(), 0L);
-                    return buildGroupVO(group, null, questionCount);
-                })
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * 将题目组关联到章节
-     */
-    @Override
-    @Transactional
-    public boolean associateGroupToSection(Long groupId, Long sectionId, Long institutionId) {
-        // 验证题目组是否存在
-        QuestionGroup group = groupRepository.findByIdAndInstitutionId(groupId, institutionId)
-                .orElseThrow(() -> new ResourceNotFoundException("题目组不存在"));
-        
-        try {
-            // 验证关联是否已存在
-            if (sectionGroupRepository.existsByGroupIdAndSectionId(groupId, sectionId)) {
-                // 关联已存在，无需重复添加
-                return true;
-            }
-            
-            // 创建并保存关联
-            SectionQuestionGroup sectionGroup = SectionQuestionGroup.builder()
-                    .sectionId(sectionId)
-                    .questionGroup(group)
-                    .orderIndex(0) // 使用默认排序
-                    .build();
-            
-            sectionGroupRepository.save(sectionGroup);
-            
-            return true;
-        } catch (Exception e) {
-            log.error("关联题目组到章节失败", e);
-            throw new BusinessException("关联题目组到章节失败：" + e.getMessage());
-        }
-    }
-
-    /**
-     * 取消题目组与章节的关联
-     */
-    @Override
-    @Transactional
-    public boolean dissociateGroupFromSection(Long groupId, Long sectionId, Long institutionId) {
-        // 验证题目组是否存在
-        groupRepository.findByIdAndInstitutionId(groupId, institutionId)
-                .orElseThrow(() -> new ResourceNotFoundException("题目组不存在"));
-        
-        try {
-            // 删除关联
-            sectionGroupRepository.deleteByGroupIdAndSectionId(groupId, sectionId);
-            
-            return true;
-        } catch (Exception e) {
-            log.error("取消题目组与章节的关联失败", e);
-            throw new BusinessException("取消题目组与章节的关联失败：" + e.getMessage());
-        }
-    }
-
-    /**
      * 批量添加题目到题目组
      */
     @Override
@@ -631,5 +541,38 @@ public class QuestionGroupServiceImpl implements QuestionGroupService {
                 .difficultyDesc(difficultyDesc)
                 .score(item.getScore())
                 .build();
+    }
+
+    @Override
+    public QuestionGroupVO getGroupByIdForPreview(Long groupId, boolean includeItems) {
+        log.info("获取题目组(预览模式) - 题目组ID: {}, 包含题目: {}", groupId, includeItems);
+        
+        // 直接通过ID查找题组，不验证机构
+        QuestionGroup group = groupRepository.findById(groupId)
+                .orElseThrow(() -> {
+                    log.error("题目组不存在, groupId: {}", groupId);
+                    return new ResourceNotFoundException("题目组不存在，ID: " + groupId);
+                });
+        
+        List<QuestionGroupItemVO> itemVOs = null;
+        long questionCount = 0;
+        
+        if (includeItems) {
+            // 获取题目组的所有题目
+            List<QuestionGroupItem> items = groupItemRepository.findByGroupId(group.getId());
+            itemVOs = buildGroupItemVOs(items);
+            questionCount = items.size();
+            log.info("已加载题目组的题目 - 题目组ID: {}, 题目数: {}", groupId, questionCount);
+        } else {
+            // 仅获取题目数量
+            questionCount = groupItemRepository.countByGroupId(group.getId());
+            log.info("已获取题目数量 - 题目组ID: {}, 题目数: {}", groupId, questionCount);
+        }
+        
+        // 构建响应对象
+        QuestionGroupVO result = buildGroupVO(group, itemVOs, questionCount);
+        log.info("已构建题目组详情(预览模式) - 题目组名称: {}", result.getName());
+        
+        return result;
     }
 } 

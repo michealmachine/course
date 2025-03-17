@@ -453,4 +453,36 @@ public class MediaServiceImpl implements MediaService {
                 .accessUrl(accessUrl)
                 .build();
     }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public MediaVO getMediaByIdForPreview(Long mediaId) {
+        log.info("开始获取媒体信息(预览模式), mediaId: {}", mediaId);
+        
+        // 直接通过ID查找媒体，不验证机构
+        Media media = mediaRepository.findById(mediaId)
+                .orElseThrow(() -> {
+                    log.error("媒体资源不存在, mediaId: {}", mediaId);
+                    return new ResourceNotFoundException("媒体资源不存在，ID: " + mediaId);
+                });
+                
+        // 检查媒体状态
+        if (media.getStatus() != MediaStatus.COMPLETED) {
+            log.warn("媒体文件未上传完成，无法访问, mediaId: {}, status: {}", mediaId, media.getStatus());
+            throw new BusinessException(400, "媒体文件未上传完成，无法访问");
+        }
+        
+        // 生成临时访问URL (默认30分钟)
+        String url = s3UploadManager.generatePresignedGetUrl(
+                media.getStoragePath(), 30L);
+        
+        // 更新最后访问时间
+        media.setLastAccessTime(LocalDateTime.now());
+        mediaRepository.save(media);
+        
+        log.info("成功获取媒体信息(预览模式): {}, URL已生成", media.getTitle());
+        
+        // 返回包含URL的VO
+        return mapToMediaVO(media, url);
+    }
 } 
