@@ -26,6 +26,7 @@ import {
   Database,
   BookOpen as BookOpenIcon,
   FileQuestion,
+  Search,
 } from 'lucide-react';
 
 // 侧边栏菜单项
@@ -56,6 +57,11 @@ const menuItems: MenuItem[] = [
     title: '我的订单',
     href: '/dashboard/orders',
     icon: <ShoppingCart className="w-5 h-5" />,
+  },
+  {
+    title: '课程搜索',
+    href: '/dashboard/course-search',
+    icon: <Search className="w-5 h-5" />,
   },
   {
     title: '资源管理',

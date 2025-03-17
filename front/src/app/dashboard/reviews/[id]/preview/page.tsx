@@ -29,7 +29,7 @@ import { Separator } from '@/components/ui/separator';
 import { ReviewContentPlayer } from '@/components/dashboard/reviews/review-content-player';
 import { reviewService } from '@/services';
 import { ReviewTask, ReviewResponseDTO, ReviewType, ReviewStatus } from '@/types/review';
-import { SectionVO } from '@/types/course';
+import { SectionVO, ChapterVO } from '@/types/course';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
@@ -54,14 +54,19 @@ export default function ReviewPreviewPage() {
   
   // 加载课程结构数据
   useEffect(() => {
+    let mounted = true;
+
     async function loadData() {
+      if (!reviewId) return;
+
       try {
         setLoading(true);
         setError(null);
         
-        // 直接使用URL中的ID作为课程ID加载课程结构
-        const courseId = Number(reviewId);
-        const structure = await reviewService.getCourseStructure(courseId);
+        const structure = await reviewService.getCourseStructure(Number(reviewId));
+        
+        if (!mounted) return;
+
         setCourseData(structure);
         
         // 默认选择第一章节和小节
@@ -76,16 +81,21 @@ export default function ReviewPreviewPage() {
           }
         }
       } catch (err: any) {
+        if (!mounted) return;
         console.error('加载课程数据失败:', err);
         setError(err.message || '无法加载课程数据');
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     }
     
-    if (reviewId) {
-      loadData();
-    }
+    loadData();
+
+    return () => {
+      mounted = false;
+    };
   }, [reviewId]);
   
   // 根据选择的小节ID加载小节数据
@@ -110,10 +120,12 @@ export default function ReviewPreviewPage() {
   
   // 点击章节
   const handleChapterClick = (chapterId: number) => {
+    if (!courseData) return;
+
     setSelectedChapterId(chapterId);
     
     // 选择该章节的第一个小节
-    const chapter = courseData.chapters.find((c: any) => c.id === chapterId);
+    const chapter = courseData.chapters.find((c: ChapterVO) => c.id === chapterId);
     if (chapter && chapter.sections && chapter.sections.length > 0) {
       setSelectedSectionId(chapter.sections[0].id);
       setSelectedSection(chapter.sections[0]);
@@ -125,6 +137,8 @@ export default function ReviewPreviewPage() {
   
   // 点击小节
   const handleSectionClick = (sectionId: number) => {
+    if (!courseData) return;
+
     setSelectedSectionId(sectionId);
     
     // 查找这个小节
@@ -144,7 +158,6 @@ export default function ReviewPreviewPage() {
     
     try {
       setSubmitting(true);
-      // 直接使用URL中的ID作为课程ID进行审核操作
       await reviewService.approveCourse(reviewId, reviewComment);
       toast.success('已成功通过课程');
       router.push('/dashboard/reviews');
@@ -162,7 +175,6 @@ export default function ReviewPreviewPage() {
     
     try {
       setSubmitting(true);
-      // 直接使用URL中的ID作为课程ID进行审核操作
       await reviewService.rejectCourse(reviewId, reviewComment);
       toast.success('已拒绝课程');
       router.push('/dashboard/reviews');
@@ -176,33 +188,35 @@ export default function ReviewPreviewPage() {
   
   // 渲染章节菜单
   const renderChaptersMenu = () => {
-    if (!courseData || !courseData.chapters) return null;
+    if (!courseData?.chapters) return null;
     
     return (
-      <div className="space-y-1 w-full">
-        {courseData.chapters.map((chapter: any) => (
-          <div key={chapter.id} className="space-y-1">
-            <Button
-              variant={selectedChapterId === chapter.id ? "secondary" : "ghost"}
-              className="w-full justify-start font-medium"
-              onClick={() => handleChapterClick(Number(chapter.id))}
+      <div className="space-y-4">
+        {courseData.chapters.map((chapter: ChapterVO) => (
+          <div key={chapter.id} className="space-y-2">
+            <div
+              className={`flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-accent ${
+                selectedChapterId === chapter.id ? 'bg-accent' : ''
+              }`}
+              onClick={() => handleChapterClick(chapter.id)}
             >
-              <BookOpen className="mr-2 h-4 w-4" />
-              {chapter.title}
-            </Button>
-            
-            {selectedChapterId === chapter.id && chapter.sections && (
-              <div className="ml-6 space-y-1">
-                {chapter.sections.map((section: any) => (
-                  <Button
+              <span className="font-medium">{chapter.title}</span>
+              <span className="text-xs text-muted-foreground">
+                {chapter.sections.length} 小节
+              </span>
+            </div>
+            {selectedChapterId === chapter.id && (
+              <div className="ml-4 space-y-1">
+                {chapter.sections.map((section: SectionVO) => (
+                  <div
                     key={section.id}
-                    variant={selectedSectionId === section.id ? "default" : "ghost"}
-                    size="sm"
-                    className="w-full justify-start"
-                    onClick={() => handleSectionClick(Number(section.id))}
+                    className={`p-2 rounded-md cursor-pointer hover:bg-accent ${
+                      selectedSectionId === section.id ? 'bg-accent' : ''
+                    }`}
+                    onClick={() => handleSectionClick(section.id)}
                   >
-                    {section.title}
-                  </Button>
+                    <span className="text-sm">{section.title}</span>
+                  </div>
                 ))}
               </div>
             )}
@@ -214,18 +228,10 @@ export default function ReviewPreviewPage() {
   
   if (loading) {
     return (
-      <div className="container py-6 space-y-8">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Skeleton className="h-8 w-8" />
-            <Skeleton className="h-8 w-48" />
-          </div>
-          <Skeleton className="h-10 w-24" />
-        </div>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <Skeleton className="h-[500px] lg:col-span-1" />
-          <Skeleton className="h-[700px] lg:col-span-3" />
+      <div className="container py-6 flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">加载课程数据...</p>
         </div>
       </div>
     );
@@ -283,7 +289,7 @@ export default function ReviewPreviewPage() {
         
         <Button 
           variant="outline" 
-          onClick={() => router.back()}
+          onClick={() => router.push('/dashboard/reviews')}
         >
           <ChevronLeft className="mr-2 h-4 w-4" />
           返回
@@ -329,74 +335,34 @@ export default function ReviewPreviewPage() {
               
               <CardContent>
                 <TabsContent value="overview" className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <div>
-                        <h3 className="text-lg font-medium">基本信息</h3>
-                        <div className="mt-2 space-y-2">
-                          <div className="flex items-start">
-                            <FileText className="h-5 w-5 mr-2 mt-0.5 text-muted-foreground" />
-                            <div>
-                              <span className="font-medium">标题：</span>
-                              <span>{courseData.course.title}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-start">
-                            <Bookmark className="h-5 w-5 mr-2 mt-0.5 text-muted-foreground" />
-                            <div>
-                              <span className="font-medium">所属机构：</span>
-                              <span>{courseData.course.institution?.name || '未知'}</span>
-                            </div>
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-lg font-medium">基本信息</h3>
+                      <div className="mt-2 space-y-2">
+                        <div className="flex items-start">
+                          <FileText className="h-5 w-5 mr-2 mt-0.5 text-muted-foreground" />
+                          <div>
+                            <span className="font-medium">标题：</span>
+                            <span>{courseData.course.title}</span>
                           </div>
                         </div>
-                      </div>
-                      
-                      <Separator />
-                      
-                      <div>
-                        <h3 className="text-lg font-medium">课程介绍</h3>
-                        <p className="mt-2 text-muted-foreground whitespace-pre-line">
-                          {courseData.course.description || '暂无课程介绍'}
-                        </p>
-                      </div>
-                      
-                      <Separator />
-                      
-                      <div>
-                        <h3 className="text-lg font-medium">适合人群</h3>
-                        <div className="flex items-start mt-2">
-                          <Target className="h-5 w-5 mr-2 mt-0.5 text-muted-foreground" />
-                          <p className="text-muted-foreground whitespace-pre-line">
-                            {courseData.course.targetAudience || '未设置适合人群'}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <Separator />
-                      
-                      <div>
-                        <h3 className="text-lg font-medium">学习目标</h3>
-                        <div className="mt-2 text-muted-foreground whitespace-pre-line">
-                          {courseData.course.learningObjectives || '未设置学习目标'}
+                        <div className="flex items-start">
+                          <Bookmark className="h-5 w-5 mr-2 mt-0.5 text-muted-foreground" />
+                          <div>
+                            <span className="font-medium">所属机构：</span>
+                            <span>{courseData.course.institution?.name || '未知'}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
                     
+                    <Separator />
+                    
                     <div>
-                      <h3 className="text-lg font-medium mb-3">课程封面</h3>
-                      {courseData.course.coverUrl ? (
-                        <div className="rounded-lg overflow-hidden border aspect-video relative">
-                          <img
-                            src={courseData.course.coverUrl}
-                            alt={courseData.course.title}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="rounded-lg border aspect-video flex items-center justify-center bg-muted">
-                          <p className="text-muted-foreground">暂无课程封面</p>
-                        </div>
-                      )}
+                      <h3 className="text-lg font-medium">课程介绍</h3>
+                      <p className="mt-2 text-muted-foreground whitespace-pre-line">
+                        {courseData.course.description || '暂无课程介绍'}
+                      </p>
                     </div>
                   </div>
                 </TabsContent>

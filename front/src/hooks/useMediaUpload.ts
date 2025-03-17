@@ -123,7 +123,7 @@ export function useMediaUpload(mediaService: MediaService) {
           // 记录已完成的分片
           completedParts.push({
             partNumber: Number(partNumber),
-            eTag: eTag  // 直接发送原始ETag，由后端处理格式问题
+            etag: eTag  // 使用正确的属性名
           });
 
           // 更新进度
@@ -151,18 +151,18 @@ export function useMediaUpload(mediaService: MediaService) {
         uploadId,
         completedParts: completedParts.map(part => ({
           partNumber: part.partNumber,
-          eTag: part.eTag
+          etag: part.etag
         }))
       };
       
       // 检查请求对象是否正确
       console.log('合并请求对象 (JSON)：', JSON.stringify(completeRequest, null, 2));
       console.log('合并请求原始对象：', completeRequest);
-      console.log('是否所有分片都有eTag：', completeRequest.completedParts.every(part => part.eTag !== null && part.eTag !== undefined && part.eTag !== ''));
+      console.log('是否所有分片都有eTag：', completeRequest.completedParts.every(part => part.etag !== null && part.etag !== undefined && part.etag !== ''));
       
       // 详细检查每个分片的ETag
       completeRequest.completedParts.forEach(part => {
-        console.log(`分片 ${part.partNumber} 的ETag: "${part.eTag}", 类型: ${typeof part.eTag}, 长度: ${part.eTag?.length || 0}`);
+        console.log(`分片 ${part.partNumber} 的ETag: "${part.etag}", 类型: ${typeof part.etag}, 长度: ${part.etag?.length || 0}`);
       });
       
       // 完成上传

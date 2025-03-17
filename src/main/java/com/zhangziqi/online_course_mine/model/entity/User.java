@@ -95,6 +95,13 @@ public class User extends BaseEntity {
     )
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
+    
+    /**
+     * 用户收藏的课程
+     */
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private Set<UserFavorite> favorites = new HashSet<>();
 
     /**
      * 获取机构ID

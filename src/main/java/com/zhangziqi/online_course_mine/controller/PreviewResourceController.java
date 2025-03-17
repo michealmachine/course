@@ -38,12 +38,7 @@ public class PreviewResourceController {
     private final SectionService sectionService;
     private final MediaService mediaService;
     private final QuestionGroupService questionGroupService;
-    private final StringRedisTemplate redisTemplate;
-    private final HttpServletRequest request;
-    
-    // Redis中预览token的key前缀
-    @Value("${app.preview.token-prefix:course:preview:}")
-    private String PREVIEW_TOKEN_KEY_PREFIX;
+
     
     /**
      * 获取小节媒体资源（预览模式）
@@ -56,11 +51,8 @@ public class PreviewResourceController {
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "获取小节媒体资源", description = "获取指定小节的媒体资源，包含临时访问URL（支持多种角色）")
     public Result<MediaVO> getSectionMedia(
-            @Parameter(description = "小节ID") @PathVariable("id") Long sectionId,
-            @Parameter(description = "预览令牌（匿名访问时必须）") @RequestParam(required = false) String token) {
-        
-        // 验证访问权限
-        validateAccessPermission(sectionId, token);
+            @Parameter(description = "小节ID") @PathVariable("id") Long sectionId) {
+
         
         // 获取小节信息
         SectionVO section = sectionService.getSectionById(sectionId);
@@ -93,11 +85,8 @@ public class PreviewResourceController {
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "获取小节题组", description = "获取指定小节的题组，包含详细题目（支持多种角色）")
     public Result<QuestionGroupVO> getSectionQuestionGroup(
-            @Parameter(description = "小节ID") @PathVariable("id") Long sectionId,
-            @Parameter(description = "预览令牌（匿名访问时必须）") @RequestParam(required = false) String token) {
-        
-        // 验证访问权限
-        validateAccessPermission(sectionId, token);
+            @Parameter(description = "小节ID") @PathVariable("id") Long sectionId) {
+
         
         // 获取小节信息
         SectionVO section = sectionService.getSectionById(sectionId);
@@ -119,73 +108,5 @@ public class PreviewResourceController {
         return Result.success(questionGroupVO);
     }
     
-    /**
-     * 验证访问权限
-     * 根据用户角色应用不同的访问策略
-     */
-    private void validateAccessPermission(Long sectionId, String token) {
-        // 尝试获取当前用户信息
-        Long userId = null;
-        boolean isAuthenticated = false;
-        
-        try {
-            userId = SecurityUtil.getCurrentUserId();
-            isAuthenticated = true;
-        } catch (Exception e) {
-            // 用户未登录，将使用令牌验证
-            log.debug("用户未登录，将使用令牌验证");
-        }
-        
-        // 根据角色应用不同的访问策略
-        if (isAuthenticated && (SecurityUtil.hasRole("ADMIN") || SecurityUtil.hasRole("REVIEWER"))) {
-            // 管理员和审核员直接放行
-            log.info("管理员/审核员访问资源, 用户ID: {}, 小节ID: {}", userId, sectionId);
-        } else if (isAuthenticated && SecurityUtil.hasRole("STUDENT")) {
-            // 学员需要验证权限
-            // TODO: 实现学员访问控制逻辑
-            // boolean hasAccess = courseAccessService.canStudentAccessSection(userId, sectionId);
-            boolean hasAccess = true; // 暂时全部放行，待实现学员访问控制
-            
-            if (!hasAccess) {
-                log.warn("学员无权访问该资源, 用户ID: {}, 小节ID: {}", userId, sectionId);
-                throw new BusinessException(403, "无权访问此资源，请购买课程或查看可试看内容");
-            }
-            log.info("学员访问资源, 用户ID: {}, 小节ID: {}", userId, sectionId);
-        } else if (isAuthenticated && SecurityUtil.hasRole("INSTITUTION")) {
-            // 机构用户需要验证是否是自己的课程
-            // TODO: 实现机构用户访问控制
-            log.info("机构用户访问资源, 用户ID: {}, 小节ID: {}", userId, sectionId);
-        } else {
-            // 匿名访问或其他角色，需要验证预览令牌
-            if (token == null || token.trim().isEmpty()) {
-                log.warn("访问令牌为空, 小节ID: {}", sectionId);
-                throw new BusinessException(401, "访问令牌不能为空");
-            }
-            
-            validatePreviewToken(token, sectionId);
-            log.info("通过预览令牌访问资源, 令牌: {}, 小节ID: {}", token, sectionId);
-        }
-    }
-    
-    /**
-     * 验证预览令牌
-     */
-    private void validatePreviewToken(String token, Long sectionId) {
-        // 从Redis中获取token对应的课程ID
-        String courseIdStr = redisTemplate.opsForValue().get(PREVIEW_TOKEN_KEY_PREFIX + token);
-        
-        if (courseIdStr == null) {
-            log.warn("预览令牌不存在或已过期, 令牌: {}", token);
-            throw new BusinessException(403, "预览链接不存在或已过期");
-        }
-        
-        // TODO: 验证小节是否属于该课程
-        // boolean sectionBelongsToCourse = sectionService.validateSectionBelongsToCourse(sectionId, Long.parseLong(courseIdStr));
-        boolean sectionBelongsToCourse = true; // 暂时假设小节属于该课程，待实现验证逻辑
-        
-        if (!sectionBelongsToCourse) {
-            log.warn("小节不属于预览课程, 小节ID: {}, 课程ID: {}", sectionId, courseIdStr);
-            throw new BusinessException(403, "无权访问此资源");
-        }
-    }
+
 } 

@@ -145,6 +145,24 @@ public class Course extends BaseEntity {
     private Integer totalDuration;
 
     /**
+     * 学习人数
+     */
+    @Builder.Default
+    private Integer studentCount = 0;
+
+    /**
+     * 平均评分(1-5星)
+     */
+    @Column
+    private Float averageRating;
+
+    /**
+     * 评分人数
+     */
+    @Builder.Default
+    private Integer ratingCount = 0;
+
+    /**
      * 适合人群
      */
     @Column(length = 1000)
@@ -182,6 +200,13 @@ public class Course extends BaseEntity {
     @OrderBy("orderIndex ASC")
     @Builder.Default
     private List<Chapter> chapters = new ArrayList<>();
+
+    /**
+     * 收藏此课程的用户
+     */
+    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private Set<UserFavorite> favoriteUsers = new HashSet<>();
 
     /**
      * 乐观锁版本字段

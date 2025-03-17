@@ -43,6 +43,7 @@ import java.io.InputStream;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import org.mockito.ArgumentCaptor;
 
 @ExtendWith(MockitoExtension.class)
 public class CourseServiceTest {
@@ -370,7 +371,16 @@ public class CourseServiceTest {
     void generatePreviewUrl_Success() {
         // 准备测试数据
         when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        
+        // 模拟Redis操作
+        ValueOperations<String, String> valueOps = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        
+        // 捕获Redis保存的键值对
+        ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> valueCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Long> expireCaptor = ArgumentCaptor.forClass(Long.class);
+        ArgumentCaptor<TimeUnit> timeUnitCaptor = ArgumentCaptor.forClass(TimeUnit.class);
         
         // 执行方法
         PreviewUrlVO result = courseService.generatePreviewUrl(testCourse.getId());
@@ -382,10 +392,28 @@ public class CourseServiceTest {
         assertEquals(testCourse.getTitle(), result.getCourseTitle());
         assertNotNull(result.getExpireTime());
         
+        // 验证Redis存储
+        verify(valueOps).set(keyCaptor.capture(), valueCaptor.capture(), expireCaptor.capture(), timeUnitCaptor.capture());
+        
+        // 验证Redis键值
+        String capturedKey = keyCaptor.getValue();
+        String capturedValue = valueCaptor.getValue();
+        Long capturedExpire = expireCaptor.getValue();
+        TimeUnit capturedTimeUnit = timeUnitCaptor.getValue();
+        
+        assertTrue(capturedKey.startsWith("course:preview:"));
+        assertEquals(testCourse.getId().toString(), capturedValue);
+        // 检查过期时间约为24小时
+        assertTrue(capturedExpire >= 1440);
+        assertEquals(TimeUnit.MINUTES, capturedTimeUnit);
+        
+        // 验证URL格式
+        String token = result.getUrl().substring(result.getUrl().lastIndexOf("/") + 1);
+        assertTrue(capturedKey.endsWith(token), "Redis键应包含URL中的token");
+        
         // 验证方法调用
         verify(courseRepository).findById(testCourse.getId());
         verify(redisTemplate).opsForValue();
-        verify(valueOperations).set(anyString(), anyString(), anyLong(), any(TimeUnit.class));
     }
 
     @Test
@@ -755,6 +783,67 @@ public class CourseServiceTest {
     }
     
     @Test
+    @DisplayName("审核通过课程 - 应保留发布版本的评分和学生数量")
+    void approveCourse_ShouldKeepRatingAndStudentCountForPublishedVersion() {
+        // 准备测试数据 - 工作区版本
+        testCourse.setStatus(CourseStatus.REVIEWING.getValue());
+        testCourse.setVersionType(CourseVersion.REVIEW.getValue());
+        testCourse.setIsPublishedVersion(false);
+        Long reviewerId = 2L;
+        testCourse.setReviewerId(reviewerId);
+        String comment = "内容符合要求，审核通过";
+        
+        // 创建一个已存在的发布版本，带有评分和学生数据
+        Course publishedVersion = Course.builder()
+                .id(2L)
+                .title("已发布的测试课程")
+                .isPublishedVersion(true)
+                .status(CourseStatus.PUBLISHED.getValue())
+                .versionType(CourseVersion.PUBLISHED.getValue())
+                .averageRating(4.5f)
+                .ratingCount(10)
+                .studentCount(100)
+                .build();
+        
+        // 设置工作区版本与发布版本的关联
+        testCourse.setPublishedVersionId(publishedVersion.getId());
+        
+        when(courseRepository.findById(testCourse.getId())).thenReturn(Optional.of(testCourse));
+        when(courseRepository.findById(publishedVersion.getId())).thenReturn(Optional.of(publishedVersion));
+        when(courseRepository.save(any(Course.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(courseRepository.saveAndFlush(any(Course.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        
+        // 执行方法
+        CourseVO result = courseService.approveCourse(testCourse.getId(), comment, reviewerId);
+        
+        // 验证工作区版本状态
+        assertNotNull(result);
+        assertEquals(CourseStatus.DRAFT.getValue(), result.getStatus());
+        
+        // 验证发布版本保留了评分和学生数量
+        // 方法一：捕获保存的发布版本对象
+        ArgumentCaptor<Course> publishedVersionCaptor = ArgumentCaptor.forClass(Course.class);
+        verify(courseRepository, atLeastOnce()).save(publishedVersionCaptor.capture());
+        
+        // 找到捕获的发布版本对象
+        Course capturedPublishedVersion = publishedVersionCaptor.getAllValues().stream()
+                .filter(Course::getIsPublishedVersion)
+                .findFirst()
+                .orElse(null);
+        
+        // 验证发布版本属性
+        assertNotNull(capturedPublishedVersion, "保存的发布版本对象不应为空");
+        assertEquals(4.5f, capturedPublishedVersion.getAverageRating(), "平均评分应保持不变");
+        assertEquals(10, capturedPublishedVersion.getRatingCount(), "评分数量应保持不变");
+        assertEquals(100, capturedPublishedVersion.getStudentCount(), "学生数量应保持不变");
+        
+        // 验证发布版本状态和评论
+        assertEquals(CourseStatus.PUBLISHED.getValue(), capturedPublishedVersion.getStatus());
+        assertEquals(CourseVersion.PUBLISHED.getValue(), capturedPublishedVersion.getVersionType());
+        assertEquals(comment, capturedPublishedVersion.getReviewComment());
+    }
+    
+    @Test
     @DisplayName("审核通过课程 - 课程状态不是审核中")
     void approveCourse_CourseNotInReviewingStatus() {
         // 准备测试数据
@@ -1008,5 +1097,124 @@ public class CourseServiceTest {
         
         // 验证方法调用
         verify(courseRepository).findLatestCourses(eq(CourseStatus.PUBLISHED.getValue()), eq(true), any(Pageable.class));
+    }
+    
+    @Test
+    @DisplayName("根据预览令牌获取课程 - 成功")
+    void getCourseByPreviewToken_Success() {
+        // 准备测试数据
+        String previewToken = "test-token-123";
+        String redisKey = "course:preview:" + previewToken;
+        Long courseId = testCourse.getId();
+        
+        // 模拟Redis返回值
+        ValueOperations<String, String> valueOps = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.get(redisKey)).thenReturn(courseId.toString());
+        
+        // 模拟课程仓库
+        when(courseRepository.findById(courseId)).thenReturn(Optional.of(testCourse));
+        
+        // 执行方法
+        CourseVO result = courseService.getCourseByPreviewToken(previewToken);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(testCourse.getId(), result.getId());
+        assertEquals(testCourse.getTitle(), result.getTitle());
+        
+        // 验证方法调用
+        verify(redisTemplate).opsForValue();
+        verify(valueOps).get(redisKey);
+        verify(courseRepository).findById(courseId);
+    }
+    
+    @Test
+    @DisplayName("根据预览令牌获取课程 - 令牌过期")
+    void getCourseByPreviewToken_TokenExpired() {
+        // 准备测试数据
+        String previewToken = "expired-token";
+        String redisKey = "course:preview:" + previewToken;
+        
+        // 模拟Redis返回空值（令牌过期或不存在）
+        ValueOperations<String, String> valueOps = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.get(redisKey)).thenReturn(null);
+        
+        // 验证抛出异常
+        BusinessException exception = assertThrows(BusinessException.class, 
+                () -> courseService.getCourseByPreviewToken(previewToken));
+        
+        assertTrue(exception.getMessage().contains("预览链接不存在或已过期"));
+        
+        // 验证方法调用
+        verify(redisTemplate).opsForValue();
+        verify(valueOps).get(redisKey);
+        verify(courseRepository, never()).findById(anyLong());
+    }
+    
+    @Test
+    @DisplayName("根据预览令牌获取课程结构 - 成功")
+    void getCourseStructureByPreviewToken_Success() {
+        // 准备测试数据
+        String previewToken = "test-token-123";
+        String redisKey = "course:preview:" + previewToken;
+        Long courseId = testCourse.getId();
+        
+        // 为课程添加章节和小节
+        Chapter chapter = new Chapter();
+        chapter.setId(1L);
+        chapter.setTitle("测试章节");
+        chapter.setDescription("这是一个测试章节");
+        chapter.setOrderIndex(1);
+        chapter.setCourse(testCourse);
+        
+        Section section = new Section();
+        section.setId(1L);
+        section.setTitle("测试小节");
+        section.setDescription("这是一个测试小节");
+        section.setOrderIndex(1);
+        section.setContentType("video");
+        section.setChapter(chapter);
+        
+        List<Section> sections = List.of(section);
+        chapter.setSections(sections);
+        
+        List<Chapter> chapters = List.of(chapter);
+        testCourse.setChapters(chapters);
+        
+        // 模拟Redis返回值
+        ValueOperations<String, String> valueOps = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.get(redisKey)).thenReturn(courseId.toString());
+        
+        // 模拟课程仓库
+        when(courseRepository.findById(courseId)).thenReturn(Optional.of(testCourse));
+        
+        // 执行方法
+        CourseStructureVO result = courseService.getCourseStructureByPreviewToken(previewToken);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertNotNull(result.getCourse());
+        assertEquals(testCourse.getId(), result.getCourse().getId());
+        assertEquals(testCourse.getTitle(), result.getCourse().getTitle());
+        
+        // 验证章节信息
+        assertNotNull(result.getChapters());
+        assertEquals(1, result.getChapters().size());
+        assertEquals(chapter.getId(), result.getChapters().get(0).getId());
+        assertEquals(chapter.getTitle(), result.getChapters().get(0).getTitle());
+        
+        // 验证小节信息
+        assertNotNull(result.getChapters().get(0).getSections());
+        assertEquals(1, result.getChapters().get(0).getSections().size());
+        assertEquals(section.getId(), result.getChapters().get(0).getSections().get(0).getId());
+        assertEquals(section.getTitle(), result.getChapters().get(0).getSections().get(0).getTitle());
+        
+        // 验证方法调用
+        verify(redisTemplate).opsForValue();
+        verify(valueOps).get(redisKey);
+        verify(courseRepository).findById(courseId);
     }
 } 

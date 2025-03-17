@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 interface EmptyProps {
   /** 图标元素 */
-  icon?: React.ReactNode;
+  icon?: ReactNode;
   /** 标题文字 */
-  title: string;
+  title?: string;
   /** 描述文字 */
   description?: string;
   /** 操作按钮 */
@@ -26,17 +26,21 @@ export function Empty({
 }: EmptyProps) {
   return (
     <div className={cn(
-      'flex flex-col items-center justify-center text-center p-8 border border-dashed rounded-lg',
+      'flex flex-col items-center justify-center py-12 text-center',
       className
     )}>
       {icon && (
-        <div className="mb-4 text-muted-foreground">
+        <div className="text-muted-foreground mb-4">
           {icon}
         </div>
       )}
-      <h3 className="text-lg font-medium">{title}</h3>
+      {title && (
+        <h3 className="text-lg font-semibold mb-2">
+          {title}
+        </h3>
+      )}
       {description && (
-        <p className="mt-2 text-sm text-muted-foreground max-w-md">
+        <p className="text-sm text-muted-foreground max-w-sm">
           {description}
         </p>
       )}

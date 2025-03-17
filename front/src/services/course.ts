@@ -74,11 +74,6 @@ const courseService = {
           offset: 0,
           paged: true,
           unpaged: false
-        },
-        sort: {
-          empty: true,
-          sorted: false,
-          unsorted: true
         }
       };
     } catch (error) {
@@ -105,11 +100,6 @@ const courseService = {
           offset: 0,
           paged: true,
           unpaged: false
-        },
-        sort: {
-          empty: true,
-          sorted: false,
-          unsorted: true
         }
       };
     }

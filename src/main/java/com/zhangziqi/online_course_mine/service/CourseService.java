@@ -246,4 +246,37 @@ public interface CourseService {
      * @return 最新课程列表
      */
     List<CourseVO> getLatestCourses(int limit);
+
+    /**
+     * 获取高评分课程
+     * 
+     * @param limit 数量限制
+     * @return 高评分课程列表
+     */
+    List<CourseVO> getTopRatedCourses(int limit);
+    
+    /**
+     * 增加课程学习人数
+     * 
+     * @param courseId 课程ID
+     */
+    void incrementStudentCount(Long courseId);
+    
+    /**
+     * 更新课程评分
+     * 
+     * @param courseId 课程ID
+     * @param newRating 新的评分(1-5)
+     */
+    void updateCourseRating(Long courseId, Integer newRating);
+
+    /**
+     * 获取课程的公开预览结构（免费课程或付费课程的试学部分）
+     * 对于未付费用户的付费课程，只返回免费试学章节的内容
+     *
+     * @param id 课程ID
+     * @param isUserEnrolled 用户是否已购买/注册该课程
+     * @return 课程结构VO
+     */
+    CourseStructureVO getPublicCourseStructure(Long id, boolean isUserEnrolled);
 } 

@@ -120,6 +120,9 @@ export interface Course {
   totalDuration?: number;
   totalChapters?: number;
   totalSections?: number;
+  studentCount?: number;      // 学习人数
+  averageRating?: number;     // 平均评分(1-5星)
+  ratingCount?: number;       // 评分人数
   submittedAt?: string;
   reviewStartedAt?: string;
   reviewedAt?: string;

@@ -48,6 +48,9 @@ public class CourseVO {
     private Integer totalDuration;
     private Integer totalChapters;
     private Integer totalSections;
+    private Integer studentCount;
+    private Float averageRating;
+    private Integer ratingCount;
     private LocalDateTime submittedAt;
     private LocalDateTime reviewStartedAt;
     private LocalDateTime reviewedAt;
@@ -88,6 +91,9 @@ public class CourseVO {
                 .totalDuration(course.getTotalDuration())
                 .totalChapters(course.getChapters() != null ? course.getChapters().size() : 0)
                 .totalSections(0) // 这里需要根据章节计算小节总数
+                .studentCount(course.getStudentCount())
+                .averageRating(course.getAverageRating())
+                .ratingCount(course.getRatingCount())
                 .submittedAt(null) // 需要添加这些字段到Entity中或从其他地方获取
                 .reviewStartedAt(null)
                 .reviewedAt(course.getReviewedAt())

@@ -153,15 +153,15 @@ public interface CourseRepository extends JpaRepository<Course, Long>, JpaSpecif
     Page<Course> findByStatusAndIsPublishedVersion(Integer status, Boolean isPublishedVersion, Pageable pageable);
     
     /**
-     * 查询热门课程（已发布状态）
-     * 暂时按创建时间排序，后续可以根据实际学习人数、评分等指标进行排序
+     * 查询热门课程（按学习人数排序）
      * 
      * @param status 课程状态（已发布）
      * @param isPublishedVersion 是否为发布版本
      * @param pageable 分页参数
      * @return 热门课程列表
      */
-    @Query("SELECT c FROM Course c WHERE c.status = :status AND c.isPublishedVersion = :isPublishedVersion ORDER BY c.createdAt DESC")
+    @Query("SELECT c FROM Course c WHERE c.status = :status AND c.isPublishedVersion = :isPublishedVersion " +
+           "ORDER BY c.studentCount DESC NULLS LAST, c.createdAt DESC")
     List<Course> findHotCourses(@Param("status") Integer status, @Param("isPublishedVersion") Boolean isPublishedVersion, Pageable pageable);
     
     /**
@@ -174,4 +174,21 @@ public interface CourseRepository extends JpaRepository<Course, Long>, JpaSpecif
      */
     @Query("SELECT c FROM Course c WHERE c.status = :status AND c.isPublishedVersion = :isPublishedVersion ORDER BY c.createdAt DESC")
     List<Course> findLatestCourses(@Param("status") Integer status, @Param("isPublishedVersion") Boolean isPublishedVersion, Pageable pageable);
+    
+    /**
+     * 查询高评分课程
+     * 
+     * @param status 课程状态（已发布）
+     * @param isPublishedVersion 是否为发布版本
+     * @param minRatingCount 最小评分数量
+     * @param pageable 分页参数
+     * @return 高评分课程列表
+     */
+    @Query("SELECT c FROM Course c WHERE c.status = :status AND c.isPublishedVersion = :isPublishedVersion " +
+           "AND (c.ratingCount IS NOT NULL AND c.ratingCount >= :minRatingCount) " +
+           "ORDER BY c.averageRating DESC NULLS LAST, c.ratingCount DESC")
+    List<Course> findTopRatedCourses(@Param("status") Integer status, 
+                                   @Param("isPublishedVersion") Boolean isPublishedVersion,
+                                   @Param("minRatingCount") Integer minRatingCount,
+                                   Pageable pageable);
 } 

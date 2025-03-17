@@ -43,7 +43,8 @@ export interface LoginRequest {
 // 邮箱验证码请求参数
 export interface EmailVerificationRequest {
   email: string;
-  type: 'register' | 'reset_password';
+  captchaCode: string;
+  captchaKey: string;
 }
 
 // 注册请求参数
@@ -55,7 +56,6 @@ export interface RegisterRequest {
   captchaCode: string;
   captchaKey: string;
   emailCode: string;        // 邮箱验证码
-  institutionId: number;
 }
 
 // 登录响应

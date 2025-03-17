@@ -500,7 +500,9 @@ public class CourseServiceImpl implements CourseService {
             Course publishedVersion = new Course();
             // 只复制基本属性，排除集合和关联实体
             BeanUtils.copyProperties(savedCourse, publishedVersion, 
-                "id", "dataVersion", "chapters", "tags", "category", "institution");
+                "id", "dataVersion", "chapters", "tags", "category", "institution",
+                "isPublishedVersion", "publishedVersionId", "status", "versionType",
+                "studentCount", "averageRating", "ratingCount", "favoriteUsers");
             publishedVersion.setId(null); // 确保新对象没有ID
             publishedVersion.setIsPublishedVersion(true); // 标记为发布版本
             publishedVersion.setPublishedVersionId(savedCourse.getId());
@@ -585,7 +587,8 @@ public class CourseServiceImpl implements CourseService {
                 // 只更新基本属性，不更新集合或关联实体
                 BeanUtils.copyProperties(course, publishedVersion, 
                     "id", "dataVersion", "chapters", "tags", "category", "institution",
-                    "isPublishedVersion", "publishedVersionId", "status", "versionType");
+                    "isPublishedVersion", "publishedVersionId", "status", "versionType",
+                    "studentCount", "averageRating", "ratingCount", "favoriteUsers");
                 
                 // 确保发布版本的状态为已发布
                 publishedVersion.setStatusEnum(CourseStatus.PUBLISHED);
@@ -1014,5 +1017,134 @@ public class CourseServiceImpl implements CourseService {
         return courses.stream()
             .map(CourseVO::fromEntity)
             .collect(Collectors.toList());
+    }
+    
+    /**
+     * 获取课程的公开预览结构（免费课程或付费课程的试学部分）
+     * @param id 课程ID
+     * @param isUserEnrolled 用户是否已购买/注册该课程
+     * @return 课程结构VO，对于未购买的付费课程，只返回免费试学章节的内容
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public CourseStructureVO getPublicCourseStructure(Long id, boolean isUserEnrolled) {
+        // 获取课程实体（带关联对象）
+        Course course = courseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("课程不存在，ID：" + id));
+        
+        // 检查课程是否已发布
+        if (!course.getIsPublishedVersion() || !course.getStatusEnum().equals(CourseStatus.PUBLISHED)) {
+            throw new BusinessException(403, "该课程尚未发布，无法预览");
+        }
+        
+        // 创建基础的课程结构VO
+        CourseStructureVO structureVO = CourseStructureVO.fromEntity(course);
+        
+        // 如果是免费课程或用户已注册/购买课程，直接返回完整结构
+        if (CoursePaymentType.FREE.getValue().equals(course.getPaymentType()) || isUserEnrolled) {
+            return structureVO;
+        }
+        
+        // 对于付费课程且用户未注册/购买，处理章节和小节的展示
+        structureVO.getChapters().forEach(chapterVO -> {
+            if (ChapterAccessType.PAID_ONLY.getValue().equals(chapterVO.getAccessType())) {
+                // 对于付费章节，保留小节但清除敏感资源信息
+                chapterVO.getSections().forEach(sectionVO -> {
+                    // 清除媒体资源ID
+                    sectionVO.setMediaId(null);
+                    // 清除题目组ID
+                    sectionVO.setQuestionGroupId(null);
+                    // 清除资源类型鉴别器，避免前端误判有资源
+                    sectionVO.setResourceTypeDiscriminator("NONE");
+                    // 其他可能的资源相关字段也需要清除
+                    sectionVO.setMediaResourceType(null);
+                    
+                    // 添加付费标记或提示信息（可选）
+                    if (sectionVO.getDescription() == null) {
+                        sectionVO.setDescription("这是付费内容，购买课程后可查看");
+                    } else if (!sectionVO.getDescription().contains("付费内容")) {
+                        sectionVO.setDescription(sectionVO.getDescription() + " (付费内容，购买后可查看)");
+                    }
+                });
+            }
+            // 免费试学章节保持不变
+        });
+        
+        return structureVO;
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<CourseVO> getTopRatedCourses(int limit) {
+        log.info("获取高评分课程，数量限制: {}", limit);
+        
+        Pageable pageable = PageRequest.of(0, limit);
+        List<Course> courses = courseRepository.findTopRatedCourses(
+            CourseStatus.PUBLISHED.getValue(),
+            true,
+            5, // 最小评分数量
+            pageable
+        );
+        
+        log.info("获取到{}门高评分课程", courses.size());
+        
+        return courses.stream()
+            .map(CourseVO::fromEntity)
+            .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public void incrementStudentCount(Long courseId) {
+        Course course = courseRepository.findById(courseId)
+            .orElseThrow(() -> new ResourceNotFoundException("课程不存在，ID: " + courseId));
+        
+        // 只能更新发布版本的统计数据
+        if (!Boolean.TRUE.equals(course.getIsPublishedVersion())) {
+            throw new BusinessException(400, "只能更新发布版本的课程统计数据");
+        }
+        
+        // 初始化或增加学习人数
+        if (course.getStudentCount() == null) {
+            course.setStudentCount(1);
+        } else {
+            course.setStudentCount(course.getStudentCount() + 1);
+        }
+        
+        courseRepository.save(course);
+        log.info("课程{}学习人数增加，当前学习人数: {}", courseId, course.getStudentCount());
+    }
+
+    @Override
+    @Transactional
+    public void updateCourseRating(Long courseId, Integer newRating) {
+        if (newRating == null || newRating < 1 || newRating > 5) {
+            throw new BusinessException(400, "评分必须在1-5之间");
+        }
+        
+        Course course = courseRepository.findById(courseId)
+            .orElseThrow(() -> new ResourceNotFoundException("课程不存在，ID: " + courseId));
+        
+        // 只能更新发布版本的统计数据
+        if (!Boolean.TRUE.equals(course.getIsPublishedVersion())) {
+            throw new BusinessException(400, "只能更新发布版本的课程统计数据");
+        }
+        
+        Float currentAvg = course.getAverageRating();
+        Integer currentCount = course.getRatingCount();
+        
+        if (currentAvg == null || currentCount == null || currentCount == 0) {
+            course.setAverageRating(newRating.floatValue());
+            course.setRatingCount(1);
+        } else {
+            // 使用加权平均公式计算新的平均评分
+            Float newAvg = (currentAvg * currentCount + newRating) / (currentCount + 1);
+            course.setAverageRating(newAvg);
+            course.setRatingCount(currentCount + 1);
+        }
+        
+        courseRepository.save(course);
+        log.info("课程{}评分更新，当前评分: {}，评分人数: {}", 
+             courseId, course.getAverageRating(), course.getRatingCount());
     }
 } 

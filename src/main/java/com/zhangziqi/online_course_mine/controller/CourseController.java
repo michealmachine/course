@@ -396,4 +396,31 @@ public class CourseController {
         
         return Result.success(courses);
     }
+    
+    /**
+     * 获取课程结构（公开API - 处理付费课程预览）
+     * 用于课程页面展示，区分不同付费类型和用户状态
+     * - 免费课程：显示全部内容
+     * - 付费课程-已购买用户：显示全部内容
+     * - 付费课程-未购买用户：只显示免费试学章节内容
+     */
+    @GetMapping("/{id}/public-structure")
+    @ResponseStatus(HttpStatus.OK)
+    @Operation(summary = "获取课程公开结构", description = "返回课程结构，对于付费课程的未购买用户仅返回免费试学章节内容")
+    public Result<CourseStructureVO> getPublicCourseStructure(
+            @Parameter(description = "课程ID") @PathVariable("id") Long courseId,
+            @Parameter(description = "用户是否已购买课程") @RequestParam(required = false, defaultValue = "false") boolean isEnrolled) {
+        
+        log.info("获取课程公开结构, 课程ID: {}, 是否已购买: {}", courseId, isEnrolled);
+        
+        try {
+            CourseStructureVO courseStructure = courseService.getPublicCourseStructure(courseId, isEnrolled);
+            return Result.success(courseStructure);
+        } catch (BusinessException e) {
+            return Result.fail(e.getCode(), e.getMessage());
+        } catch (Exception e) {
+            log.error("获取课程公开结构失败: {}", e.getMessage(), e);
+            return Result.fail(500, "获取课程公开结构失败: " + e.getMessage());
+        }
+    }
 } 

@@ -4,11 +4,7 @@ import { request } from './api';
 import { Tag, TagDTO } from '@/types/course';
 import { ApiResponse, PaginationResult } from '@/types/api';
 import { AxiosResponse } from 'axios';
-
-// 简单的内存缓存，避免频繁请求
-let tagsCache: Tag[] | null = null;
-let lastFetchTime = 0;
-const CACHE_TTL = 5 * 60 * 1000; // 5分钟缓存
+import { useCacheStore } from '@/stores/cache-store';
 
 /**
  * 标签管理服务
@@ -22,38 +18,66 @@ const tagService = {
       const params: any = { page, size };
       if (keyword) params.keyword = keyword;
       
-      const response: AxiosResponse<ApiResponse<PaginationResult<Tag>>> = 
-        await request.get<PaginationResult<Tag>>('/tags', { params });
-      return response.data.data;
+      const response = await request.get<PaginationResult<Tag>>('/tags', { params });
+      const result = (response.data as unknown as ApiResponse<PaginationResult<Tag>>).data;
+      return result || {
+        content: [],
+        totalElements: 0,
+        totalPages: 0,
+        size: 0,
+        number: 0,
+        first: true,
+        last: true,
+        empty: true,
+        numberOfElements: 0
+      };
     } catch (error) {
       console.error('获取标签列表失败:', error);
-      throw error;
+      return {
+        content: [],
+        totalElements: 0,
+        totalPages: 0,
+        size: 0,
+        number: 0,
+        first: true,
+        last: true,
+        empty: true,
+        numberOfElements: 0
+      };
     }
   },
 
   /**
    * 根据ID获取标签详情
    */
-  getTagById: async (id: number): Promise<Tag> => {
+  getTagById: async (id: number): Promise<Tag | null> => {
+    // 先从缓存中查找
+    const cachedTag = useCacheStore.getState().getTagById(id);
+    if (cachedTag) {
+      return cachedTag;
+    }
+
     try {
-      const response: AxiosResponse<ApiResponse<Tag>> = await request.get<Tag>(`/tags/${id}`);
-      return response.data.data;
+      const response = await request.get<Tag>(`/tags/${id}`);
+      const tag = (response.data as unknown as ApiResponse<Tag>).data;
+      return tag || null;
     } catch (error) {
       console.error(`获取标签详情失败, ID: ${id}:`, error);
-      throw error;
+      return null;
     }
   },
 
   /**
    * 根据名称获取标签
    */
-  getTagByName: async (name: string): Promise<Tag> => {
+  getTagByName: async (name: string): Promise<Tag | null> => {
     try {
-      const response: AxiosResponse<ApiResponse<Tag>> = await request.get<Tag>(`/tags/name/${encodeURIComponent(name)}`);
-      return response.data.data;
+      const response = await request.get<Tag>(`/tags/name/${encodeURIComponent(name)}`);
+      const tag = (response.data as unknown as ApiResponse<Tag>).data;
+      return tag || null;
     } catch (error) {
       console.error(`根据名称获取标签失败, name: ${name}:`, error);
-      throw error;
+      return null;
     }
   },
 
@@ -62,10 +86,11 @@ const tagService = {
    */
   createTag: async (tag: TagDTO): Promise<number> => {
     try {
-      const response: AxiosResponse<ApiResponse<{id: number}>> = await request.post<{id: number}>('/tags', tag);
+      const response = await request.post<{id: number}>('/tags', tag);
+      const result = (response.data as unknown as ApiResponse<{id: number}>).data;
       // 创建后清除缓存
-      tagsCache = null;
-      return response.data.data.id;
+      useCacheStore.getState().clearTagsCache();
+      return result.id;
     } catch (error) {
       console.error('创建标签失败:', error);
       throw error;
@@ -79,7 +104,7 @@ const tagService = {
     try {
       await request.put(`/tags/${id}`, tag);
       // 更新后清除缓存
-      tagsCache = null;
+      useCacheStore.getState().clearTagsCache();
     } catch (error) {
       console.error(`更新标签失败, ID: ${id}:`, error);
       throw error;
@@ -93,7 +118,7 @@ const tagService = {
     try {
       await request.delete(`/tags/${id}`);
       // 删除后清除缓存
-      tagsCache = null;
+      useCacheStore.getState().clearTagsCache();
     } catch (error) {
       console.error(`删除标签失败, ID: ${id}:`, error);
       throw error;
@@ -105,12 +130,12 @@ const tagService = {
    */
   getPopularTags: async (limit = 10): Promise<Tag[]> => {
     try {
-      const response: AxiosResponse<ApiResponse<Tag[]>> = 
-        await request.get<Tag[]>(`/tags/popular?limit=${limit}`);
-      return response.data.data;
+      const response = await request.get<Tag[]>(`/tags/popular?limit=${limit}`);
+      const tags = (response.data as unknown as ApiResponse<Tag[]>).data;
+      return tags || [];
     } catch (error) {
       console.error(`获取热门标签失败:`, error);
-      throw error;
+      return [];
     }
   },
 
@@ -136,78 +161,53 @@ const tagService = {
    */
   batchGetOrCreateTags: async (tagNames: string[]): Promise<number[]> => {
     try {
-      const response: AxiosResponse<ApiResponse<number[]>> = await request.post<number[]>('/tags/batch', tagNames);
-      return response.data.data;
+      const response = await request.post<number[]>('/tags/batch', tagNames);
+      const ids = (response.data as unknown as ApiResponse<number[]>).data;
+      // 批量操作后清除缓存
+      useCacheStore.getState().clearTagsCache();
+      return ids || [];
     } catch (error) {
       console.error('批量获取或创建标签失败:', error);
-      throw error;
+      return [];
     }
   },
 
   /**
    * 获取所有标签
-   * @param useCache 是否使用缓存（默认使用）
    * @returns 标签列表
    */
-  async getAllTags(useCache: boolean = true): Promise<Tag[]> {
-    // 如果启用缓存且缓存有效，则使用缓存
-    const now = Date.now();
-    if (useCache && tagsCache && (now - lastFetchTime < CACHE_TTL)) {
-      console.log('使用标签缓存数据');
-      return tagsCache;
+  async getAllTags(): Promise<Tag[]> {
+    const cacheStore = useCacheStore.getState();
+    
+    // 如果缓存有效，使用缓存
+    if (cacheStore.isTagsCacheValid()) {
+      return cacheStore.tags || [];
     }
 
     try {
-      const response = await request.get<{ data: Tag[] }>('/tags');
-      const tags = response.data.data || [];
+      const response = await request.get<Tag[]>('/tags');
+      const tags = (response.data as unknown as ApiResponse<Tag[]>).data || [];
       
       // 更新缓存
-      tagsCache = tags;
-      lastFetchTime = now;
+      cacheStore.setTags(tags);
       
       return tags;
     } catch (error) {
       console.error('获取标签失败:', error);
       // 如果请求失败但缓存存在，返回缓存数据
-      if (tagsCache) {
+      if (cacheStore.tags) {
         console.log('请求失败，使用过期的标签缓存');
-        return tagsCache;
+        return cacheStore.tags;
       }
       throw error;
     }
   },
 
   /**
-   * 创建新标签
-   * @param tag 要创建的标签数据
-   * @returns 创建的标签
-   */
-  async createTag(tag: Omit<Tag, 'id'>): Promise<Tag> {
-    const response = await request.post<{ data: Tag }>('/tags', tag);
-    // 创建后清除缓存
-    tagsCache = null;
-    return response.data.data;
-  },
-
-  /**
-   * 更新标签
-   * @param id 标签ID
-   * @param tag 要更新的标签数据
-   * @returns 更新后的标签
-   */
-  async updateTag(id: number, tag: Partial<Tag>): Promise<Tag> {
-    const response = await request.put<{ data: Tag }>(`/tags/${id}`, tag);
-    // 更新后清除缓存
-    tagsCache = null;
-    return response.data.data;
-  },
-
-  /**
    * 手动清除缓存
    */
   clearCache(): void {
-    tagsCache = null;
-    lastFetchTime = 0;
+    useCacheStore.getState().clearTagsCache();
   }
 };
 
