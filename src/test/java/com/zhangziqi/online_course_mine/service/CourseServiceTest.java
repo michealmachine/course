@@ -4,6 +4,7 @@ import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.exception.ResourceNotFoundException;
 import com.zhangziqi.online_course_mine.model.dto.course.CourseCreateDTO;
 import com.zhangziqi.online_course_mine.model.entity.*;
+import com.zhangziqi.online_course_mine.model.enums.ChapterAccessType;
 import com.zhangziqi.online_course_mine.model.enums.CoursePaymentType;
 import com.zhangziqi.online_course_mine.model.enums.CourseStatus;
 import com.zhangziqi.online_course_mine.model.enums.CourseVersion;
@@ -242,7 +243,9 @@ public class CourseServiceTest {
         List<Course> courseList = List.of(testCourse);
         Page<Course> coursePage = new PageImpl<>(courseList, pageable, courseList.size());
         
-        when(courseRepository.findByInstitution(any(Institution.class), any(Pageable.class))).thenReturn(coursePage);
+        // 修改为正确的mock方法
+        when(courseRepository.findByInstitutionAndIsPublishedVersion(any(Institution.class), eq(false), any(Pageable.class)))
+            .thenReturn(coursePage);
         
         // 执行方法
         Page<CourseVO> result = courseService.getCoursesByInstitution(testInstitution.getId(), pageable);
@@ -255,7 +258,7 @@ public class CourseServiceTest {
         
         // 验证方法调用
         verify(institutionRepository).findById(testInstitution.getId());
-        verify(courseRepository).findByInstitution(testInstitution, pageable);
+        verify(courseRepository).findByInstitutionAndIsPublishedVersion(testInstitution, false, pageable);
     }
 
     @Test
@@ -318,6 +321,47 @@ public class CourseServiceTest {
         // 验证方法调用
         verify(courseRepository).findById(testCourse.getId());
         verify(courseRepository).save(any(Course.class));
+    }
+
+    @Test
+    @DisplayName("提交课程审核 - 课程没有章节")
+    void submitForReview_CourseWithoutChapters() {
+        // 准备测试数据
+        testCourse.setStatus(CourseStatus.DRAFT.getValue());
+        testCourse.setVersionType(CourseVersion.DRAFT.getValue());
+        testCourse.setChapters(new ArrayList<>()); // 空章节列表
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
+        
+        // 验证抛出异常
+        BusinessException exception = assertThrows(BusinessException.class, 
+                () -> courseService.submitForReview(testCourse.getId()));
+        
+        assertTrue(exception.getMessage().contains("课程必须至少有一个章节才能提交审核"));
+        
+        // 验证方法调用
+        verify(courseRepository).findById(testCourse.getId());
+        verify(courseRepository, never()).save(any(Course.class));
+    }
+    
+    @Test
+    @DisplayName("提交课程审核 - 课程状态不是草稿")
+    void submitForReview_CourseNotInDraftStatus() {
+        // 准备测试数据
+        testCourse.setStatus(CourseStatus.PENDING_REVIEW.getValue());
+        testCourse.setVersionType(CourseVersion.DRAFT.getValue());
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
+        
+        // 验证抛出异常
+        BusinessException exception = assertThrows(BusinessException.class, 
+                () -> courseService.submitForReview(testCourse.getId()));
+        
+        assertTrue(exception.getMessage().contains("只有草稿状态的课程才能提交审核"));
+        
+        // 验证方法调用
+        verify(courseRepository).findById(testCourse.getId());
+        verify(courseRepository, never()).save(any(Course.class));
     }
 
     @Test
@@ -556,5 +600,327 @@ public class CourseServiceTest {
         
         // 验证方法调用
         verify(courseRepository).findById(1L);
+    }
+
+    @Test
+    @DisplayName("更新支付设置 - 从付费改为免费时所有章节变为免费")
+    void updatePaymentSettings_PaidToFree_AllChaptersShouldBeFree() {
+        // 准备测试数据
+        testCourse.setPaymentType(CoursePaymentType.PAID.getValue());
+        testCourse.setStatus(CourseStatus.DRAFT.getValue());
+        
+        // 创建两个付费章节
+        Chapter chapter1 = Chapter.builder()
+                .id(1L)
+                .accessType(ChapterAccessType.PAID_ONLY.getValue())
+                .build();
+        Chapter chapter2 = Chapter.builder()
+                .id(2L)
+                .accessType(ChapterAccessType.PAID_ONLY.getValue())
+                .build();
+        testCourse.setChapters(Arrays.asList(chapter1, chapter2));
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
+        when(courseRepository.save(any(Course.class))).thenReturn(testCourse);
+        
+        // 执行方法 - 更新为免费课程
+        CourseVO result = courseService.updatePaymentSettings(
+                testCourse.getId(),
+                CoursePaymentType.FREE.getValue(),
+                null,
+                null
+        );
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(CoursePaymentType.FREE.getValue(), result.getPaymentType());
+        
+        // 验证所有章节都设置为免费访问
+        testCourse.getChapters().forEach(chapter -> 
+            assertEquals(ChapterAccessType.FREE_TRIAL.getValue(), chapter.getAccessType(),
+                    "章节ID为" + chapter.getId() + "的章节应该设置为免费访问")
+        );
+    }
+
+    @Test
+    @DisplayName("更新支付设置 - 付费课程必须设置价格")
+    void updatePaymentSettings_PaidCourse_MustSetPrice() {
+        // 准备测试数据
+        testCourse.setPaymentType(CoursePaymentType.FREE.getValue());
+        testCourse.setStatus(CourseStatus.DRAFT.getValue());
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
+        
+        // 验证抛出异常
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> courseService.updatePaymentSettings(
+                        testCourse.getId(),
+                        CoursePaymentType.PAID.getValue(),
+                        null,
+                        null
+                ));
+        
+        assertTrue(exception.getMessage().contains("付费课程必须设置价格"));
+    }
+
+    @Test
+    @DisplayName("更新支付设置 - 只有草稿或已拒绝状态的课程可以更新")
+    void updatePaymentSettings_OnlyDraftOrRejectedCoursesCanBeUpdated() {
+        // 准备测试数据
+        testCourse.setPaymentType(CoursePaymentType.FREE.getValue());
+        testCourse.setStatus(CourseStatus.PUBLISHED.getValue());
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
+        
+        // 验证抛出异常
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> courseService.updatePaymentSettings(
+                        testCourse.getId(),
+                        CoursePaymentType.PAID.getValue(),
+                        new BigDecimal("99.99"),
+                        null
+                ));
+        
+        assertTrue(exception.getMessage().contains("只有草稿或已拒绝状态的课程才能更新支付设置"));
+    }
+
+    @Test
+    @DisplayName("开始审核课程 - 成功")
+    void startReview_Success() {
+        // 准备测试数据
+        testCourse.setStatus(CourseStatus.PENDING_REVIEW.getValue());
+        Long reviewerId = 2L;
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
+        when(courseRepository.save(any(Course.class))).thenReturn(testCourse);
+        
+        // 执行方法
+        CourseVO result = courseService.startReview(testCourse.getId(), reviewerId);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(CourseStatus.REVIEWING.getValue(), result.getStatus());
+        assertEquals(reviewerId, result.getReviewerId());
+        
+        // 验证方法调用
+        verify(courseRepository).findById(testCourse.getId());
+        verify(courseRepository).save(any(Course.class));
+    }
+    
+    @Test
+    @DisplayName("开始审核课程 - 课程状态不是待审核")
+    void startReview_CourseNotInPendingReviewStatus() {
+        // 准备测试数据
+        testCourse.setStatus(CourseStatus.DRAFT.getValue());
+        Long reviewerId = 2L;
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
+        
+        // 验证抛出异常
+        BusinessException exception = assertThrows(BusinessException.class, 
+                () -> courseService.startReview(testCourse.getId(), reviewerId));
+        
+        assertTrue(exception.getMessage().contains("只有待审核状态的课程才能开始审核"));
+        
+        // 验证方法调用
+        verify(courseRepository).findById(testCourse.getId());
+        verify(courseRepository, never()).save(any(Course.class));
+    }
+    
+    @Test
+    @DisplayName("审核通过课程 - 成功")
+    void approveCourse_Success() {
+        // 准备测试数据
+        testCourse.setStatus(CourseStatus.REVIEWING.getValue());
+        Long reviewerId = 2L;
+        testCourse.setReviewerId(reviewerId);
+        String comment = "内容符合要求，审核通过";
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
+        when(courseRepository.save(any(Course.class))).thenReturn(testCourse);
+        
+        // 执行方法
+        CourseVO result = courseService.approveCourse(testCourse.getId(), comment, reviewerId);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(CourseStatus.DRAFT.getValue(), result.getStatus());
+        assertEquals(comment, result.getReviewComment());
+        assertNotNull(result.getReviewedAt());
+        
+        // 验证方法调用
+        verify(courseRepository).findById(testCourse.getId());
+        verify(courseRepository, atLeastOnce()).save(any(Course.class));
+    }
+    
+    @Test
+    @DisplayName("审核通过课程 - 课程状态不是审核中")
+    void approveCourse_CourseNotInReviewingStatus() {
+        // 准备测试数据
+        testCourse.setStatus(CourseStatus.DRAFT.getValue());
+        Long reviewerId = 2L;
+        testCourse.setReviewerId(reviewerId);
+        String comment = "内容符合要求，审核通过";
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
+        
+        // 验证抛出异常
+        BusinessException exception = assertThrows(BusinessException.class, 
+                () -> courseService.approveCourse(testCourse.getId(), comment, reviewerId));
+        
+        assertTrue(exception.getMessage().contains("只有审核中状态的课程才能审核通过"));
+        
+        // 验证方法调用
+        verify(courseRepository).findById(testCourse.getId());
+        verify(courseRepository, never()).save(any(Course.class));
+    }
+    
+    @Test
+    @DisplayName("审核通过课程 - 审核人不匹配")
+    void approveCourse_ReviewerNotMatch() {
+        // 准备测试数据
+        testCourse.setStatus(CourseStatus.REVIEWING.getValue());
+        Long reviewerId = 2L;
+        testCourse.setReviewerId(3L); // 不同的审核人ID
+        String comment = "内容符合要求，审核通过";
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
+        
+        // 验证抛出异常
+        BusinessException exception = assertThrows(BusinessException.class, 
+                () -> courseService.approveCourse(testCourse.getId(), comment, reviewerId));
+        
+        assertTrue(exception.getMessage().contains("只有分配的审核人才能审核课程"));
+        
+        // 验证方法调用
+        verify(courseRepository).findById(testCourse.getId());
+        verify(courseRepository, never()).save(any(Course.class));
+    }
+    
+    @Test
+    @DisplayName("拒绝课程 - 成功")
+    void rejectCourse_Success() {
+        // 准备测试数据
+        testCourse.setStatus(CourseStatus.REVIEWING.getValue());
+        Long reviewerId = 2L;
+        testCourse.setReviewerId(reviewerId);
+        String reason = "内容不符合要求，需要修改";
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
+        when(courseRepository.save(any(Course.class))).thenReturn(testCourse);
+        
+        // 执行方法
+        CourseVO result = courseService.rejectCourse(testCourse.getId(), reason, reviewerId);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(CourseStatus.REJECTED.getValue(), result.getStatus());
+        assertEquals(reason, result.getReviewComment());
+        assertNotNull(result.getReviewedAt());
+        assertEquals(CourseVersion.DRAFT.getValue(), result.getVersionType());
+        
+        // 验证方法调用
+        verify(courseRepository).findById(testCourse.getId());
+        verify(courseRepository).save(any(Course.class));
+    }
+    
+    @Test
+    @DisplayName("拒绝课程 - 课程状态不是审核中")
+    void rejectCourse_CourseNotInReviewingStatus() {
+        // 准备测试数据
+        testCourse.setStatus(CourseStatus.DRAFT.getValue());
+        Long reviewerId = 2L;
+        testCourse.setReviewerId(reviewerId);
+        String reason = "内容不符合要求，需要修改";
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
+        
+        // 验证抛出异常
+        BusinessException exception = assertThrows(BusinessException.class, 
+                () -> courseService.rejectCourse(testCourse.getId(), reason, reviewerId));
+        
+        assertTrue(exception.getMessage().contains("只有审核中状态的课程才能被拒绝"));
+        
+        // 验证方法调用
+        verify(courseRepository).findById(testCourse.getId());
+        verify(courseRepository, never()).save(any(Course.class));
+    }
+    
+    @Test
+    @DisplayName("拒绝课程 - 审核人不匹配")
+    void rejectCourse_ReviewerNotMatch() {
+        // 准备测试数据
+        testCourse.setStatus(CourseStatus.REVIEWING.getValue());
+        Long reviewerId = 2L;
+        testCourse.setReviewerId(3L); // 不同的审核人ID
+        String reason = "内容不符合要求，需要修改";
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
+        
+        // 验证抛出异常
+        BusinessException exception = assertThrows(BusinessException.class, 
+                () -> courseService.rejectCourse(testCourse.getId(), reason, reviewerId));
+        
+        assertTrue(exception.getMessage().contains("只有分配的审核人才能审核课程"));
+        
+        // 验证方法调用
+        verify(courseRepository).findById(testCourse.getId());
+        verify(courseRepository, never()).save(any(Course.class));
+    }
+
+    @Test
+    @DisplayName("获取机构已发布课程列表 - 成功")
+    void getPublishedCoursesByInstitution_Success() {
+        // 准备测试数据
+        when(institutionRepository.findById(anyLong())).thenReturn(Optional.of(testInstitution));
+        
+        Pageable pageable = PageRequest.of(0, 10);
+        List<Course> courseList = List.of(testCourse);
+        Page<Course> coursePage = new PageImpl<>(courseList, pageable, courseList.size());
+        
+        // 模拟已发布版本查询
+        when(courseRepository.findByInstitutionAndIsPublishedVersion(any(Institution.class), eq(true), any(Pageable.class)))
+            .thenReturn(coursePage);
+        
+        // 执行方法
+        Page<CourseVO> result = courseService.getPublishedCoursesByInstitution(testInstitution.getId(), pageable);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(testCourse.getId(), result.getContent().get(0).getId());
+        assertEquals(testCourse.getTitle(), result.getContent().get(0).getTitle());
+        
+        // 验证方法调用
+        verify(institutionRepository).findById(testInstitution.getId());
+        verify(courseRepository).findByInstitutionAndIsPublishedVersion(testInstitution, true, pageable);
+    }
+    
+    @Test
+    @DisplayName("获取机构工作区课程列表 - 成功")
+    void getWorkspaceCoursesByInstitution_Success() {
+        // 准备测试数据
+        when(institutionRepository.findById(anyLong())).thenReturn(Optional.of(testInstitution));
+        
+        Pageable pageable = PageRequest.of(0, 10);
+        List<Course> courseList = List.of(testCourse);
+        Page<Course> coursePage = new PageImpl<>(courseList, pageable, courseList.size());
+        
+        // 模拟工作区版本查询
+        when(courseRepository.findByInstitutionAndIsPublishedVersion(any(Institution.class), eq(false), any(Pageable.class)))
+            .thenReturn(coursePage);
+        
+        // 执行方法
+        Page<CourseVO> result = courseService.getWorkspaceCoursesByInstitution(testInstitution.getId(), pageable);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(testCourse.getId(), result.getContent().get(0).getId());
+        assertEquals(testCourse.getTitle(), result.getContent().get(0).getTitle());
+        
+        // 验证方法调用
+        verify(institutionRepository).findById(testInstitution.getId());
+        verify(courseRepository).findByInstitutionAndIsPublishedVersion(testInstitution, false, pageable);
     }
 } 

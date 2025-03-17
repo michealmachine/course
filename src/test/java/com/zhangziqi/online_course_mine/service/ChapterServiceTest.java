@@ -8,6 +8,7 @@ import com.zhangziqi.online_course_mine.model.entity.Chapter;
 import com.zhangziqi.online_course_mine.model.entity.Course;
 import com.zhangziqi.online_course_mine.model.entity.Institution;
 import com.zhangziqi.online_course_mine.model.enums.ChapterAccessType;
+import com.zhangziqi.online_course_mine.model.enums.CoursePaymentType;
 import com.zhangziqi.online_course_mine.model.enums.CourseStatus;
 import com.zhangziqi.online_course_mine.model.vo.ChapterVO;
 import com.zhangziqi.online_course_mine.repository.ChapterRepository;
@@ -62,6 +63,7 @@ public class ChapterServiceTest {
                 .description("这是一个测试课程")
                 .institution(testInstitution)
                 .status(CourseStatus.DRAFT.getValue())
+                .paymentType(CoursePaymentType.PAID.getValue()) // 默认设置为付费课程
                 .build();
 
         // 创建测试章节
@@ -277,5 +279,66 @@ public class ChapterServiceTest {
         verify(courseRepository).findById(testCourse.getId());
         verify(chapterRepository, atLeastOnce()).findByCourse_IdOrderByOrderIndexAsc(testCourse.getId());
         verify(chapterRepository, times(2)).save(any(Chapter.class));
+    }
+
+    @Test
+    @DisplayName("创建章节 - 免费课程必须创建免费章节")
+    void createChapter_FreeCourse_MustCreateFreeChapter() {
+        // 设置课程为免费
+        testCourse.setPaymentType(CoursePaymentType.FREE.getValue());
+        
+        // 尝试创建付费章节
+        testChapterCreateDTO.setAccessType(ChapterAccessType.PAID_ONLY.getValue());
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
+        when(chapterRepository.save(any(Chapter.class))).thenAnswer(invocation -> {
+            Chapter savedChapter = invocation.getArgument(0);
+            savedChapter.setId(1L);
+            return savedChapter;
+        });
+        
+        // 执行方法
+        ChapterVO result = chapterService.createChapter(testChapterCreateDTO);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(ChapterAccessType.FREE_TRIAL.getValue(), result.getAccessType());
+    }
+
+    @Test
+    @DisplayName("更新章节 - 免费课程的章节不能设置为付费")
+    void updateChapter_FreeCourse_CannotSetChapterToPaid() {
+        // 设置课程为免费
+        testCourse.setPaymentType(CoursePaymentType.FREE.getValue());
+        testChapter.setCourse(testCourse);
+        
+        // 尝试更新为付费章节
+        testChapterCreateDTO.setAccessType(ChapterAccessType.PAID_ONLY.getValue());
+        
+        when(chapterRepository.findById(anyLong())).thenReturn(Optional.of(testChapter));
+        when(chapterRepository.save(any(Chapter.class))).thenReturn(testChapter);
+        
+        // 执行方法
+        ChapterVO result = chapterService.updateChapter(testChapter.getId(), testChapterCreateDTO);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(ChapterAccessType.FREE_TRIAL.getValue(), result.getAccessType());
+    }
+
+    @Test
+    @DisplayName("更新访问类型 - 免费课程不能更新章节访问类型")
+    void updateAccessType_FreeCourse_ShouldThrowException() {
+        // 设置课程为免费
+        testCourse.setPaymentType(CoursePaymentType.FREE.getValue());
+        testChapter.setCourse(testCourse);
+        
+        when(chapterRepository.findById(anyLong())).thenReturn(Optional.of(testChapter));
+        
+        // 验证抛出异常
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> chapterService.updateAccessType(testChapter.getId(), ChapterAccessType.PAID_ONLY.getValue()));
+        
+        assertTrue(exception.getMessage().contains("免费课程的章节不能修改访问类型"));
     }
 } 

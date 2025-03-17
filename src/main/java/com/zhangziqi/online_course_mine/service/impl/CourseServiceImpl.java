@@ -7,6 +7,7 @@ import com.zhangziqi.online_course_mine.model.entity.*;
 import com.zhangziqi.online_course_mine.model.enums.CourseStatus;
 import com.zhangziqi.online_course_mine.model.enums.CourseVersion;
 import com.zhangziqi.online_course_mine.model.enums.CoursePaymentType;
+import com.zhangziqi.online_course_mine.model.enums.ChapterAccessType;
 import com.zhangziqi.online_course_mine.model.vo.CourseVO;
 import com.zhangziqi.online_course_mine.model.vo.PreviewUrlVO;
 import com.zhangziqi.online_course_mine.model.vo.CourseStructureVO;
@@ -861,6 +862,15 @@ public class CourseServiceImpl implements CourseService {
         course.setPaymentType(paymentType);
         course.setPrice(price);
         course.setDiscountPrice(discountPrice);
+        
+        // 如果课程变更为免费，则更新所有章节为免费访问
+        if (paymentType.equals(CoursePaymentType.FREE.getValue())) {
+            if (course.getChapters() != null && !course.getChapters().isEmpty()) {
+                for (Chapter chapter : course.getChapters()) {
+                    chapter.setAccessType(ChapterAccessType.FREE_TRIAL.getValue());
+                }
+            }
+        }
         
         Course updatedCourse = courseRepository.save(course);
         

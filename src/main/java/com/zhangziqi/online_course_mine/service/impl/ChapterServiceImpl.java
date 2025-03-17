@@ -7,6 +7,7 @@ import com.zhangziqi.online_course_mine.model.dto.chapter.ChapterOrderDTO;
 import com.zhangziqi.online_course_mine.model.entity.Chapter;
 import com.zhangziqi.online_course_mine.model.entity.Course;
 import com.zhangziqi.online_course_mine.model.enums.ChapterAccessType;
+import com.zhangziqi.online_course_mine.model.enums.CoursePaymentType;
 import com.zhangziqi.online_course_mine.model.vo.ChapterVO;
 import com.zhangziqi.online_course_mine.repository.ChapterRepository;
 import com.zhangziqi.online_course_mine.repository.CourseRepository;
@@ -48,8 +49,17 @@ public class ChapterServiceImpl implements ChapterService {
         
         // 设置访问类型
         Integer accessType = dto.getAccessType();
-        if (accessType == null) {
-            accessType = ChapterAccessType.PAID_ONLY.getValue();
+        if (course.getPaymentType().equals(CoursePaymentType.FREE.getValue())) {
+            // 如果课程是免费的，章节必须是免费的
+            accessType = ChapterAccessType.FREE_TRIAL.getValue();
+        } else {
+            // 如果课程是付费的，默认章节为付费，但允许设置为免费试看
+            if (accessType == null) {
+                accessType = ChapterAccessType.PAID_ONLY.getValue();
+            } else if (!accessType.equals(ChapterAccessType.FREE_TRIAL.getValue()) && 
+                       !accessType.equals(ChapterAccessType.PAID_ONLY.getValue())) {
+                throw new BusinessException(400, "无效的访问类型");
+            }
         }
         
         // 创建章节
@@ -78,10 +88,13 @@ public class ChapterServiceImpl implements ChapterService {
         Chapter chapter = findChapterById(id);
         
         // 验证课程是否存在，且课程ID是否一致
+        Course course;
         if (!chapter.getCourse().getId().equals(dto.getCourseId())) {
-            Course course = courseRepository.findById(dto.getCourseId())
+            course = courseRepository.findById(dto.getCourseId())
                     .orElseThrow(() -> new ResourceNotFoundException("课程不存在，ID: " + dto.getCourseId()));
             chapter.setCourse(course);
+        } else {
+            course = chapter.getCourse();
         }
         
         // 更新章节信息
@@ -89,8 +102,16 @@ public class ChapterServiceImpl implements ChapterService {
         chapter.setDescription(dto.getDescription());
         chapter.setOrderIndex(dto.getOrderIndex());
         
-        // 更新访问类型（如果提供）
-        if (dto.getAccessType() != null) {
+        // 更新访问类型
+        if (course.getPaymentType().equals(CoursePaymentType.FREE.getValue())) {
+            // 如果课程是免费的，章节必须是免费的
+            chapter.setAccessType(ChapterAccessType.FREE_TRIAL.getValue());
+        } else if (dto.getAccessType() != null) {
+            // 如果课程是付费的，验证访问类型的有效性
+            if (!dto.getAccessType().equals(ChapterAccessType.FREE_TRIAL.getValue()) && 
+                !dto.getAccessType().equals(ChapterAccessType.PAID_ONLY.getValue())) {
+                throw new BusinessException(400, "无效的访问类型");
+            }
             chapter.setAccessType(dto.getAccessType());
         }
         
@@ -163,8 +184,14 @@ public class ChapterServiceImpl implements ChapterService {
             throw new BusinessException(400, "访问类型不能为空");
         }
         
+        // 检查课程的付费类型
+        if (chapter.getCourse().getPaymentType().equals(CoursePaymentType.FREE.getValue())) {
+            throw new BusinessException(400, "免费课程的章节不能修改访问类型");
+        }
+        
         // 检查访问类型是否有效
-        if (ChapterAccessType.getByValue(accessType) == null) {
+        if (!accessType.equals(ChapterAccessType.FREE_TRIAL.getValue()) && 
+            !accessType.equals(ChapterAccessType.PAID_ONLY.getValue())) {
             throw new BusinessException(400, "无效的访问类型");
         }
         
