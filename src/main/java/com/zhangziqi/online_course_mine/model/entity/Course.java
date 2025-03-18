@@ -209,6 +209,20 @@ public class Course extends BaseEntity {
     private Set<UserFavorite> favoriteUsers = new HashSet<>();
 
     /**
+     * 购买此课程的用户关联
+     */
+    @OneToMany(mappedBy = "course", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @Builder.Default
+    private Set<UserCourse> enrolledUsers = new HashSet<>();
+
+    /**
+     * 课程相关订单
+     */
+    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL)
+    @Builder.Default
+    private List<Order> orders = new ArrayList<>();
+
+    /**
      * 乐观锁版本字段
      */
     @Version
@@ -275,5 +289,24 @@ public class Course extends BaseEntity {
      */
     public void setPaymentTypeEnum(CoursePaymentType paymentType) {
         this.paymentType = paymentType != null ? paymentType.getValue() : null;
+    }
+
+    /**
+     * 增加学生数
+     */
+    public void incrementStudentCount() {
+        if (this.studentCount == null) {
+            this.studentCount = 0;
+        }
+        this.studentCount++;
+    }
+    
+    /**
+     * 减少学生数
+     */
+    public void decrementStudentCount() {
+        if (this.studentCount != null && this.studentCount > 0) {
+            this.studentCount--;
+        }
     }
 } 

@@ -355,7 +355,7 @@ export function ReviewContentPlayer({ section }: ReviewContentPlayerProps) {
         <Alert>
           <Clock className="h-4 w-4 text-muted-foreground" />
           <AlertDescription>
-            共 {content.items.length} 个题目，审核预览模式
+            共 {content.items.length} 个题目，预览模式
           </AlertDescription>
         </Alert>
         

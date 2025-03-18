@@ -6,6 +6,8 @@ import { AxiosResponse } from 'axios';
 import { Course, CoursePaymentType, CourseDifficulty } from '@/types/course';
 import { Category } from '@/types/course';
 import { Tag } from '@/types/course';
+import { CourseStructureVO } from '@/types/course';
+import { CourseQueryParams, CourseListResponse } from '@/types/course';
 
 // 搜索参数接口
 interface CourseSearchParams {
@@ -91,6 +93,40 @@ const courseService = {
       return response.data.data;
     } catch (error) {
       console.error('获取课程标签失败:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * 获取课程的公开结构
+   * 根据用户是否已购买课程，返回不同级别的内容
+   * @param courseId 课程ID
+   * @param isEnrolled 是否已购买课程
+   * @returns 课程结构（含章节和小节）
+   */
+  getPublicCourseStructure: async (courseId: number, isEnrolled: boolean = false): Promise<CourseStructureVO> => {
+    try {
+      const response: AxiosResponse<ApiResponse<CourseStructureVO>> = 
+        await request.get<CourseStructureVO>(`/courses/${courseId}/public-structure`, {
+          params: { isEnrolled }
+        });
+      return response.data.data;
+    } catch (error) {
+      console.error(`获取课程公开结构失败, ID: ${courseId}:`, error);
+      throw error;
+    }
+  },
+  
+  /**
+   * 获取机构发布版本课程列表
+   */
+  getPublishedCoursesByInstitution: async (params?: CourseQueryParams): Promise<CourseListResponse> => {
+    try {
+      const response: AxiosResponse<ApiResponse<CourseListResponse>> = 
+        await request.get('/courses/institution', { params });
+      return response.data.data;
+    } catch (error) {
+      console.error('获取机构发布版本课程列表失败:', error);
       throw error;
     }
   }

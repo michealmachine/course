@@ -175,6 +175,20 @@
             <artifactId>easyexcel</artifactId>
             <version>3.3.3</version>
         </dependency>
+
+        <!-- 支付宝SDK -->
+        <dependency>
+            <groupId>com.alipay.sdk</groupId>
+            <artifactId>alipay-sdk-java</artifactId>
+            <version>4.38.0.ALL</version>
+        </dependency>
+        
+        <!-- 支付宝开放平台SDK -->
+        <dependency>
+            <groupId>com.alipay.sdk</groupId>
+            <artifactId>alipay-easysdk</artifactId>
+            <version>2.2.3</version>
+        </dependency>
     </dependencies>
 
     <build>

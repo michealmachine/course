@@ -1217,4 +1217,135 @@ public class CourseServiceTest {
         verify(valueOps).get(redisKey);
         verify(courseRepository).findById(courseId);
     }
+
+    @Test
+    @DisplayName("取消发布课程 - 成功")
+    void unpublishCourse_Success() {
+        // 准备测试数据
+        testCourse.setStatus(CourseStatus.PUBLISHED.getValue());
+        testCourse.setVersionType(CourseVersion.PUBLISHED.getValue());
+        testCourse.setIsPublishedVersion(true);
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
+        when(courseRepository.save(any(Course.class))).thenReturn(testCourse);
+        
+        // 执行方法
+        CourseVO result = courseService.unpublishCourse(testCourse.getId());
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(CourseStatus.UNPUBLISHED.getValue(), result.getStatus());
+        
+        // 验证方法调用
+        verify(courseRepository).findById(testCourse.getId());
+        verify(courseRepository).save(any(Course.class));
+    }
+
+    @Test
+    @DisplayName("取消发布课程 - 课程状态不是已发布")
+    void unpublishCourse_CourseNotInPublishedStatus() {
+        // 准备测试数据
+        testCourse.setStatus(CourseStatus.DRAFT.getValue());
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
+        
+        // 验证抛出异常
+        BusinessException exception = assertThrows(BusinessException.class, 
+                () -> courseService.unpublishCourse(testCourse.getId()));
+        
+        assertTrue(exception.getMessage().contains("只有已发布状态的课程才能下线"));
+        
+        // 验证方法调用
+        verify(courseRepository).findById(testCourse.getId());
+        verify(courseRepository, never()).save(any(Course.class));
+    }
+
+    @Test
+    @DisplayName("重新发布课程 - 成功")
+    void republishCourse_Success() {
+        // 准备测试数据
+        testCourse.setStatus(CourseStatus.UNPUBLISHED.getValue());
+        testCourse.setVersionType(CourseVersion.DRAFT.getValue());
+        testCourse.setIsPublishedVersion(true);
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
+        when(courseRepository.save(any(Course.class))).thenReturn(testCourse);
+        
+        // 执行方法
+        CourseVO result = courseService.republishCourse(testCourse.getId());
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(CourseStatus.PUBLISHED.getValue(), result.getStatus());
+        
+        // 验证方法调用
+        verify(courseRepository).findById(testCourse.getId());
+        verify(courseRepository).save(any(Course.class));
+    }
+
+    @Test
+    @DisplayName("重新发布课程 - 课程不是已下线状态")
+    void republishCourse_CourseNotPublishedVersion() {
+        // 准备测试数据
+        testCourse.setStatus(CourseStatus.DRAFT.getValue());
+        testCourse.setVersionType(CourseVersion.DRAFT.getValue());
+        testCourse.setIsPublishedVersion(false);
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
+        
+        // 验证抛出异常
+        BusinessException exception = assertThrows(BusinessException.class, 
+                () -> courseService.republishCourse(testCourse.getId()));
+        
+        assertTrue(exception.getMessage().contains("只有已下线状态的课程才能重新上线"));
+        
+        // 验证方法调用
+        verify(courseRepository).findById(testCourse.getId());
+        verify(courseRepository, never()).save(any(Course.class));
+    }
+
+    @Test
+    @DisplayName("增加学生数量 - 成功")
+    void incrementStudentCount_Success() {
+        // 准备测试数据
+        testCourse.setStudentCount(10);
+        testCourse.setIsPublishedVersion(true);
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
+        when(courseRepository.save(any(Course.class))).thenReturn(testCourse);
+        
+        // 执行方法
+        courseService.incrementStudentCount(testCourse.getId());
+        
+        // 验证结果
+        assertEquals(11, testCourse.getStudentCount());
+        
+        // 验证方法调用
+        verify(courseRepository).findById(testCourse.getId());
+        verify(courseRepository).save(any(Course.class));
+    }
+
+    @Test
+    @DisplayName("更新课程评分 - 成功")
+    void updateCourseRating_Success() {
+        // 准备测试数据
+        testCourse.setAverageRating(4.0f);
+        testCourse.setRatingCount(5);
+        testCourse.setIsPublishedVersion(true);
+        Integer newRating = 5;
+        
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
+        when(courseRepository.save(any(Course.class))).thenReturn(testCourse);
+        
+        // 执行方法
+        courseService.updateCourseRating(testCourse.getId(), newRating);
+        
+        // 验证结果
+        assertEquals(6, testCourse.getRatingCount());
+        assertEquals(4.17f, testCourse.getAverageRating(), 0.01f);
+        
+        // 验证方法调用
+        verify(courseRepository).findById(testCourse.getId());
+        verify(courseRepository).save(any(Course.class));
+    }
 } 

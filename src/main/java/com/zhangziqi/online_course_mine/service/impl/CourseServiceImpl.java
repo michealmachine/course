@@ -8,15 +8,19 @@ import com.zhangziqi.online_course_mine.model.enums.CourseStatus;
 import com.zhangziqi.online_course_mine.model.enums.CourseVersion;
 import com.zhangziqi.online_course_mine.model.enums.CoursePaymentType;
 import com.zhangziqi.online_course_mine.model.enums.ChapterAccessType;
+import com.zhangziqi.online_course_mine.model.enums.OrderStatus;
 import com.zhangziqi.online_course_mine.model.vo.CourseVO;
 import com.zhangziqi.online_course_mine.model.vo.PreviewUrlVO;
 import com.zhangziqi.online_course_mine.model.vo.CourseStructureVO;
 import com.zhangziqi.online_course_mine.repository.CategoryRepository;
 import com.zhangziqi.online_course_mine.repository.CourseRepository;
 import com.zhangziqi.online_course_mine.repository.InstitutionRepository;
+import com.zhangziqi.online_course_mine.repository.OrderRepository;
+import com.zhangziqi.online_course_mine.repository.UserCourseRepository;
 import com.zhangziqi.online_course_mine.repository.TagRepository;
 import com.zhangziqi.online_course_mine.service.CourseService;
 import com.zhangziqi.online_course_mine.service.MinioService;
+import com.zhangziqi.online_course_mine.service.OrderService;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
@@ -55,6 +59,9 @@ public class CourseServiceImpl implements CourseService {
     private final TagRepository tagRepository;
     private final StringRedisTemplate redisTemplate;
     private final MinioService minioService;
+    private final OrderRepository orderRepository;
+    private final UserCourseRepository userCourseRepository;
+    private final OrderService orderService;
     
     // 预览URL有效期（分钟）
     private static final long PREVIEW_URL_EXPIRATION_MINUTES = 60;
@@ -713,13 +720,75 @@ public class CourseServiceImpl implements CourseService {
             throw new BusinessException(400, "只有已发布状态的课程才能下线");
         }
         
-        // 更新课程状态为已下线
-        course.setStatusEnum(CourseStatus.UNPUBLISHED);
+        // 如果存在发布版本，获取发布版本ID并处理相关订单
+        if (course.getPublishedVersionId() != null) {
+            Long publishedVersionId = course.getPublishedVersionId();
+            log.info("课程下架，工作区ID：{}，发布版本ID：{}", id, publishedVersionId);
+            
+            // 获取已发布版本
+            Course publishedVersion = courseRepository.findById(publishedVersionId)
+                    .orElseThrow(() -> new ResourceNotFoundException("发布版本不存在，ID: " + publishedVersionId));
+            
+            // 处理已购买课程用户的退款，调用订单服务进行退款
+            processRefundsForUnpublishedCourse(publishedVersion);
+            
+            // 删除发布版本
+            log.info("删除课程发布版本，ID: {}", publishedVersionId);
+            courseRepository.delete(publishedVersion);
+            
+            // 更新工作区版本，设置publishedVersionId为null
+            course.setPublishedVersionId(null);
+            course.setStatusEnum(CourseStatus.DRAFT);
+            
+            Course updatedCourse = courseRepository.save(course);
+            return CourseVO.fromEntity(updatedCourse);
+        } else {
+            // 如果没有发布版本，则仅更新状态
+            log.warn("课程{}没有发布版本，仅更新状态", id);
+            course.setStatusEnum(CourseStatus.UNPUBLISHED);
+            Course updatedCourse = courseRepository.save(course);
+            return CourseVO.fromEntity(updatedCourse);
+        }
+    }
+    
+    /**
+     * 处理下架课程的退款
+     * @param course 要下架的课程
+     */
+    private void processRefundsForUnpublishedCourse(Course course) {
+        // 查询所有已支付的该课程订单
+        List<Order> paidOrders = orderRepository.findByCourse_IdAndStatus(course.getId(), OrderStatus.PAID.getValue());
         
-        Course updatedCourse = courseRepository.save(course);
+        if (paidOrders.isEmpty()) {
+            log.info("课程{}没有需要退款的订单", course.getId());
+            return;
+        }
         
-        // 转换为VO并返回
-        return CourseVO.fromEntity(updatedCourse);
+        log.info("课程下架，开始处理{}个订单的退款", paidOrders.size());
+        
+        for (Order order : paidOrders) {
+            try {
+                log.info("处理订单{}退款", order.getOrderNo());
+                
+                // 更新订单状态为退款中
+                order.setStatus(OrderStatus.REFUNDING.getValue());
+                order.setRefundAmount(order.getAmount());
+                order.setRefundReason("课程已下架，系统自动退款");
+                orderRepository.save(order);
+                
+                // 调用支付宝退款接口
+                boolean refundSuccess = orderService.executeAlipayRefund(
+                        order.getOrderNo(), 
+                        order.getAmount(), 
+                        "课程已下架，系统自动退款");
+                
+                if (!refundSuccess) {
+                    log.error("订单{}退款失败", order.getOrderNo());
+                }
+            } catch (Exception e) {
+                log.error("处理订单{}退款异常", order.getOrderNo(), e);
+            }
+        }
     }
     
     @Override

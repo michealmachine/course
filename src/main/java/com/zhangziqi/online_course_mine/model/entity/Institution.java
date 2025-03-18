@@ -111,4 +111,11 @@ public class Institution extends BaseEntity {
     @OneToMany(mappedBy = "institution", cascade = CascadeType.ALL)
     @Builder.Default
     private Set<Question> questions = new HashSet<>();
+
+    /**
+     * 机构课程订单
+     */
+    @OneToMany(mappedBy = "institution", cascade = CascadeType.ALL)
+    @Builder.Default
+    private List<Order> orders = new ArrayList<>();
 } 

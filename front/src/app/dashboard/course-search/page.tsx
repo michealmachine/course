@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,9 @@ import {
   Star,
   Clock,
   Sparkles,
-  GraduationCap
+  GraduationCap,
+  Heart,
+  HeartOff
 } from 'lucide-react';
 import { Course, CoursePaymentType, CourseDifficulty } from '@/types/course';
 import { Category } from '@/types/course';
@@ -32,6 +34,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { categoryService, tagService } from '@/services';
 import useDebounce from '@/hooks/useDebounce';
+import favoriteService from '@/services/favorite-service';
 
 // 搜索过滤器接口
 interface SearchFilters {
@@ -60,6 +63,7 @@ interface CourseSearchParams {
 }
 
 export default function CourseSearchPage() {
+  const router = useRouter();
   // 状态管理
   const [filters, setFilters] = useState<SearchFilters>({
     keyword: '',
@@ -74,6 +78,8 @@ export default function CourseSearchPage() {
   const [loading, setLoading] = useState(false);
   const [totalElements, setTotalElements] = useState(0);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [favoriteStates, setFavoriteStates] = useState<Record<number, boolean>>({});
+  const [favoritesLoading, setFavoritesLoading] = useState<Record<number, boolean>>({});
 
   // 使用防抖处理搜索
   const debouncedFilters = useDebounce(filters, 300);
@@ -130,6 +136,53 @@ export default function CourseSearchPage() {
     loadMetadata();
   }, []);
 
+  // 检查课程收藏状态
+  const checkFavoriteStatus = async (courseId: number) => {
+    try {
+      setFavoritesLoading(prev => ({ ...prev, [courseId]: true }));
+      const isFavorite = await favoriteService.checkFavorite(courseId);
+      setFavoriteStates(prev => ({ ...prev, [courseId]: isFavorite }));
+    } catch (error) {
+      console.error('检查收藏状态失败:', error);
+    } finally {
+      setFavoritesLoading(prev => ({ ...prev, [courseId]: false }));
+    }
+  };
+
+  // 处理收藏/取消收藏
+  const handleToggleFavorite = async (courseId: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    try {
+      setFavoritesLoading(prev => ({ ...prev, [courseId]: true }));
+      
+      if (favoriteStates[courseId]) {
+        await favoriteService.removeFavorite(courseId);
+        toast.success('已取消收藏');
+      } else {
+        await favoriteService.addFavorite(courseId);
+        toast.success('收藏成功');
+      }
+      
+      setFavoriteStates(prev => ({ ...prev, [courseId]: !prev[courseId] }));
+    } catch (err: any) {
+      console.error('操作收藏失败:', err);
+      toast.error(favoriteStates[courseId] ? '取消收藏失败' : '收藏失败');
+    } finally {
+      setFavoritesLoading(prev => ({ ...prev, [courseId]: false }));
+    }
+  };
+
+  // 在课程列表加载完成后检查收藏状态
+  useEffect(() => {
+    if (courses.length > 0) {
+      courses.forEach(course => {
+        checkFavoriteStatus(course.id);
+      });
+    }
+  }, [courses]);
+
   // 处理过滤器变化
   const handleFilterChange = (key: keyof SearchFilters, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value, page: 1 }));
@@ -144,6 +197,11 @@ export default function CourseSearchPage() {
       sortBy: 'rating',
       page: 1
     });
+  };
+
+  // 处理课程卡片点击
+  const handleCourseClick = (courseId: number) => {
+    router.push(`/dashboard/course-detail/${courseId}`);
   };
 
   return (
@@ -379,10 +437,14 @@ export default function CourseSearchPage() {
             viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'
           )}>
             {courses.map((course) => (
-              <Card key={course.id} className={cn(
-                "overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group",
-                viewMode === 'list' && "flex"
-              )}>
+              <Card 
+                key={course.id} 
+                className={cn(
+                  "overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group",
+                  viewMode === 'list' && "flex"
+                )}
+                onClick={() => handleCourseClick(course.id)}
+              >
                 {course.coverUrl && (
                   <div className={cn(
                     "relative overflow-hidden",
@@ -393,6 +455,26 @@ export default function CourseSearchPage() {
                       alt={course.title}
                       className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
+                    {/* 收藏按钮 */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-2 right-2 bg-white/80 hover:bg-white/90 rounded-full w-8 h-8 p-1.5"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleToggleFavorite(course.id, e);
+                      }}
+                      disabled={favoritesLoading[course.id]}
+                    >
+                      {favoritesLoading[course.id] ? (
+                        <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent" />
+                      ) : favoriteStates[course.id] ? (
+                        <Heart className="h-4 w-4 text-red-500 fill-red-500" />
+                      ) : (
+                        <Heart className="h-4 w-4" />
+                      )}
+                    </Button>
                   </div>
                 )}
                 <CardContent className={cn(

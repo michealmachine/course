@@ -2,13 +2,12 @@ package com.zhangziqi.online_course_mine.controller;
 
 import com.zhangziqi.online_course_mine.model.vo.Result;
 import com.zhangziqi.online_course_mine.model.vo.UserFavoriteVO;
+import com.zhangziqi.online_course_mine.security.SecurityUtil;
 import com.zhangziqi.online_course_mine.service.UserFavoriteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -25,9 +24,8 @@ public class UserFavoriteController {
      * 收藏课程
      */
     @PostMapping("/{courseId}")
-    public Result<Void> addFavorite(@PathVariable Long courseId,
-                                    @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = Long.valueOf(userDetails.getUsername());
+    public Result<Void> addFavorite(@PathVariable Long courseId) {
+        Long userId = SecurityUtil.getCurrentUserId();
         boolean success = userFavoriteService.addFavorite(userId, courseId);
         
         if (success) {
@@ -41,9 +39,8 @@ public class UserFavoriteController {
      * 取消收藏
      */
     @DeleteMapping("/{courseId}")
-    public Result<Void> removeFavorite(@PathVariable Long courseId,
-                                      @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = Long.valueOf(userDetails.getUsername());
+    public Result<Void> removeFavorite(@PathVariable Long courseId) {
+        Long userId = SecurityUtil.getCurrentUserId();
         boolean success = userFavoriteService.removeFavorite(userId, courseId);
         
         if (success) {
@@ -57,9 +54,8 @@ public class UserFavoriteController {
      * 检查是否已收藏
      */
     @GetMapping("/check/{courseId}")
-    public Result<Boolean> checkFavorite(@PathVariable Long courseId,
-                                       @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = Long.valueOf(userDetails.getUsername());
+    public Result<Boolean> checkFavorite(@PathVariable Long courseId) {
+        Long userId = SecurityUtil.getCurrentUserId();
         boolean isFavorite = userFavoriteService.isFavorite(userId, courseId);
         
         return Result.success(isFavorite);
@@ -71,10 +67,9 @@ public class UserFavoriteController {
     @GetMapping
     public Result<Page<UserFavoriteVO>> getFavorites(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @AuthenticationPrincipal UserDetails userDetails) {
+            @RequestParam(defaultValue = "10") int size) {
         
-        Long userId = Long.valueOf(userDetails.getUsername());
+        Long userId = SecurityUtil.getCurrentUserId();
         
         PageRequest pageRequest = PageRequest.of(page, size, 
                 Sort.by(Sort.Direction.DESC, "favoriteTime"));
@@ -88,8 +83,8 @@ public class UserFavoriteController {
      * 获取收藏数量
      */
     @GetMapping("/count")
-    public Result<Long> getFavoriteCount(@AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = Long.valueOf(userDetails.getUsername());
+    public Result<Long> getFavoriteCount() {
+        Long userId = SecurityUtil.getCurrentUserId();
         long count = userFavoriteService.countUserFavorites(userId);
         
         return Result.success(count);
