@@ -2,6 +2,7 @@ package com.zhangziqi.online_course_mine.controller;
 
 import com.zhangziqi.online_course_mine.model.dto.order.OrderCreateDTO;
 import com.zhangziqi.online_course_mine.model.dto.order.OrderRefundDTO;
+import com.zhangziqi.online_course_mine.model.dto.order.OrderSearchDTO;
 import com.zhangziqi.online_course_mine.model.vo.OrderVO;
 import com.zhangziqi.online_course_mine.model.vo.Result;
 import com.zhangziqi.online_course_mine.security.SecurityUtil;
@@ -52,37 +53,6 @@ public class OrderController {
     }
 
     /**
-     * 获取用户订单列表
-     */
-    @GetMapping("/my")
-    @ResponseStatus(HttpStatus.OK)
-    @Operation(summary = "获取当前用户订单列表", description = "获取已登录用户的所有订单")
-    public Result<List<OrderVO>> getUserOrders() {
-        Long userId = SecurityUtil.getCurrentUserId();
-        log.info("获取用户订单列表, 用户ID: {}", userId);
-        
-        List<OrderVO> orders = orderService.getUserOrders(userId);
-        return Result.success(orders);
-    }
-
-    /**
-     * 分页获取用户订单
-     */
-    @GetMapping("/my/page")
-    @ResponseStatus(HttpStatus.OK)
-    @Operation(summary = "分页获取当前用户订单", description = "分页获取已登录用户的订单")
-    public Result<Page<OrderVO>> getUserOrdersPage(
-            @Parameter(description = "页码") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "每页条数") @RequestParam(defaultValue = "10") int size) {
-        Long userId = SecurityUtil.getCurrentUserId();
-        log.info("分页获取用户订单, 用户ID: {}, 页码: {}, 每页条数: {}", userId, page, size);
-        
-        Pageable pageable = PageRequest.of(page, size);
-        Page<OrderVO> orderPage = orderService.getUserOrders(userId, pageable);
-        return Result.success(orderPage);
-    }
-
-    /**
      * 根据ID获取订单详情
      */
     @GetMapping("/{id}")
@@ -130,39 +100,6 @@ public class OrderController {
     }
 
     /**
-     * 获取机构订单列表（机构管理员）
-     */
-    @GetMapping("/institution")
-    @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
-    @ResponseStatus(HttpStatus.OK)
-    @Operation(summary = "获取机构订单列表", description = "获取当前用户所属机构的所有订单")
-    public Result<List<OrderVO>> getInstitutionOrders() {
-        Long institutionId = SecurityUtil.getCurrentInstitutionId();
-        log.info("获取机构订单列表, 机构ID: {}", institutionId);
-        
-        List<OrderVO> orders = orderService.getInstitutionOrders(institutionId);
-        return Result.success(orders);
-    }
-
-    /**
-     * 分页获取机构订单（机构管理员）
-     */
-    @GetMapping("/institution/page")
-    @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
-    @ResponseStatus(HttpStatus.OK)
-    @Operation(summary = "分页获取机构订单", description = "分页获取当前用户所属机构的订单")
-    public Result<Page<OrderVO>> getInstitutionOrdersPage(
-            @Parameter(description = "页码") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "每页条数") @RequestParam(defaultValue = "10") int size) {
-        Long institutionId = SecurityUtil.getCurrentInstitutionId();
-        log.info("分页获取机构订单, 机构ID: {}, 页码: {}, 每页条数: {}", institutionId, page, size);
-        
-        Pageable pageable = PageRequest.of(page, size);
-        Page<OrderVO> orderPage = orderService.getInstitutionOrders(institutionId, pageable);
-        return Result.success(orderPage);
-    }
-    
-    /**
      * 获取机构收入统计（机构管理员）
      */
     @GetMapping("/institution/income")
@@ -186,36 +123,6 @@ public class OrderController {
     }
 
     /**
-     * 获取所有订单（平台管理员）
-     */
-    @GetMapping("/admin/all")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
-    @ResponseStatus(HttpStatus.OK)
-    @Operation(summary = "获取所有订单", description = "平台管理员获取所有订单")
-    public Result<List<OrderVO>> getAllOrders() {
-        log.info("管理员获取所有订单");
-        List<OrderVO> orders = orderService.getAllOrders();
-        return Result.success(orders);
-    }
-
-    /**
-     * 分页获取所有订单（平台管理员）
-     */
-    @GetMapping("/admin/page")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
-    @ResponseStatus(HttpStatus.OK)
-    @Operation(summary = "分页获取所有订单", description = "平台管理员分页获取所有订单")
-    public Result<Page<OrderVO>> getAllOrdersPage(
-            @Parameter(description = "页码") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "每页条数") @RequestParam(defaultValue = "10") int size) {
-        log.info("管理员分页获取所有订单, 页码: {}, 每页条数: {}", page, size);
-        
-        Pageable pageable = PageRequest.of(page, size);
-        Page<OrderVO> orderPage = orderService.getAllOrders(pageable);
-        return Result.success(orderPage);
-    }
-
-    /**
      * 处理退款申请（机构管理员或平台管理员）
      */
     @PostMapping("/admin/{id}/process-refund")
@@ -230,5 +137,48 @@ public class OrderController {
         
         OrderVO orderVO = orderService.processRefund(id, approved, operatorId);
         return Result.success(orderVO);
+    }
+
+    /**
+     * 高级搜索个人订单
+     */
+    @PostMapping("/my/search")
+    @ResponseStatus(HttpStatus.OK)
+    @Operation(summary = "高级搜索用户订单", description = "根据条件高级搜索已登录用户的订单")
+    public Result<Page<OrderVO>> searchUserOrders(@Valid @RequestBody OrderSearchDTO searchDTO) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        log.info("高级搜索用户订单, 用户ID: {}, 搜索条件: {}", userId, searchDTO);
+        
+        Page<OrderVO> orderPage = orderService.searchUserOrders(searchDTO, userId);
+        return Result.success(orderPage);
+    }
+
+    /**
+     * 高级搜索机构订单（机构管理员）
+     */
+    @PostMapping("/institution/search")
+    @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
+    @ResponseStatus(HttpStatus.OK)
+    @Operation(summary = "高级搜索机构订单", description = "根据条件高级搜索机构的所有订单")
+    public Result<Page<OrderVO>> searchInstitutionOrders(@Valid @RequestBody OrderSearchDTO searchDTO) {
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+        log.info("高级搜索机构订单, 机构ID: {}, 搜索条件: {}", institutionId, searchDTO);
+        
+        Page<OrderVO> orderPage = orderService.searchInstitutionOrders(searchDTO, institutionId);
+        return Result.success(orderPage);
+    }
+
+    /**
+     * 高级搜索所有订单（平台管理员）
+     */
+    @PostMapping("/admin/search")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @ResponseStatus(HttpStatus.OK)
+    @Operation(summary = "高级搜索所有订单", description = "平台管理员根据条件高级搜索所有订单")
+    public Result<Page<OrderVO>> searchAllOrders(@Valid @RequestBody OrderSearchDTO searchDTO) {
+        log.info("管理员高级搜索所有订单, 搜索条件: {}", searchDTO);
+        
+        Page<OrderVO> orderPage = orderService.searchAllOrders(searchDTO);
+        return Result.success(orderPage);
     }
 } 

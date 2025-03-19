@@ -10,6 +10,7 @@ import com.zhangziqi.online_course_mine.config.AlipayConfig;
 import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.exception.ResourceNotFoundException;
 import com.zhangziqi.online_course_mine.model.dto.order.OrderRefundDTO;
+import com.zhangziqi.online_course_mine.model.dto.order.OrderSearchDTO;
 import com.zhangziqi.online_course_mine.model.entity.Course;
 import com.zhangziqi.online_course_mine.model.entity.*;
 import com.zhangziqi.online_course_mine.model.vo.OrderVO;
@@ -19,12 +20,16 @@ import com.zhangziqi.online_course_mine.repository.UserCourseRepository;
 import com.zhangziqi.online_course_mine.repository.UserRepository;
 import com.zhangziqi.online_course_mine.service.OrderService;
 import com.zhangziqi.online_course_mine.service.UserCourseService;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -34,6 +39,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.Objects;
 import java.util.Random;
+import java.util.ArrayList;
 import com.zhangziqi.online_course_mine.model.enums.OrderStatus;
 import com.zhangziqi.online_course_mine.constant.OrderConstants;
 
@@ -239,60 +245,6 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("订单不存在，ID: " + id));
         
         return OrderVO.fromEntity(order);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<OrderVO> getUserOrders(Long userId) {
-        List<Order> orders = orderRepository.findByUser_Id(userId);
-        
-        return orders.stream()
-                .map(OrderVO::fromEntity)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<OrderVO> getUserOrders(Long userId, Pageable pageable) {
-        Page<Order> orderPage = orderRepository.findByUser_Id(userId, pageable);
-        
-        return orderPage.map(OrderVO::fromEntity);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<OrderVO> getInstitutionOrders(Long institutionId) {
-        List<Order> orders = orderRepository.findByInstitution_Id(institutionId);
-        
-        return orders.stream()
-                .map(OrderVO::fromEntity)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<OrderVO> getInstitutionOrders(Long institutionId, Pageable pageable) {
-        Page<Order> orderPage = orderRepository.findByInstitution_Id(institutionId, pageable);
-        
-        return orderPage.map(OrderVO::fromEntity);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<OrderVO> getAllOrders() {
-        List<Order> orders = orderRepository.findAll();
-        
-        return orders.stream()
-                .map(OrderVO::fromEntity)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<OrderVO> getAllOrders(Pageable pageable) {
-        Page<Order> orderPage = orderRepository.findAll(pageable);
-        
-        return orderPage.map(OrderVO::fromEntity);
     }
 
     @Override
@@ -582,5 +534,149 @@ public class OrderServiceImpl implements OrderService {
                 true);
         
         log.info("支付成功处理完成，订单号：{}", orderNo);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<OrderVO> searchUserOrders(OrderSearchDTO searchDTO, Long userId) {
+        log.info("搜索用户订单，用户ID: {}, 搜索条件: {}", userId, searchDTO);
+        
+        // 创建分页对象
+        Pageable pageable = PageRequest.of(searchDTO.getPageNum() - 1, searchDTO.getPageSize());
+        
+        // 构建查询条件
+        Specification<Order> spec = buildOrderSpecification(searchDTO);
+        
+        // 添加用户ID的查询条件
+        spec = spec.and((root, query, cb) -> cb.equal(root.get("user").get("id"), userId));
+        
+        // 执行查询
+        Page<Order> orderPage = orderRepository.findAll(spec, pageable);
+        
+        log.info("用户订单搜索结果: 共{}条记录", orderPage.getTotalElements());
+        
+        // 转换为VO
+        return orderPage.map(OrderVO::fromEntity);
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public Page<OrderVO> searchInstitutionOrders(OrderSearchDTO searchDTO, Long institutionId) {
+        log.info("搜索机构订单，机构ID: {}, 搜索条件: {}", institutionId, searchDTO);
+        
+        // 创建分页对象
+        Pageable pageable = PageRequest.of(searchDTO.getPageNum() - 1, searchDTO.getPageSize());
+        
+        // 构建查询条件
+        Specification<Order> spec = buildOrderSpecification(searchDTO);
+        
+        // 添加机构ID的查询条件
+        spec = spec.and((root, query, cb) -> cb.equal(root.get("institution").get("id"), institutionId));
+        
+        // 执行查询
+        Page<Order> orderPage = orderRepository.findAll(spec, pageable);
+        
+        log.info("机构订单搜索结果: 共{}条记录", orderPage.getTotalElements());
+        
+        // 转换为VO
+        return orderPage.map(OrderVO::fromEntity);
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public Page<OrderVO> searchAllOrders(OrderSearchDTO searchDTO) {
+        log.info("搜索所有订单，搜索条件: {}", searchDTO);
+        
+        // 创建分页对象
+        Pageable pageable = PageRequest.of(searchDTO.getPageNum() - 1, searchDTO.getPageSize());
+        
+        // 构建查询条件
+        Specification<Order> spec = buildOrderSpecification(searchDTO);
+        
+        // 执行查询
+        Page<Order> orderPage = orderRepository.findAll(spec, pageable);
+        
+        log.info("所有订单搜索结果: 共{}条记录", orderPage.getTotalElements());
+        
+        // 转换为VO
+        return orderPage.map(OrderVO::fromEntity);
+    }
+    
+    /**
+     * 构建订单查询条件
+     */
+    private Specification<Order> buildOrderSpecification(OrderSearchDTO searchDTO) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            
+            // 订单号模糊查询
+            if (StringUtils.hasText(searchDTO.getOrderNo())) {
+                predicates.add(cb.like(root.get("orderNo"), "%" + searchDTO.getOrderNo() + "%"));
+            }
+            
+            // 交易号模糊查询
+            if (StringUtils.hasText(searchDTO.getTradeNo())) {
+                predicates.add(cb.like(root.get("tradeNo"), "%" + searchDTO.getTradeNo() + "%"));
+            }
+            
+            // 订单状态查询
+            if (searchDTO.getStatus() != null) {
+                predicates.add(cb.equal(root.get("status"), searchDTO.getStatus()));
+            }
+            
+            // 创建时间范围查询
+            if (searchDTO.getCreatedTimeStart() != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), searchDTO.getCreatedTimeStart()));
+            }
+            if (searchDTO.getCreatedTimeEnd() != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"), searchDTO.getCreatedTimeEnd()));
+            }
+            
+            // 支付时间范围查询
+            if (searchDTO.getPaidTimeStart() != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("paidAt"), searchDTO.getPaidTimeStart()));
+            }
+            if (searchDTO.getPaidTimeEnd() != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("paidAt"), searchDTO.getPaidTimeEnd()));
+            }
+            
+            // 退款时间范围查询
+            if (searchDTO.getRefundTimeStart() != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("refundedAt"), searchDTO.getRefundTimeStart()));
+            }
+            if (searchDTO.getRefundTimeEnd() != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("refundedAt"), searchDTO.getRefundTimeEnd()));
+            }
+            
+            // 订单金额范围查询
+            if (searchDTO.getMinAmount() != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("amount"), searchDTO.getMinAmount()));
+            }
+            if (searchDTO.getMaxAmount() != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("amount"), searchDTO.getMaxAmount()));
+            }
+            
+            // 课程ID查询
+            if (searchDTO.getCourseId() != null) {
+                predicates.add(cb.equal(root.get("course").get("id"), searchDTO.getCourseId()));
+            }
+            
+            // 用户ID查询（仅管理员使用）
+            if (searchDTO.getUserId() != null) {
+                predicates.add(cb.equal(root.get("user").get("id"), searchDTO.getUserId()));
+            }
+            
+            // 课程名称模糊查询
+            if (StringUtils.hasText(searchDTO.getCourseTitle())) {
+                predicates.add(cb.like(root.get("course").get("title"), "%" + searchDTO.getCourseTitle() + "%"));
+            }
+            
+            // 用户名称模糊查询
+            if (StringUtils.hasText(searchDTO.getUserName())) {
+                predicates.add(cb.like(root.get("user").get("username"), "%" + searchDTO.getUserName() + "%"));
+            }
+            
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
     }
 } 

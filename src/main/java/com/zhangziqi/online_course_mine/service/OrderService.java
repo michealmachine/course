@@ -2,6 +2,7 @@ package com.zhangziqi.online_course_mine.service;
 
 import com.zhangziqi.online_course_mine.model.dto.order.OrderCreateDTO;
 import com.zhangziqi.online_course_mine.model.dto.order.OrderRefundDTO;
+import com.zhangziqi.online_course_mine.model.dto.order.OrderSearchDTO;
 import com.zhangziqi.online_course_mine.model.vo.OrderVO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -54,55 +55,6 @@ public interface OrderService {
      * @return 订单VO
      */
     OrderVO getOrderById(Long id);
-
-    /**
-     * 查询用户的所有订单
-     *
-     * @param userId 用户ID
-     * @return 订单VO列表
-     */
-    List<OrderVO> getUserOrders(Long userId);
-
-    /**
-     * 分页查询用户订单
-     *
-     * @param userId 用户ID
-     * @param pageable 分页参数
-     * @return 分页订单VO
-     */
-    Page<OrderVO> getUserOrders(Long userId, Pageable pageable);
-
-    /**
-     * 查询机构的所有订单
-     *
-     * @param institutionId 机构ID
-     * @return 订单VO列表
-     */
-    List<OrderVO> getInstitutionOrders(Long institutionId);
-
-    /**
-     * 分页查询机构订单
-     *
-     * @param institutionId 机构ID
-     * @param pageable 分页参数
-     * @return 分页订单VO
-     */
-    Page<OrderVO> getInstitutionOrders(Long institutionId, Pageable pageable);
-    
-    /**
-     * 查询所有订单（管理员）
-     *
-     * @return 订单VO列表
-     */
-    List<OrderVO> getAllOrders();
-
-    /**
-     * 分页查询所有订单（管理员）
-     *
-     * @param pageable 分页参数
-     * @return 分页订单VO
-     */
-    Page<OrderVO> getAllOrders(Pageable pageable);
     
     /**
      * 申请退款
@@ -164,4 +116,30 @@ public interface OrderService {
      * @param orderNo 订单号
      */
     void handlePaymentSuccess(String orderNo);
+
+    /**
+     * 根据搜索条件查询用户订单
+     *
+     * @param searchDTO 搜索条件
+     * @param userId 用户ID
+     * @return 分页订单VO
+     */
+    Page<OrderVO> searchUserOrders(OrderSearchDTO searchDTO, Long userId);
+    
+    /**
+     * 根据搜索条件查询机构订单
+     *
+     * @param searchDTO 搜索条件
+     * @param institutionId 机构ID
+     * @return 分页订单VO
+     */
+    Page<OrderVO> searchInstitutionOrders(OrderSearchDTO searchDTO, Long institutionId);
+    
+    /**
+     * 根据搜索条件查询所有订单（管理员）
+     *
+     * @param searchDTO 搜索条件
+     * @return 分页订单VO
+     */
+    Page<OrderVO> searchAllOrders(OrderSearchDTO searchDTO);
 } 

@@ -6,8 +6,6 @@ import com.zhangziqi.online_course_mine.model.dto.JwtTokenDTO;
 import com.zhangziqi.online_course_mine.model.dto.LoginDTO;
 import com.zhangziqi.online_course_mine.model.dto.RefreshTokenDTO;
 import com.zhangziqi.online_course_mine.model.dto.RegisterDTO;
-import com.zhangziqi.online_course_mine.model.entity.User;
-import com.zhangziqi.online_course_mine.model.vo.UserVO;
 import com.zhangziqi.online_course_mine.security.jwt.JwtTokenProvider;
 import com.zhangziqi.online_course_mine.security.jwt.TokenBlacklistService;
 import com.zhangziqi.online_course_mine.service.AuthService;
@@ -20,7 +18,6 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

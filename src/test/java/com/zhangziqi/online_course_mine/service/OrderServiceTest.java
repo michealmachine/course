@@ -10,6 +10,7 @@ import com.zhangziqi.online_course_mine.config.AlipayConfig;
 import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.exception.ResourceNotFoundException;
 import com.zhangziqi.online_course_mine.model.dto.order.OrderRefundDTO;
+import com.zhangziqi.online_course_mine.model.dto.order.OrderSearchDTO;
 import com.zhangziqi.online_course_mine.model.entity.Course;
 import com.zhangziqi.online_course_mine.model.entity.Institution;
 import com.zhangziqi.online_course_mine.model.entity.Order;
@@ -34,6 +35,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -330,47 +332,6 @@ public class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("获取用户订单 - 成功")
-    void getUserOrders_Success() {
-        // 准备测试数据
-        when(orderRepository.findByUser_Id(anyLong())).thenReturn(List.of(testOrder));
-        
-        // 执行方法
-        List<OrderVO> result = orderService.getUserOrders(testUser.getId());
-        
-        // 验证结果
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        assertEquals(testOrder.getId(), result.get(0).getId());
-        assertEquals(testOrder.getOrderNo(), result.get(0).getOrderNo());
-        
-        // 验证方法调用
-        verify(orderRepository).findByUser_Id(testUser.getId());
-    }
-
-    @Test
-    @DisplayName("分页获取用户订单 - 成功")
-    void getUserOrdersWithPagination_Success() {
-        // 准备测试数据
-        Pageable pageable = PageRequest.of(0, 10);
-        Page<Order> orderPage = new PageImpl<>(List.of(testOrder), pageable, 1);
-        
-        when(orderRepository.findByUser_Id(anyLong(), any(Pageable.class))).thenReturn(orderPage);
-        
-        // 执行方法
-        Page<OrderVO> result = orderService.getUserOrders(testUser.getId(), pageable);
-        
-        // 验证结果
-        assertNotNull(result);
-        assertEquals(1, result.getTotalElements());
-        assertEquals(testOrder.getId(), result.getContent().get(0).getId());
-        assertEquals(testOrder.getOrderNo(), result.getContent().get(0).getOrderNo());
-        
-        // 验证方法调用
-        verify(orderRepository).findByUser_Id(testUser.getId(), pageable);
-    }
-
-    @Test
     @DisplayName("申请退款 - 成功")
     void refundOrder_Success() {
         // 准备测试数据
@@ -664,5 +625,249 @@ public class OrderServiceTest {
         verify(orderRepository).findByOrderNo(testOrder.getOrderNo());
         verify(orderRepository, never()).save(any(Order.class));
         verify(userCourseService, never()).createUserCourseRelation(anyLong(), anyLong(), anyLong(), anyBoolean());
+    }
+
+    @Test
+    @DisplayName("用户订单高级搜索 - 基本搜索")
+    void searchUserOrders_BasicSearch() {
+        // 准备测试数据
+        OrderSearchDTO searchDTO = OrderSearchDTO.builder()
+                .pageNum(1)
+                .pageSize(10)
+                .build();
+        
+        Long userId = 1L;
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Order> orderPage = new PageImpl<>(List.of(testOrder), pageable, 1);
+        
+        // 模拟repository调用
+        when(orderRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(orderPage);
+        
+        // 执行方法
+        Page<OrderVO> result = orderService.searchUserOrders(searchDTO, userId);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(testOrder.getId(), result.getContent().get(0).getId());
+        
+        // 验证方法调用
+        verify(orderRepository).findAll(any(Specification.class), eq(pageable));
+    }
+    
+    @Test
+    @DisplayName("用户订单高级搜索 - 带条件")
+    void searchUserOrders_WithConditions() {
+        // 准备测试数据
+        OrderSearchDTO searchDTO = OrderSearchDTO.builder()
+                .pageNum(1)
+                .pageSize(10)
+                .orderNo("TEST")
+                .status(OrderStatus.PAID.getValue())
+                .minAmount(BigDecimal.valueOf(50))
+                .maxAmount(BigDecimal.valueOf(200))
+                .courseTitle("测试")
+                .build();
+        
+        Long userId = 1L;
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Order> orderPage = new PageImpl<>(List.of(testOrder), pageable, 1);
+        
+        // 模拟repository调用
+        when(orderRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(orderPage);
+        
+        // 执行方法
+        Page<OrderVO> result = orderService.searchUserOrders(searchDTO, userId);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(testOrder.getId(), result.getContent().get(0).getId());
+        
+        // 验证方法调用
+        verify(orderRepository).findAll(any(Specification.class), eq(pageable));
+    }
+    
+    @Test
+    @DisplayName("用户订单高级搜索 - 日期范围")
+    void searchUserOrders_DateRange() {
+        // 准备测试数据
+        LocalDateTime start = LocalDateTime.now().minusDays(30);
+        LocalDateTime end = LocalDateTime.now();
+        
+        OrderSearchDTO searchDTO = OrderSearchDTO.builder()
+                .pageNum(1)
+                .pageSize(10)
+                .createdTimeStart(start)
+                .createdTimeEnd(end)
+                .build();
+        
+        Long userId = 1L;
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Order> orderPage = new PageImpl<>(List.of(testOrder), pageable, 1);
+        
+        // 模拟repository调用
+        when(orderRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(orderPage);
+        
+        // 执行方法
+        Page<OrderVO> result = orderService.searchUserOrders(searchDTO, userId);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        
+        // 验证方法调用
+        verify(orderRepository).findAll(any(Specification.class), eq(pageable));
+    }
+    
+    @Test
+    @DisplayName("机构订单高级搜索 - 基本搜索")
+    void searchInstitutionOrders_BasicSearch() {
+        // 准备测试数据
+        OrderSearchDTO searchDTO = OrderSearchDTO.builder()
+                .pageNum(1)
+                .pageSize(10)
+                .build();
+        
+        Long institutionId = 1L;
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Order> orderPage = new PageImpl<>(List.of(testOrder), pageable, 1);
+        
+        // 模拟repository调用
+        when(orderRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(orderPage);
+        
+        // 执行方法
+        Page<OrderVO> result = orderService.searchInstitutionOrders(searchDTO, institutionId);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(testOrder.getId(), result.getContent().get(0).getId());
+        
+        // 验证方法调用
+        verify(orderRepository).findAll(any(Specification.class), eq(pageable));
+    }
+    
+    @Test
+    @DisplayName("机构订单高级搜索 - 带条件")
+    void searchInstitutionOrders_WithConditions() {
+        // 准备测试数据
+        OrderSearchDTO searchDTO = OrderSearchDTO.builder()
+                .pageNum(1)
+                .pageSize(10)
+                .status(OrderStatus.PAID.getValue())
+                .userName("test")
+                .build();
+        
+        Long institutionId = 1L;
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Order> orderPage = new PageImpl<>(List.of(testOrder), pageable, 1);
+        
+        // 模拟repository调用
+        when(orderRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(orderPage);
+        
+        // 执行方法
+        Page<OrderVO> result = orderService.searchInstitutionOrders(searchDTO, institutionId);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        
+        // 验证方法调用
+        verify(orderRepository).findAll(any(Specification.class), eq(pageable));
+    }
+    
+    @Test
+    @DisplayName("管理员订单高级搜索 - 基本搜索")
+    void searchAllOrders_BasicSearch() {
+        // 准备测试数据
+        OrderSearchDTO searchDTO = OrderSearchDTO.builder()
+                .pageNum(1)
+                .pageSize(10)
+                .build();
+        
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Order> orderPage = new PageImpl<>(List.of(testOrder), pageable, 1);
+        
+        // 模拟repository调用
+        when(orderRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(orderPage);
+        
+        // 执行方法
+        Page<OrderVO> result = orderService.searchAllOrders(searchDTO);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(testOrder.getId(), result.getContent().get(0).getId());
+        
+        // 验证方法调用
+        verify(orderRepository).findAll(any(Specification.class), eq(pageable));
+    }
+    
+    @Test
+    @DisplayName("管理员订单高级搜索 - 复杂条件")
+    void searchAllOrders_ComplexConditions() {
+        // 准备测试数据
+        LocalDateTime start = LocalDateTime.now().minusDays(30);
+        LocalDateTime end = LocalDateTime.now();
+        
+        OrderSearchDTO searchDTO = OrderSearchDTO.builder()
+                .pageNum(1)
+                .pageSize(10)
+                .orderNo("TEST")
+                .status(OrderStatus.PAID.getValue())
+                .createdTimeStart(start)
+                .createdTimeEnd(end)
+                .minAmount(BigDecimal.valueOf(50))
+                .maxAmount(BigDecimal.valueOf(200))
+                .courseId(1L)
+                .userId(1L)
+                .courseTitle("测试")
+                .userName("test")
+                .build();
+        
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Order> orderPage = new PageImpl<>(List.of(testOrder), pageable, 1);
+        
+        // 模拟repository调用
+        when(orderRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(orderPage);
+        
+        // 执行方法
+        Page<OrderVO> result = orderService.searchAllOrders(searchDTO);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        
+        // 验证方法调用
+        verify(orderRepository).findAll(any(Specification.class), eq(pageable));
+    }
+    
+    @Test
+    @DisplayName("管理员订单高级搜索 - 空结果")
+    void searchAllOrders_EmptyResult() {
+        // 准备测试数据
+        OrderSearchDTO searchDTO = OrderSearchDTO.builder()
+                .pageNum(1)
+                .pageSize(10)
+                .status(OrderStatus.REFUNDED.getValue()) // 不存在的状态
+                .build();
+        
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Order> emptyPage = new PageImpl<>(Collections.emptyList(), pageable, 0);
+        
+        // 模拟repository调用
+        when(orderRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(emptyPage);
+        
+        // 执行方法
+        Page<OrderVO> result = orderService.searchAllOrders(searchDTO);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(0, result.getTotalElements());
+        assertTrue(result.getContent().isEmpty());
+        
+        // 验证方法调用
+        verify(orderRepository).findAll(any(Specification.class), eq(pageable));
     }
 } 
