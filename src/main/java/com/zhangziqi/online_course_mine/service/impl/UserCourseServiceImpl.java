@@ -272,4 +272,11 @@ public class UserCourseServiceImpl implements UserCourseService {
         log.info("根据订单ID查询用户课程关系, 订单ID: {}", orderId);
         return userCourseRepository.findByOrder_Id(orderId);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<UserCourse> findByUserIdAndStatus(Long userId, Integer status, Pageable pageable) {
+        log.info("分页查询用户指定状态的课程关系, 用户ID: {}, 状态: {}, 分页: {}", userId, status, pageable);
+        return userCourseRepository.findByUser_IdAndStatus(userId, status, pageable);
+    }
 } 

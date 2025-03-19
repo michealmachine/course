@@ -189,6 +189,21 @@ public class OrderController {
     }
 
     /**
+     * 获取机构待处理退款申请（机构管理员）
+     */
+    @GetMapping("/institution/pending-refunds")
+    @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
+    @ResponseStatus(HttpStatus.OK)
+    @Operation(summary = "获取机构待处理退款申请", description = "获取当前用户所属机构的所有待处理退款申请")
+    public Result<List<OrderVO>> getInstitutionPendingRefunds() {
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+        log.info("获取机构待处理退款申请, 机构ID: {}", institutionId);
+        
+        List<OrderVO> pendingRefunds = orderService.getInstitutionPendingRefunds(institutionId);
+        return Result.success(pendingRefunds);
+    }
+
+    /**
      * 高级搜索所有订单（平台管理员）
      */
     @PostMapping("/admin/search")

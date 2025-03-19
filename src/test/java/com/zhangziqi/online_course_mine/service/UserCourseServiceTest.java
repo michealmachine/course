@@ -597,4 +597,53 @@ public class UserCourseServiceTest {
         // 验证方法调用
         verify(userCourseRepository).findByOrder_Id(999L);
     }
+
+    @Test
+    @DisplayName("分页查询用户指定状态的课程关系 - 成功")
+    void findByUserIdAndStatus_Success() {
+        // 准备测试数据
+        Pageable pageable = PageRequest.of(0, 10);
+        Integer status = UserCourseStatus.NORMAL.ordinal();
+        Page<UserCourse> userCoursePage = new PageImpl<>(List.of(testUserCourse), pageable, 1);
+        
+        when(userCourseRepository.findByUser_IdAndStatus(anyLong(), anyInt(), any(Pageable.class)))
+                .thenReturn(userCoursePage);
+        
+        // 执行方法
+        Page<UserCourse> result = userCourseService.findByUserIdAndStatus(testUser.getId(), status, pageable);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(testUserCourse.getId(), result.getContent().get(0).getId());
+        assertEquals(testUserCourse.getUser().getId(), result.getContent().get(0).getUser().getId());
+        assertEquals(testUserCourse.getCourse().getId(), result.getContent().get(0).getCourse().getId());
+        assertEquals(status, result.getContent().get(0).getStatus());
+        
+        // 验证方法调用
+        verify(userCourseRepository).findByUser_IdAndStatus(testUser.getId(), status, pageable);
+    }
+    
+    @Test
+    @DisplayName("分页查询用户指定状态的课程关系 - 无记录")
+    void findByUserIdAndStatus_NoRecords() {
+        // 准备测试数据
+        Pageable pageable = PageRequest.of(0, 10);
+        Integer status = UserCourseStatus.REFUNDED.ordinal();
+        Page<UserCourse> emptyPage = new PageImpl<>(Collections.emptyList(), pageable, 0);
+        
+        when(userCourseRepository.findByUser_IdAndStatus(anyLong(), anyInt(), any(Pageable.class)))
+                .thenReturn(emptyPage);
+        
+        // 执行方法
+        Page<UserCourse> result = userCourseService.findByUserIdAndStatus(testUser.getId(), status, pageable);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(0, result.getTotalElements());
+        assertTrue(result.getContent().isEmpty());
+        
+        // 验证方法调用
+        verify(userCourseRepository).findByUser_IdAndStatus(testUser.getId(), status, pageable);
+    }
 }

@@ -142,4 +142,12 @@ public interface OrderService {
      * @return 分页订单VO
      */
     Page<OrderVO> searchAllOrders(OrderSearchDTO searchDTO);
+    
+    /**
+     * 获取机构待处理退款申请
+     *
+     * @param institutionId 机构ID
+     * @return 待处理退款申请列表
+     */
+    List<OrderVO> getInstitutionPendingRefunds(Long institutionId);
 } 

@@ -918,4 +918,54 @@ public class OrderServiceTest {
         // 验证方法调用
         verify(orderRepository).findByOrderNo(testOrder.getOrderNo());
     }
+
+    @Test
+    @DisplayName("获取机构待处理退款申请 - 有申请")
+    void getInstitutionPendingRefunds_WithRefunds() {
+        // 准备测试数据
+        testOrder.setStatus(OrderStatus.REFUNDING.getValue());
+        testOrder.setRefundReason("课程内容不符合预期");
+        testOrder.setRefundAmount(BigDecimal.valueOf(99.99));
+        
+        List<Order> pendingRefunds = List.of(testOrder);
+        
+        when(orderRepository.findByInstitution_IdAndStatus(
+                anyLong(), eq(OrderStatus.REFUNDING.getValue())))
+                .thenReturn(pendingRefunds);
+        
+        // 执行方法
+        List<OrderVO> result = orderService.getInstitutionPendingRefunds(testInstitution.getId());
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals(testOrder.getId(), result.get(0).getId());
+        assertEquals(OrderStatus.REFUNDING.getValue(), result.get(0).getStatus());
+        assertEquals("课程内容不符合预期", result.get(0).getRefundReason());
+        assertEquals(BigDecimal.valueOf(99.99), result.get(0).getRefundAmount());
+        
+        // 验证方法调用
+        verify(orderRepository).findByInstitution_IdAndStatus(
+                testInstitution.getId(), OrderStatus.REFUNDING.getValue());
+    }
+    
+    @Test
+    @DisplayName("获取机构待处理退款申请 - 无申请")
+    void getInstitutionPendingRefunds_NoRefunds() {
+        // 准备测试数据 - 返回空列表
+        when(orderRepository.findByInstitution_IdAndStatus(
+                anyLong(), eq(OrderStatus.REFUNDING.getValue())))
+                .thenReturn(Collections.emptyList());
+        
+        // 执行方法
+        List<OrderVO> result = orderService.getInstitutionPendingRefunds(testInstitution.getId());
+        
+        // 验证结果
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+        
+        // 验证方法调用
+        verify(orderRepository).findByInstitution_IdAndStatus(
+                testInstitution.getId(), OrderStatus.REFUNDING.getValue());
+    }
 } 

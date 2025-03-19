@@ -603,6 +603,26 @@ public class OrderServiceImpl implements OrderService {
     }
     
     /**
+     * 获取机构待处理退款申请
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<OrderVO> getInstitutionPendingRefunds(Long institutionId) {
+        log.info("获取机构待处理退款申请, 机构ID: {}", institutionId);
+        
+        // 查询状态为"退款中"的订单
+        List<Order> pendingRefunds = orderRepository.findByInstitution_IdAndStatus(
+                institutionId, OrderStatus.REFUNDING.getValue());
+        
+        log.info("机构待处理退款申请数量: {}", pendingRefunds.size());
+        
+        // 转换为VO
+        return pendingRefunds.stream()
+                .map(OrderVO::fromEntity)
+                .collect(Collectors.toList());
+    }
+    
+    /**
      * 构建订单查询条件
      */
     private Specification<Order> buildOrderSpecification(OrderSearchDTO searchDTO) {

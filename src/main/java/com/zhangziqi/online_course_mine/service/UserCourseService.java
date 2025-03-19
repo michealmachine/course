@@ -138,4 +138,14 @@ public interface UserCourseService {
      * @return 用户课程关系(可能为空)
      */
     Optional<UserCourse> findByOrderId(Long orderId);
+    
+    /**
+     * 分页查询用户指定状态的课程关系
+     *
+     * @param userId 用户ID
+     * @param status 状态值
+     * @param pageable 分页参数
+     * @return 分页用户课程关系
+     */
+    Page<UserCourse> findByUserIdAndStatus(Long userId, Integer status, Pageable pageable);
 } 
