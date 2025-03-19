@@ -73,6 +73,26 @@ public class OrderController {
     }
 
     /**
+     * 根据订单号查询订单状态（前端轮询支付状态用）
+     */
+    @GetMapping("/query")
+    @ResponseStatus(HttpStatus.OK)
+    @Operation(summary = "根据订单号查询订单", description = "前端根据订单号轮询查询订单状态")
+    public Result<OrderVO> queryOrderByOrderNo(@Parameter(description = "订单号") @RequestParam String orderNo) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        log.info("查询订单状态, 订单号: {}, 用户ID: {}", orderNo, userId);
+        
+        OrderVO orderVO = orderService.getOrderByOrderNo(orderNo);
+        
+        // 验证订单所有者或管理员权限
+        if (!orderVO.getUserId().equals(userId) && !SecurityUtil.isAdmin()) {
+            return Result.fail(403, "无权访问此订单");
+        }
+        
+        return Result.success(orderVO);
+    }
+
+    /**
      * 申请退款
      */
     @PostMapping("/{id}/refund")

@@ -49,7 +49,7 @@ public class SecurityConfig {
                 // 公开接口
                 .requestMatchers("/api/auth/**", "/api/public/**", "/api/institutions/apply", 
                                  "/api/institutions/application-status", "/h2-console/**",
-                                 "/api/alipay/**").permitAll()
+                                 "/api/orders/alipay/notify", "/api/orders/query").permitAll()
                 // Swagger相关接口
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**").permitAll()
                 // 其他所有请求需要认证

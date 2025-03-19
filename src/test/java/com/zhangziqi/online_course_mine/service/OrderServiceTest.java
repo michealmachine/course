@@ -870,4 +870,52 @@ public class OrderServiceTest {
         // 验证方法调用
         verify(orderRepository).findAll(any(Specification.class), eq(pageable));
     }
+    
+    @Test
+    @DisplayName("根据订单号查询订单 - 支付成功情况")
+    void getOrderByOrderNo_PaymentSuccessful() {
+        // 准备测试数据 - 模拟已支付订单
+        testOrder.setStatus(OrderStatus.PAID.getValue());
+        testOrder.setPaidAt(LocalDateTime.now());
+        testOrder.setTradeNo("ALIPAY12345678");
+        
+        when(orderRepository.findByOrderNo(anyString())).thenReturn(Optional.of(testOrder));
+        
+        // 执行方法
+        OrderVO result = orderService.getOrderByOrderNo(testOrder.getOrderNo());
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(testOrder.getOrderNo(), result.getOrderNo());
+        assertEquals(OrderStatus.PAID.getValue(), result.getStatus());
+        assertNotNull(result.getPaidAt());
+        assertEquals("ALIPAY12345678", result.getTradeNo());
+        
+        // 验证方法调用
+        verify(orderRepository).findByOrderNo(testOrder.getOrderNo());
+    }
+    
+    @Test
+    @DisplayName("根据订单号查询订单 - 待支付情况")
+    void getOrderByOrderNo_PendingPayment() {
+        // 准备测试数据 - 模拟待支付订单
+        testOrder.setStatus(OrderStatus.PENDING.getValue());
+        testOrder.setPaidAt(null);
+        testOrder.setTradeNo(null);
+        
+        when(orderRepository.findByOrderNo(anyString())).thenReturn(Optional.of(testOrder));
+        
+        // 执行方法
+        OrderVO result = orderService.getOrderByOrderNo(testOrder.getOrderNo());
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(testOrder.getOrderNo(), result.getOrderNo());
+        assertEquals(OrderStatus.PENDING.getValue(), result.getStatus());
+        assertNull(result.getPaidAt());
+        assertNull(result.getTradeNo());
+        
+        // 验证方法调用
+        verify(orderRepository).findByOrderNo(testOrder.getOrderNo());
+    }
 } 
