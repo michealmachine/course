@@ -7,6 +7,9 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -14,13 +17,15 @@ import java.time.LocalDateTime;
 /**
  * 订单实体类
  */
-@Data
+@Getter
+@Setter
+@ToString(exclude = {"user", "course", "institution", "userCourse"})
 @Entity
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "orders")
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class Order extends BaseEntity {
     
     /**
@@ -141,5 +146,24 @@ public class Order extends BaseEntity {
      */
     public Long getInstitutionId() {
         return institution != null ? institution.getId() : null;
+    }
+
+    /**
+     * 自定义equals方法，只比较ID
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Order order = (Order) o;
+        return getId() != null && getId().equals(order.getId());
+    }
+
+    /**
+     * 自定义hashCode方法，只使用ID
+     */
+    @Override
+    public int hashCode() {
+        return getId() != null ? getId().hashCode() : 0;
     }
 } 

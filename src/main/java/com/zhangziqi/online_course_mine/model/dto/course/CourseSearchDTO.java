@@ -67,4 +67,22 @@ public class CourseSearchDTO {
      */
     @Schema(description = "机构ID", example = "1")
     private Long institutionId;
+
+    /**
+     * 排序方式
+     */
+    @Schema(description = "排序方式", example = "rating")
+    private String sortBy;
+    
+    /**
+     * 页码
+     */
+    @Schema(description = "页码", example = "1")
+    private Integer page;
+    
+    /**
+     * 每页大小
+     */
+    @Schema(description = "每页大小", example = "10")
+    private Integer pageSize;
 } 

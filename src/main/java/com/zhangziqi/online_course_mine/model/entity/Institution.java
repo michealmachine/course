@@ -7,22 +7,28 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 /**
- * 机构实体类
+ * 教育机构实体类
  */
-@Data
+@Getter
+@Setter
+@ToString(exclude = {"courses", "users", "questions", "orders"})
 @Entity
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "institutions")
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class Institution extends BaseEntity {
 
     /**
@@ -118,4 +124,23 @@ public class Institution extends BaseEntity {
     @OneToMany(mappedBy = "institution", cascade = CascadeType.ALL)
     @Builder.Default
     private List<Order> orders = new ArrayList<>();
+
+    /**
+     * 自定义equals方法，只比较ID
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Institution that = (Institution) o;
+        return getId() != null && getId().equals(that.getId());
+    }
+
+    /**
+     * 自定义hashCode方法，只使用ID
+     */
+    @Override
+    public int hashCode() {
+        return getId() != null ? getId().hashCode() : 0;
+    }
 } 

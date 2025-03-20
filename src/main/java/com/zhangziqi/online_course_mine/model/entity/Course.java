@@ -10,6 +10,9 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -21,13 +24,15 @@ import java.util.Set;
 /**
  * 课程实体类
  */
-@Data
+@Getter
+@Setter
+@ToString(exclude = {"chapters", "favoriteUsers", "enrolledUsers", "orders", "tags", "category"})
 @Entity
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "courses")
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class Course extends BaseEntity {
 
     /**
@@ -308,5 +313,24 @@ public class Course extends BaseEntity {
         if (this.studentCount != null && this.studentCount > 0) {
             this.studentCount--;
         }
+    }
+
+    /**
+     * 自定义equals方法，只比较ID
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Course course = (Course) o;
+        return getId() != null && getId().equals(course.getId());
+    }
+
+    /**
+     * 自定义hashCode方法，只使用ID
+     */
+    @Override
+    public int hashCode() {
+        return getId() != null ? getId().hashCode() : 0;
     }
 } 

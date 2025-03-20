@@ -77,8 +77,6 @@ interface SectionFormData {
   title: string;
   description: string;
   contentType: string;
-  accessType: ChapterAccessType;
-  estimatedMinutes: number;
   resourceType: 'MEDIA' | 'QUESTION_GROUP' | 'NONE';
   resourceId?: number;
 }
@@ -103,8 +101,6 @@ export function SectionDrawer({
     title: '',
     description: '',
     contentType: 'video',
-    accessType: ChapterAccessType.PAID_ONLY,
-    estimatedMinutes: 30,
     resourceType: 'NONE'
   });
 
@@ -136,8 +132,6 @@ export function SectionDrawer({
       title: '',
       description: '',
       contentType: 'video',
-      accessType: ChapterAccessType.PAID_ONLY,
-      estimatedMinutes: 30,
       resourceType: 'NONE'
     });
     setSelectedMedia(null);
@@ -287,8 +281,6 @@ export function SectionDrawer({
         title: formData.title,
         description: formData.description,
         contentType: formData.contentType,
-        accessType: formData.accessType,
-        estimatedMinutes: formData.estimatedMinutes,
         chapterId: chapterId
       };
       
@@ -374,69 +366,30 @@ export function SectionDrawer({
           
           <div className="space-y-8">
             {/* 基本信息 */}
-            <div className="space-y-4">
+            <div className="space-y-5">
               <h3 className="text-lg font-medium">基本信息</h3>
               
-              <div className="space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="title">小节标题 *</Label>
-                  <Input 
-                    id="title" 
-                    value={formData.title} 
-                    onChange={e => handleChange('title', e.target.value)}
-                    placeholder="输入小节标题"
-                    className="w-full"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="description">小节描述</Label>
-                  <Textarea 
-                    id="description" 
-                    value={formData.description} 
-                    onChange={e => handleChange('description', e.target.value)}
-                    placeholder="描述小节内容（可选）"
-                    rows={3}
-                    className="w-full resize-none"
-                  />
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-3">
-                    <Label>访问权限</Label>
-                    <RadioGroup 
-                      value={formData.accessType.toString()} 
-                      onValueChange={value => handleChange('accessType', parseInt(value))}
-                      className="space-y-3"
-                    >
-                      {accessTypes.map(type => (
-                        <div key={type.value} className="flex items-center space-x-2">
-                          <RadioGroupItem 
-                            value={type.value.toString()} 
-                            id={`access-type-${type.value}`} 
-                          />
-                          <Label htmlFor={`access-type-${type.value}`} className="font-normal">
-                            {type.label}
-                            <p className="text-xs text-muted-foreground">{type.description}</p>
-                          </Label>
-                        </div>
-                      ))}
-                    </RadioGroup>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <Label htmlFor="estimatedMinutes">预计学习时间（分钟）</Label>
-                    <Input 
-                      id="estimatedMinutes" 
-                      type="number" 
-                      value={formData.estimatedMinutes} 
-                      onChange={e => handleChange('estimatedMinutes', parseInt(e.target.value) || 0)}
-                      min={1}
-                      max={1000}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="title">小节标题 *</Label>
+                <Input 
+                  id="title" 
+                  value={formData.title} 
+                  onChange={e => handleChange('title', e.target.value)}
+                  placeholder="输入小节标题"
+                  className="w-full"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="description">小节描述</Label>
+                <Textarea 
+                  id="description" 
+                  value={formData.description} 
+                  onChange={e => handleChange('description', e.target.value)}
+                  placeholder="描述小节内容（可选）"
+                  rows={3}
+                  className="w-full resize-none"
+                />
               </div>
             </div>
             

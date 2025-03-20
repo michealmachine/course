@@ -7,13 +7,18 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 
 /**
  * 用户收藏课程实体类
  */
-@Data
+@Getter
+@Setter
+@ToString(exclude = {"user", "course"})
 @Entity
 @SuperBuilder
 @NoArgsConstructor

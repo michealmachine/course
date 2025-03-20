@@ -8,20 +8,25 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 
 /**
  * 用户课程关联实体类
  */
-@Data
+@Getter
+@Setter
+@ToString(exclude = {"user", "course", "order"})
 @Entity
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "user_courses", 
        uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "course_id"}))
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class UserCourse extends BaseEntity {
     
     /**
@@ -120,5 +125,24 @@ public class UserCourse extends BaseEntity {
      */
     public void setStatusEnum(UserCourseStatus status) {
         this.status = status != null ? status.getValue() : null;
+    }
+
+    /**
+     * 自定义equals方法，只比较ID
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        UserCourse that = (UserCourse) o;
+        return getId() != null && getId().equals(that.getId());
+    }
+
+    /**
+     * 自定义hashCode方法，只使用ID
+     */
+    @Override
+    public int hashCode() {
+        return getId() != null ? getId().hashCode() : 0;
     }
 } 

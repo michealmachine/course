@@ -67,8 +67,6 @@ interface SectionFormData {
   title: string;
   description: string;
   contentType: string;
-  accessType: ChapterAccessType;
-  estimatedMinutes: number;
   resourceType: 'MEDIA' | 'QUESTION_GROUP' | 'NONE';
   resourceId?: number;
 }
@@ -97,8 +95,6 @@ export function SectionEditDrawer({
     title: '',
     description: '',
     contentType: 'video',
-    accessType: ChapterAccessType.PAID_ONLY,
-    estimatedMinutes: 30,
     resourceType: 'NONE'
   });
 
@@ -132,8 +128,6 @@ export function SectionEditDrawer({
         title: section.title,
         description: section.description || '',
         contentType: section.contentType,
-        accessType: section.accessType !== undefined ? section.accessType : ChapterAccessType.PAID_ONLY,
-        estimatedMinutes: section.estimatedMinutes || 30,
         resourceType: section.resourceTypeDiscriminator === 'MEDIA' 
           ? 'MEDIA' 
           : section.resourceTypeDiscriminator === 'QUESTION_GROUP' 
@@ -305,8 +299,6 @@ export function SectionEditDrawer({
         title: formData.title,
         description: formData.description,
         contentType: formData.contentType,
-        accessType: formData.accessType,
-        estimatedMinutes: formData.estimatedMinutes,
         chapterId: chapterId
       };
       
@@ -480,43 +472,6 @@ export function SectionEditDrawer({
                     rows={3}
                     className="w-full resize-none"
                   />
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-3">
-                    <Label>访问权限</Label>
-                    <RadioGroup 
-                      value={formData.accessType.toString()} 
-                      onValueChange={value => handleChange('accessType', parseInt(value))}
-                      className="space-y-3"
-                    >
-                      {accessTypes.map(type => (
-                        <div key={type.value} className="flex items-center space-x-2">
-                          <RadioGroupItem 
-                            value={type.value.toString()} 
-                            id={`access-type-${type.value}`} 
-                          />
-                          <Label htmlFor={`access-type-${type.value}`} className="font-normal">
-                            {type.label}
-                            <p className="text-xs text-muted-foreground">{type.description}</p>
-                          </Label>
-                        </div>
-                      ))}
-                    </RadioGroup>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <Label htmlFor="estimatedMinutes">预计学习时间（分钟）</Label>
-                    <Input 
-                      id="estimatedMinutes" 
-                      type="number" 
-                      value={formData.estimatedMinutes} 
-                      onChange={e => handleChange('estimatedMinutes', parseInt(e.target.value) || 0)}
-                      min={1}
-                      max={1000}
-                      className="w-full"
-                    />
-                  </div>
                 </div>
               </div>
             </div>

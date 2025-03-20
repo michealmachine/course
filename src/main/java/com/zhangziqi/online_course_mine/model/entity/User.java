@@ -6,6 +6,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 import org.hibernate.annotations.DynamicUpdate;
 
 import java.time.LocalDateTime;
@@ -17,7 +20,9 @@ import java.util.Set;
 /**
  * 用户实体类
  */
-@Data
+@Getter
+@Setter
+@ToString(exclude = {"favorites", "purchasedCourses", "orders", "roles", "institution"})
 @Entity
 @SuperBuilder
 @NoArgsConstructor
@@ -157,5 +162,24 @@ public class User extends BaseEntity {
             }
             return self();
         }
+    }
+
+    /**
+     * 自定义equals方法，只比较ID
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        User user = (User) o;
+        return getId() != null && getId().equals(user.getId());
+    }
+
+    /**
+     * 自定义hashCode方法，只使用ID
+     */
+    @Override
+    public int hashCode() {
+        return getId() != null ? getId().hashCode() : 0;
     }
 } 

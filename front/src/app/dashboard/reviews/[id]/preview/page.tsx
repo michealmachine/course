@@ -27,13 +27,14 @@ import {
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { ReviewContentPlayer } from '@/components/dashboard/reviews/review-content-player';
-import { reviewService } from '@/services';
+import { reviewService } from '@/services/review-service';
 import { ReviewTask, ReviewResponseDTO, ReviewType, ReviewStatus } from '@/types/review';
 import { SectionVO, ChapterVO } from '@/types/course';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import Image from 'next/image';
+import { formatDate } from '@/utils/date';
 
 export default function ReviewPreviewPage() {
   const params = useParams();
@@ -383,8 +384,8 @@ export default function ReviewPreviewPage() {
                   <div className="space-y-6">
                     <div>
                       <h3 className="text-lg font-medium mb-2">审核信息</h3>
-                      <div className="space-y-2">
-                        <div className="grid grid-cols-1 gap-4">
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="p-4 border rounded-lg">
                             <div className="font-medium">课程状态</div>
                             <div className="mt-1 text-muted-foreground">
@@ -395,7 +396,52 @@ export default function ReviewPreviewPage() {
                                '草稿'}
                             </div>
                           </div>
+                          
+                          {courseData.course.submittedAt && (
+                            <div className="p-4 border rounded-lg">
+                              <div className="font-medium">提交审核时间</div>
+                              <div className="mt-1 text-muted-foreground">
+                                {formatDate(courseData.course.submittedAt)}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {courseData.course.reviewStartedAt && (
+                            <div className="p-4 border rounded-lg">
+                              <div className="font-medium">开始审核时间</div>
+                              <div className="mt-1 text-muted-foreground">
+                                {formatDate(courseData.course.reviewStartedAt)}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {courseData.course.reviewedAt && (
+                            <div className="p-4 border rounded-lg">
+                              <div className="font-medium">完成审核时间</div>
+                              <div className="mt-1 text-muted-foreground">
+                                {formatDate(courseData.course.reviewedAt)}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {courseData.course.reviewerName && (
+                            <div className="p-4 border rounded-lg">
+                              <div className="font-medium">审核人</div>
+                              <div className="mt-1 text-muted-foreground">
+                                {courseData.course.reviewerName}
+                              </div>
+                            </div>
+                          )}
                         </div>
+                        
+                        {courseData.course.reviewComment && (
+                          <div className="p-4 border rounded-lg">
+                            <div className="font-medium">审核意见</div>
+                            <div className="mt-2 text-muted-foreground whitespace-pre-wrap">
+                              {courseData.course.reviewComment}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                     

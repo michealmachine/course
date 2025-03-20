@@ -1,5 +1,8 @@
 package com.zhangziqi.online_course_mine.config.redis;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -15,11 +18,22 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 public class RedisConfig {
 
     /**
-     * Redis模板配置
-     * 使用GenericJackson2JsonRedisSerializer作为默认序列化器
+     * 创建支持Java 8日期时间类型的ObjectMapper
      */
     @Bean
-    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory factory) {
+    public ObjectMapper redisObjectMapper() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        return objectMapper;
+    }
+
+    /**
+     * Redis模板配置
+     * 使用支持Java 8日期时间的GenericJackson2JsonRedisSerializer作为默认序列化器
+     */
+    @Bean
+    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory factory, ObjectMapper redisObjectMapper) {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(factory);
         
@@ -28,7 +42,7 @@ public class RedisConfig {
         template.setHashKeySerializer(new StringRedisSerializer());
         
         // 使用GenericJackson2JsonRedisSerializer来序列化和反序列化redis的value值
-        RedisSerializer<Object> serializer = new GenericJackson2JsonRedisSerializer();
+        RedisSerializer<Object> serializer = new GenericJackson2JsonRedisSerializer(redisObjectMapper);
         template.setValueSerializer(serializer);
         template.setHashValueSerializer(serializer);
         

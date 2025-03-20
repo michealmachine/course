@@ -306,6 +306,28 @@ export default function CourseDetailPage() {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>审核未通过</AlertTitle>
             <AlertDescription>{course.reviewComment}</AlertDescription>
+            {course.reviewedAt && (
+              <div className="mt-2 text-xs">
+                审核时间: {formatDate(course.reviewedAt)}
+                {course.reviewerName && <span> • 审核人: {course.reviewerName}</span>}
+              </div>
+            )}
+          </Alert>
+        )}
+        
+        {course.status === CourseStatus.PUBLISHED && (
+          <Alert className="bg-green-50 border-green-200">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <AlertTitle className="text-green-800">审核通过</AlertTitle>
+            <AlertDescription className="text-green-700">
+              {course.reviewComment || "课程已审核通过并发布"}
+            </AlertDescription>
+            {course.reviewedAt && (
+              <div className="mt-2 text-xs text-green-600">
+                审核时间: {formatDate(course.reviewedAt)}
+                {course.reviewerName && <span> • 审核人: {course.reviewerName}</span>}
+              </div>
+            )}
           </Alert>
         )}
         

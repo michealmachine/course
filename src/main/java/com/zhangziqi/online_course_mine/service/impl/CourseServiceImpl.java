@@ -31,6 +31,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -986,7 +987,34 @@ public class CourseServiceImpl implements CourseService {
     @Override
     @Transactional(readOnly = true)
     public Page<CourseVO> searchCourses(CourseSearchDTO searchDTO, Pageable pageable) {
-        log.info("搜索课程，参数: {}", searchDTO);
+        log.info("搜索课程，参数: {}, 分页: {}", searchDTO, pageable);
+        
+        // 处理排序
+        Sort sort = null;
+        if (searchDTO.getSortBy() != null && !searchDTO.getSortBy().isEmpty()) {
+            switch (searchDTO.getSortBy()) {
+                case "rating":
+                    sort = Sort.by(Sort.Direction.DESC, "averageRating", "ratingCount");
+                    break;
+                case "price":
+                    sort = Sort.by(Sort.Direction.ASC, "price");
+                    break;
+                case "price_desc":
+                    sort = Sort.by(Sort.Direction.DESC, "price");
+                    break;
+                case "students":
+                    sort = Sort.by(Sort.Direction.DESC, "studentCount");
+                    break;
+                case "newest":
+                    sort = Sort.by(Sort.Direction.DESC, "createdAt");
+                    break;
+                default:
+                    sort = Sort.by(Sort.Direction.DESC, "createdAt");
+            }
+            
+            // 使用传入的分页参数，但应用新的排序
+            pageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
+        }
         
         Specification<Course> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -1011,9 +1039,12 @@ public class CourseServiceImpl implements CourseService {
             
             // 标签筛选
             if (searchDTO.getTagIds() != null && !searchDTO.getTagIds().isEmpty()) {
-                // 创建一个子查询，找到同时包含所有指定标签的课程
+                // 使用适当的联接策略来处理多个标签
                 Join<Course, Tag> tagJoin = root.join("tags", JoinType.INNER);
                 predicates.add(tagJoin.get("id").in(searchDTO.getTagIds()));
+                
+                // 去除重复，因为join可能导致结果重复
+                query.distinct(true);
             }
             
             // 难度筛选
@@ -1042,9 +1073,13 @@ public class CourseServiceImpl implements CourseService {
             return cb.and(predicates.toArray(new Predicate[0]));
         };
         
+        // 执行分页查询
         Page<Course> coursePage = courseRepository.findAll(spec, pageable);
         
-        log.info("搜索结果: 共{}条记录", coursePage.getTotalElements());
+        log.info("搜索结果: 共{}条记录, 当前页: {}, 总页数: {}", 
+                coursePage.getTotalElements(), 
+                coursePage.getNumber() + 1, 
+                coursePage.getTotalPages());
         
         // 转换为VO
         return coursePage.map(CourseVO::fromEntity);

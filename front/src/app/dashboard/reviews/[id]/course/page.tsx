@@ -336,6 +336,24 @@ export default function CourseReviewPage() {
                     {courseStructure.chapters.reduce((total, chapter) => total + chapter.sections.length, 0)}
                   </p>
                 </div>
+                {course.submittedAt && (
+                  <div>
+                    <p className="text-sm font-medium">提交审核时间</p>
+                    <p className="text-sm mt-1">{formatDate(course.submittedAt)}</p>
+                  </div>
+                )}
+                {course.reviewStartedAt && (
+                  <div>
+                    <p className="text-sm font-medium">开始审核时间</p>
+                    <p className="text-sm mt-1">{formatDate(course.reviewStartedAt)}</p>
+                  </div>
+                )}
+                {course.reviewedAt && (
+                  <div>
+                    <p className="text-sm font-medium">完成审核时间</p>
+                    <p className="text-sm mt-1">{formatDate(course.reviewedAt)}</p>
+                  </div>
+                )}
               </div>
               
               <Separator />

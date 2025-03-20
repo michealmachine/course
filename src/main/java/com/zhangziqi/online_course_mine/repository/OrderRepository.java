@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -124,4 +125,9 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
     long countByStatus(Integer status);
 
     List<Order> findByUser_IdAndCourse_IdAndStatus(Long userId, Long courseId, Integer status);
+
+    /**
+     * 查询创建时间早于指定时间的待支付订单
+     */
+    List<Order> findByStatusAndCreatedAtBefore(Integer status, LocalDateTime createdTime);
 } 

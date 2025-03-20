@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -354,12 +355,21 @@ public class CourseController {
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "搜索课程", description = "根据多种条件搜索已发布的课程")
     public Result<Page<CourseVO>> searchCourses(
-            @Valid @RequestBody CourseSearchDTO searchDTO,
-            @PageableDefault(size = 10) Pageable pageable) {
+            @Valid @RequestBody CourseSearchDTO searchDTO) {
         
-        log.info("搜索课程, 关键词: {}, 分类ID: {}, 标签IDs: {}", 
-                searchDTO.getKeyword(), searchDTO.getCategoryId(), searchDTO.getTagIds());
+        log.info("搜索课程, 关键词: {}, 分类ID: {}, 标签IDs: {}, 页码: {}, 每页大小: {}", 
+                searchDTO.getKeyword(), searchDTO.getCategoryId(), searchDTO.getTagIds(),
+                searchDTO.getPage(), searchDTO.getPageSize());
         
+        // 使用DTO中的page和pageSize创建Pageable对象
+        // 注意：页码从0开始计数，而前端通常从1开始，需要转换
+        int page = searchDTO.getPage() != null ? Math.max(0, searchDTO.getPage() - 1) : 0;
+        int size = searchDTO.getPageSize() != null ? searchDTO.getPageSize() : 10;
+        
+        // 创建分页请求对象
+        Pageable pageable = PageRequest.of(page, size);
+        
+        // 调用服务层方法进行搜索
         Page<CourseVO> courses = courseService.searchCourses(searchDTO, pageable);
         
         return Result.success(courses);

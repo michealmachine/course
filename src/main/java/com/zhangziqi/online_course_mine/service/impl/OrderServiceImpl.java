@@ -5,7 +5,9 @@ import com.alipay.api.AlipayClient;
 import com.alipay.api.internal.util.AlipaySignature;
 import com.alipay.api.request.AlipayTradePagePayRequest;
 import com.alipay.api.request.AlipayTradeRefundRequest;
+import com.alipay.api.request.AlipayTradeQueryRequest;
 import com.alipay.api.response.AlipayTradeRefundResponse;
+import com.alipay.api.response.AlipayTradeQueryResponse;
 import com.zhangziqi.online_course_mine.config.AlipayConfig;
 import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.exception.ResourceNotFoundException;
@@ -45,6 +47,11 @@ import java.util.ArrayList;
 import com.zhangziqi.online_course_mine.model.enums.OrderStatus;
 import com.zhangziqi.online_course_mine.constant.OrderConstants;
 import java.util.Optional;
+import com.alipay.api.AlipayClient;
+import com.alipay.api.request.AlipayTradeRefundRequest;
+import com.alipay.api.response.AlipayTradeRefundResponse;
+import com.alipay.api.DefaultAlipayClient;
+import com.alibaba.fastjson.JSONObject;
 
 /**
  * 订单服务实现类
@@ -169,6 +176,10 @@ public class OrderServiceImpl implements OrderService {
                             order.getCourse().getId(),
                             order.getId(),
                             true);
+                    
+                    // 取消Redis中的订单超时
+                    redisOrderService.cancelOrderTimeout(outTradeNo);
+                    log.info("取消订单超时计时，订单号：{}", outTradeNo);
                 }
                 
                 return "支付成功！订单号: " + outTradeNo;
@@ -228,6 +239,10 @@ public class OrderServiceImpl implements OrderService {
                                 order.getCourse().getId(),
                                 order.getId(),
                                 true);
+                        
+                        // 取消Redis中的订单超时
+                        redisOrderService.cancelOrderTimeout(outTradeNo);
+                        log.info("取消订单超时计时，订单号：{}", outTradeNo);
                     }
                 } else if (OrderConstants.ALIPAY_TRADE_CLOSED.equals(tradeStatus)) {
                     // 交易关闭
@@ -453,66 +468,93 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public boolean executeAlipayRefund(String orderNo, BigDecimal refundAmount, String refundReason) {
-        log.info("执行支付宝退款，订单号：{}，退款金额：{}，退款原因：{}", orderNo, refundAmount, refundReason);
-        
         try {
-            // 查询订单
+            // 查询订单信息
             Order order = orderRepository.findByOrderNo(orderNo)
                     .orElseThrow(() -> new ResourceNotFoundException("订单不存在，订单号: " + orderNo));
             
-            // 验证订单状态
-            if (order.getStatus() != OrderStatus.PAID.getValue() && order.getStatus() != OrderStatus.REFUNDING.getValue()) {
-                log.warn("订单状态不适合退款，订单号：{}，当前状态：{}", orderNo, order.getStatus());
+            // 详细的订单信息日志，但不直接使用toString()
+            log.info("开始处理支付宝退款, 订单号: {}, 退款金额: {}, 订单状态: {}, 订单金额: {}, 交易号: {}, 创建时间: {}, 支付时间: {}", 
+                orderNo, refundAmount, order.getStatus(), order.getAmount(), 
+                order.getTradeNo(), order.getCreatedAt(), order.getPaidAt());
+
+            // 验证订单状态 - 允许PAID(1)或REFUNDING(3)状态的订单退款
+            if (order.getStatus() != OrderStatus.PAID.getValue() 
+                && order.getStatus() != OrderStatus.REFUNDING.getValue()) {
+                log.error("订单状态不正确, 订单号: {}, 当前状态: {}, 需要状态: PAID(1)或REFUNDING(3)", 
+                    orderNo, order.getStatus());
                 return false;
             }
-            
+
             // 验证退款金额
             if (refundAmount.compareTo(order.getAmount()) > 0) {
-                log.warn("退款金额大于订单金额，订单号：{}，订单金额：{}，退款金额：{}", 
-                        orderNo, order.getAmount(), refundAmount);
+                log.error("退款金额不能大于订单金额, 订单号: {}, 退款金额: {}, 订单金额: {}", 
+                    orderNo, refundAmount, order.getAmount());
                 return false;
             }
+
+            // 记录退款请求配置
+            log.info("支付宝退款配置, 网关地址: {}, APPID: {}", alipayConfig.getGatewayUrl(), alipayConfig.getAppId());
             
-            // 设置退款参数并调用支付宝退款接口
-            // 创建API对应的request
-            AlipayTradeRefundRequest alipayRequest = new AlipayTradeRefundRequest();
+            // 创建支付宝客户端
+            AlipayClient alipayClient = new DefaultAlipayClient(
+                alipayConfig.getGatewayUrl(),
+                alipayConfig.getAppId(),
+                alipayConfig.getAppPrivateKey(),
+                "JSON",
+                "UTF-8",
+                alipayConfig.getAlipayPublicKey(),
+                "RSA2"
+            );
+
+            // 创建退款请求
+            AlipayTradeRefundRequest request = new AlipayTradeRefundRequest();
             
-            // 设置请求参数
-            Map<String, Object> bizContent = new HashMap<>();
-            bizContent.put("out_trade_no", orderNo);
+            // 构建退款请求参数
+            JSONObject bizContent = new JSONObject();
+            // 优先使用支付宝交易流水号
+            if (StringUtils.hasText(order.getTradeNo())) {
+                bizContent.put("trade_no", order.getTradeNo());
+                log.info("使用支付宝交易流水号进行退款, trade_no: {}", order.getTradeNo());
+            } else {
+                bizContent.put("out_trade_no", orderNo);
+                log.info("使用商户订单号进行退款, out_trade_no: {}", orderNo);
+            }
+            
             bizContent.put("refund_amount", refundAmount.toString());
             bizContent.put("refund_reason", refundReason);
+            bizContent.put("out_request_no", orderNo + "_" + System.currentTimeMillis()); // 退款请求号
             
-            alipayRequest.setBizContent(com.alibaba.fastjson.JSON.toJSONString(bizContent));
+            request.setBizContent(bizContent.toString());
             
-            // 调用API
-            try {
-                AlipayTradeRefundResponse response = alipayClient.execute(alipayRequest);
-                if (response.isSuccess()) {
-                    log.info("支付宝退款成功，订单号：{}，退款金额：{}", orderNo, refundAmount);
-                    
-                    // 更新订单状态
-                    order.setStatus(OrderStatus.REFUNDED.getValue());
-                    order.setRefundAmount(refundAmount);
-                    order.setRefundReason(refundReason);
-                    order.setRefundedAt(LocalDateTime.now());
-                    orderRepository.save(order);
-                    
-                    // 更新用户课程状态为已退款
-                    userCourseService.updateUserCourseRefunded(order.getId());
-                    
-                    return true;
-                } else {
-                    log.error("支付宝退款接口调用失败，订单号：{}，错误码：{}，错误信息：{}", 
-                            orderNo, response.getCode(), response.getMsg());
-                    return false;
-                }
-            } catch (AlipayApiException e) {
-                log.error("调用支付宝退款接口异常", e);
+            log.info("支付宝退款请求参数: {}", request.getBizContent());
+
+            // 执行退款请求
+            AlipayTradeRefundResponse response = alipayClient.execute(request);
+            
+            log.info("支付宝退款响应: {}", response.getBody());
+            log.info("响应代码: {}, 响应信息: {}, 子代码: {}, 子信息: {}", 
+                response.getCode(), response.getMsg(), response.getSubCode(), response.getSubMsg());
+
+            if (response.isSuccess()) {
+                log.info("支付宝退款成功, 订单号: {}", orderNo);
+                // 更新订单状态
+                order.setStatus(OrderStatus.REFUNDED.getValue());
+                order.setRefundAmount(refundAmount);
+                order.setRefundReason(refundReason);
+                order.setRefundedAt(LocalDateTime.now());
+                orderRepository.save(order);
+                
+                // 更新用户课程状态为已退款
+                userCourseService.updateUserCourseRefunded(order.getId());
+                
+                return true;
+            } else {
+                log.error("支付宝退款失败, 订单号: {}, 错误信息: {}", orderNo, response.getMsg());
                 return false;
             }
-        } catch (Exception e) {
-            log.error("执行支付宝退款过程发生异常", e);
+        } catch (AlipayApiException e) {
+            log.error("支付宝退款异常, 订单号: {}, 异常信息: {}", orderNo, e.getMessage(), e);
             return false;
         }
     }
