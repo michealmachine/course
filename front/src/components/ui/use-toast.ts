@@ -8,6 +8,7 @@ type ToastProps = ToastT & {
     label: string
     onClick: () => void
   }
+  variant?: "default" | "destructive" | "success" | "warning"
 }
 
 export const useToast = () => {

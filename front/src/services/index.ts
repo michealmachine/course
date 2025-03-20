@@ -12,6 +12,8 @@ import authService from './auth';
 import reviewService from './review-service';
 import orderService from './order-service';
 import userCourseService from './user-course-service';
+import wrongQuestionService from './wrong-question-service';
+import learningService from './learning-service';
 
 export {
   courseService,
@@ -27,5 +29,7 @@ export {
   authService,
   reviewService,
   orderService,
-  userCourseService
+  userCourseService,
+  wrongQuestionService,
+  learningService
 }; 

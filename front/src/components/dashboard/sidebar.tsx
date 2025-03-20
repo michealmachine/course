@@ -27,6 +27,7 @@ import {
   BookOpen as BookOpenIcon,
   FileQuestion,
   Search,
+  AlertCircle,
 } from 'lucide-react';
 
 // 侧边栏菜单项
@@ -67,6 +68,12 @@ const menuItems: MenuItem[] = [
     title: '我的课程',
     href: '/dashboard/my-courses',
     icon: <BookOpenIcon className="w-5 h-5" />,
+    roles: [UserRole.USER],
+  },
+  {
+    title: '错题本',
+    href: '/dashboard/wrong-questions',
+    icon: <AlertCircle className="w-5 h-5" />,
     roles: [UserRole.USER],
   },
   {
