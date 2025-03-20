@@ -247,7 +247,9 @@ public class CourseServiceImpl implements CourseService {
     @Transactional(readOnly = true)
     public CourseVO getCourseById(Long id) {
         Course course = findCourseById(id);
-        return CourseVO.fromEntity(course);
+        CourseVO vo = CourseVO.fromEntity(course);
+        vo.setFavoriteCount(course.getFavoriteCount());
+        return vo;
     }
     
     @Override
@@ -1082,7 +1084,12 @@ public class CourseServiceImpl implements CourseService {
                 coursePage.getTotalPages());
         
         // 转换为VO
-        return coursePage.map(CourseVO::fromEntity);
+        return coursePage.map(course -> {
+            CourseVO vo = CourseVO.fromEntity(course);
+            // 设置收藏数量
+            vo.setFavoriteCount(course.getFavoriteCount());
+            return vo;
+        });
     }
     
     @Override
@@ -1100,7 +1107,12 @@ public class CourseServiceImpl implements CourseService {
         log.info("获取到{}门热门课程", courses.size());
         
         return courses.stream()
-            .map(CourseVO::fromEntity)
+            .map(course -> {
+                CourseVO vo = CourseVO.fromEntity(course);
+                // 设置收藏数量
+                vo.setFavoriteCount(course.getFavoriteCount());
+                return vo;
+            })
             .collect(Collectors.toList());
     }
     
@@ -1109,17 +1121,23 @@ public class CourseServiceImpl implements CourseService {
     public List<CourseVO> getLatestCourses(int limit) {
         log.info("获取最新课程，数量限制: {}", limit);
         
-        Pageable pageable = PageRequest.of(0, limit);
-        List<Course> courses = courseRepository.findLatestCourses(
+        Pageable pageable = PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Course> coursePage = courseRepository.findByStatusAndIsPublishedVersion(
             CourseStatus.PUBLISHED.getValue(),
             true,
             pageable
         );
+        List<Course> courses = coursePage.getContent();
         
         log.info("获取到{}门最新课程", courses.size());
         
         return courses.stream()
-            .map(CourseVO::fromEntity)
+            .map(course -> {
+                CourseVO vo = CourseVO.fromEntity(course);
+                // 设置收藏数量
+                vo.setFavoriteCount(course.getFavoriteCount());
+                return vo;
+            })
             .collect(Collectors.toList());
     }
     

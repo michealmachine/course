@@ -35,6 +35,7 @@
     "cmdk": "^1.0.4",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.4.10",
+    "front": "file:",
     "lodash": "^4.17.21",
     "lucide-react": "^0.479.0",
     "next": "15.2.1",

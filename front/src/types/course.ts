@@ -123,6 +123,7 @@ export interface Course {
   studentCount?: number;      // 学习人数
   averageRating?: number;     // 平均评分(1-5星)
   ratingCount?: number;       // 评分人数
+  favoriteCount?: number;     // 收藏人数
   submittedAt?: string;
   reviewStartedAt?: string;
   reviewedAt?: string;

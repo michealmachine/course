@@ -214,6 +214,15 @@ public class Course extends BaseEntity {
     private Set<UserFavorite> favoriteUsers = new HashSet<>();
 
     /**
+     * 获取收藏人数
+     * @return 收藏此课程的用户数量
+     */
+    @Transient
+    public Integer getFavoriteCount() {
+        return favoriteUsers != null ? favoriteUsers.size() : 0;
+    }
+
+    /**
      * 购买此课程的用户关联
      */
     @OneToMany(mappedBy = "course", cascade = {CascadeType.PERSIST, CascadeType.MERGE})

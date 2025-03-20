@@ -517,6 +517,10 @@ export default function CourseSearchPage() {
                       <Users className="w-3 h-3 mr-1" />
                       {course.studentCount || 0} 人学习
                     </Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      <Heart className="w-3 h-3 mr-1" />
+                      {course.favoriteCount || 0} 人收藏
+                    </Badge>
                     {course.difficulty && (
                       <Badge variant="outline" className="text-xs">
                         <Sparkles className="w-3 h-3 mr-1" />

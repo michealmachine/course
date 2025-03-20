@@ -51,6 +51,7 @@ public class CourseVO {
     private Integer studentCount;
     private Float averageRating;
     private Integer ratingCount;
+    private Integer favoriteCount;
     private LocalDateTime submittedAt;
     private LocalDateTime reviewStartedAt;
     private LocalDateTime reviewedAt;
@@ -94,6 +95,7 @@ public class CourseVO {
                 .studentCount(course.getStudentCount())
                 .averageRating(course.getAverageRating())
                 .ratingCount(course.getRatingCount())
+                .favoriteCount(course.getFavoriteCount())
                 .submittedAt(null) // 需要添加这些字段到Entity中或从其他地方获取
                 .reviewStartedAt(null)
                 .reviewedAt(course.getReviewedAt())
@@ -184,6 +186,20 @@ public class CourseVO {
             return "已发布";
         } else {
             return "未发布";
+        }
+    }
+    
+    /**
+     * 获取收藏人数文本
+     * @return 格式化的收藏人数文本
+     */
+    public String getFavoriteCountText() {
+        if (favoriteCount == null || favoriteCount == 0) {
+            return "暂无收藏";
+        } else if (favoriteCount < 1000) {
+            return favoriteCount + "人收藏";
+        } else {
+            return String.format("%.1fk人收藏", favoriteCount / 1000.0);
         }
     }
 } 
