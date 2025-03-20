@@ -2,7 +2,7 @@
 
 import { request } from './api';
 import { ApiResponse, PaginationResult } from '@/types/api';
-import { OrderVO, OrderCreateDTO, OrderRefundDTO, OrderSearchDTO, InstitutionIncomeVO } from '@/types/order';
+import { OrderVO, OrderCreateDTO, OrderRefundDTO, OrderSearchDTO, InstitutionIncomeVO, InstitutionDailyIncomeVO, InstitutionWeeklyIncomeVO, InstitutionMonthlyIncomeVO, InstitutionCustomIncomeVO } from '@/types/order';
 import { AxiosResponse } from 'axios';
 
 /**
@@ -96,6 +96,60 @@ const orderService = {
       return response.data.data;
     } catch (error) {
       console.error('获取机构收入统计失败:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * 获取机构今日收入统计
+   */
+  getInstitutionDailyIncome: async (): Promise<InstitutionDailyIncomeVO> => {
+    try {
+      const response: AxiosResponse<ApiResponse<InstitutionDailyIncomeVO>> = await request.get('/orders/institution/income/daily');
+      return response.data.data;
+    } catch (error) {
+      console.error('获取机构今日收入统计失败:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * 获取机构本周收入统计
+   */
+  getInstitutionWeeklyIncome: async (): Promise<InstitutionWeeklyIncomeVO> => {
+    try {
+      const response: AxiosResponse<ApiResponse<InstitutionWeeklyIncomeVO>> = await request.get('/orders/institution/income/weekly');
+      return response.data.data;
+    } catch (error) {
+      console.error('获取机构本周收入统计失败:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * 获取机构本月收入统计
+   */
+  getInstitutionMonthlyIncome: async (): Promise<InstitutionMonthlyIncomeVO> => {
+    try {
+      const response: AxiosResponse<ApiResponse<InstitutionMonthlyIncomeVO>> = await request.get('/orders/institution/income/monthly');
+      return response.data.data;
+    } catch (error) {
+      console.error('获取机构本月收入统计失败:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * 获取机构自定义时间范围收入统计
+   */
+  getInstitutionCustomIncome: async (startTime: string, endTime: string): Promise<InstitutionCustomIncomeVO> => {
+    try {
+      const response: AxiosResponse<ApiResponse<InstitutionCustomIncomeVO>> = await request.get(
+        `/orders/institution/income/custom?startTime=${encodeURIComponent(startTime)}&endTime=${encodeURIComponent(endTime)}`
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error('获取机构自定义时间范围收入统计失败:', error);
       throw error;
     }
   },

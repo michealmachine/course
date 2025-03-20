@@ -157,6 +157,111 @@ public class OrderController {
         
         return Result.success(incomeStats);
     }
+    
+    /**
+     * 获取机构今日收入统计（机构管理员）
+     */
+    @GetMapping("/institution/income/daily")
+    @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
+    @ResponseStatus(HttpStatus.OK)
+    @Operation(summary = "获取机构今日收入统计", description = "获取当前用户所属机构的今日收入统计")
+    public Result<Map<String, BigDecimal>> getInstitutionDailyIncome() {
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+        log.info("获取机构今日收入统计, 机构ID: {}", institutionId);
+        
+        BigDecimal dailyIncome = orderService.calculateInstitutionDailyIncome(institutionId);
+        BigDecimal dailyRefund = orderService.calculateInstitutionDailyRefund(institutionId);
+        BigDecimal dailyNetIncome = orderService.calculateInstitutionDailyNetIncome(institutionId);
+        
+        Map<String, BigDecimal> incomeStats = new HashMap<>();
+        incomeStats.put("dailyIncome", dailyIncome);
+        incomeStats.put("dailyRefund", dailyRefund);
+        incomeStats.put("dailyNetIncome", dailyNetIncome);
+        
+        return Result.success(incomeStats);
+    }
+    
+    /**
+     * 获取机构本周收入统计（机构管理员）
+     */
+    @GetMapping("/institution/income/weekly")
+    @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
+    @ResponseStatus(HttpStatus.OK)
+    @Operation(summary = "获取机构本周收入统计", description = "获取当前用户所属机构的本周收入统计")
+    public Result<Map<String, BigDecimal>> getInstitutionWeeklyIncome() {
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+        log.info("获取机构本周收入统计, 机构ID: {}", institutionId);
+        
+        BigDecimal weeklyIncome = orderService.calculateInstitutionWeeklyIncome(institutionId);
+        BigDecimal weeklyRefund = orderService.calculateInstitutionWeeklyRefund(institutionId);
+        BigDecimal weeklyNetIncome = orderService.calculateInstitutionWeeklyNetIncome(institutionId);
+        
+        Map<String, BigDecimal> incomeStats = new HashMap<>();
+        incomeStats.put("weeklyIncome", weeklyIncome);
+        incomeStats.put("weeklyRefund", weeklyRefund);
+        incomeStats.put("weeklyNetIncome", weeklyNetIncome);
+        
+        return Result.success(incomeStats);
+    }
+    
+    /**
+     * 获取机构本月收入统计（机构管理员）
+     */
+    @GetMapping("/institution/income/monthly")
+    @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
+    @ResponseStatus(HttpStatus.OK)
+    @Operation(summary = "获取机构本月收入统计", description = "获取当前用户所属机构的本月收入统计")
+    public Result<Map<String, BigDecimal>> getInstitutionMonthlyIncome() {
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+        log.info("获取机构本月收入统计, 机构ID: {}", institutionId);
+        
+        BigDecimal monthlyIncome = orderService.calculateInstitutionMonthlyIncome(institutionId);
+        BigDecimal monthlyRefund = orderService.calculateInstitutionMonthlyRefund(institutionId);
+        BigDecimal monthlyNetIncome = orderService.calculateInstitutionMonthlyNetIncome(institutionId);
+        
+        Map<String, BigDecimal> incomeStats = new HashMap<>();
+        incomeStats.put("monthlyIncome", monthlyIncome);
+        incomeStats.put("monthlyRefund", monthlyRefund);
+        incomeStats.put("monthlyNetIncome", monthlyNetIncome);
+        
+        return Result.success(incomeStats);
+    }
+    
+    /**
+     * 获取机构自定义时间范围收入统计（机构管理员）
+     */
+    @GetMapping("/institution/income/custom")
+    @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
+    @ResponseStatus(HttpStatus.OK)
+    @Operation(summary = "获取机构自定义时间范围收入统计", description = "获取当前用户所属机构的自定义时间范围收入统计")
+    public Result<Map<String, BigDecimal>> getInstitutionCustomTimeIncome(
+            @Parameter(description = "开始时间") @RequestParam String startTime,
+            @Parameter(description = "结束时间") @RequestParam String endTime) {
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+        log.info("获取机构自定义时间范围收入统计, 机构ID: {}, 开始时间: {}, 结束时间: {}", institutionId, startTime, endTime);
+        
+        // 解析时间参数
+        java.time.LocalDateTime start = java.time.LocalDateTime.parse(startTime);
+        java.time.LocalDateTime end = java.time.LocalDateTime.parse(endTime);
+        
+        // 检查时间范围有效性
+        if (start.isAfter(end)) {
+            return Result.fail(400, "开始时间不能晚于结束时间");
+        }
+        
+        BigDecimal customIncome = orderService.calculateInstitutionTotalIncome(institutionId, start, end);
+        BigDecimal customRefund = orderService.calculateInstitutionTotalRefund(institutionId, start, end);
+        BigDecimal customNetIncome = orderService.calculateInstitutionNetIncome(institutionId, start, end);
+        
+        Map<String, BigDecimal> incomeStats = new HashMap<>();
+        incomeStats.put("customIncome", customIncome);
+        incomeStats.put("customRefund", customRefund);
+        incomeStats.put("customNetIncome", customNetIncome);
+        incomeStats.put("startTime", new BigDecimal(start.toEpochSecond(java.time.ZoneOffset.UTC)));
+        incomeStats.put("endTime", new BigDecimal(end.toEpochSecond(java.time.ZoneOffset.UTC)));
+        
+        return Result.success(incomeStats);
+    }
 
     /**
      * 处理退款申请（机构管理员或平台管理员）

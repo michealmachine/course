@@ -130,4 +130,39 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
      * 查询创建时间早于指定时间的待支付订单
      */
     List<Order> findByStatusAndCreatedAtBefore(Integer status, LocalDateTime createdTime);
+    
+    /**
+     * 根据机构ID、多个订单状态和时间范围查询订单
+     */
+    List<Order> findByInstitution_IdAndStatusInAndCreatedAtBetween(
+            Long institutionId, List<Integer> statuses, 
+            LocalDateTime startTime, LocalDateTime endTime);
+    
+    /**
+     * 根据机构ID、订单状态和时间范围查询订单
+     */
+    List<Order> findByInstitution_IdAndStatusAndCreatedAtBetween(
+            Long institutionId, Integer status, 
+            LocalDateTime startTime, LocalDateTime endTime);
+    
+    /**
+     * 根据机构ID、多个订单状态和时间范围查询订单（按支付时间）
+     */
+    List<Order> findByInstitution_IdAndStatusInAndPaidAtBetween(
+            Long institutionId, List<Integer> statuses, 
+            LocalDateTime startTime, LocalDateTime endTime);
+    
+    /**
+     * 根据机构ID、订单状态和时间范围查询订单（按支付时间）
+     */
+    List<Order> findByInstitution_IdAndStatusAndPaidAtBetween(
+            Long institutionId, Integer status, 
+            LocalDateTime startTime, LocalDateTime endTime);
+            
+    /**
+     * 根据机构ID、订单状态和时间范围查询订单（按退款时间）
+     */
+    List<Order> findByInstitution_IdAndStatusAndRefundedAtBetween(
+            Long institutionId, Integer status, 
+            LocalDateTime startTime, LocalDateTime endTime);
 } 

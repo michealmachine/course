@@ -101,6 +101,21 @@ public class UserCourseVO {
     private Integer learnDuration;
     
     /**
+     * 当前学习章节ID
+     */
+    private Long currentChapterId;
+    
+    /**
+     * 当前学习小节ID
+     */
+    private Long currentSectionId;
+    
+    /**
+     * 当前小节学习进度（百分比）
+     */
+    private Integer currentSectionProgress;
+    
+    /**
      * 创建时间
      */
     private LocalDateTime createdAt;
@@ -135,6 +150,9 @@ public class UserCourseVO {
                 .status(userCourse.getStatus())
                 .lastLearnAt(userCourse.getLastLearnAt())
                 .learnDuration(userCourse.getLearnDuration())
+                .currentChapterId(userCourse.getCurrentChapterId())
+                .currentSectionId(userCourse.getCurrentSectionId())
+                .currentSectionProgress(userCourse.getCurrentSectionProgress())
                 .createdAt(userCourse.getCreatedAt())
                 .updatedAt(userCourse.getUpdatedAt())
                 .build();

@@ -7,6 +7,8 @@ import com.zhangziqi.online_course_mine.model.vo.OrderVO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -91,7 +93,7 @@ public interface OrderService {
      * @param institutionId 机构ID
      * @return 总收入金额
      */
-    java.math.BigDecimal calculateInstitutionTotalIncome(Long institutionId);
+    BigDecimal calculateInstitutionTotalIncome(Long institutionId);
     
     /**
      * 统计机构总退款
@@ -99,7 +101,7 @@ public interface OrderService {
      * @param institutionId 机构ID
      * @return 总退款金额
      */
-    java.math.BigDecimal calculateInstitutionTotalRefund(Long institutionId);
+    BigDecimal calculateInstitutionTotalRefund(Long institutionId);
     
     /**
      * 获取机构净收入
@@ -107,7 +109,109 @@ public interface OrderService {
      * @param institutionId 机构ID
      * @return 净收入金额（总收入-总退款）
      */
-    java.math.BigDecimal calculateInstitutionNetIncome(Long institutionId);
+    BigDecimal calculateInstitutionNetIncome(Long institutionId);
+    
+    /**
+     * 统计指定时间范围内的机构收入
+     *
+     * @param institutionId 机构ID
+     * @param startTime 起始时间
+     * @param endTime 结束时间
+     * @return 时间范围内的收入金额
+     */
+    BigDecimal calculateInstitutionTotalIncome(Long institutionId, LocalDateTime startTime, LocalDateTime endTime);
+    
+    /**
+     * 统计指定时间范围内的机构退款
+     *
+     * @param institutionId 机构ID
+     * @param startTime 起始时间
+     * @param endTime 结束时间
+     * @return 时间范围内的退款金额
+     */
+    BigDecimal calculateInstitutionTotalRefund(Long institutionId, LocalDateTime startTime, LocalDateTime endTime);
+    
+    /**
+     * 获取指定时间范围内的机构净收入
+     *
+     * @param institutionId 机构ID
+     * @param startTime 起始时间
+     * @param endTime 结束时间
+     * @return 时间范围内的净收入金额
+     */
+    BigDecimal calculateInstitutionNetIncome(Long institutionId, LocalDateTime startTime, LocalDateTime endTime);
+    
+    /**
+     * 获取当日机构收入
+     *
+     * @param institutionId 机构ID
+     * @return 当日收入金额
+     */
+    BigDecimal calculateInstitutionDailyIncome(Long institutionId);
+    
+    /**
+     * 获取当日机构退款
+     *
+     * @param institutionId 机构ID
+     * @return 当日退款金额
+     */
+    BigDecimal calculateInstitutionDailyRefund(Long institutionId);
+    
+    /**
+     * 获取当日机构净收入
+     *
+     * @param institutionId 机构ID
+     * @return 当日净收入金额
+     */
+    BigDecimal calculateInstitutionDailyNetIncome(Long institutionId);
+    
+    /**
+     * 获取本周机构收入
+     *
+     * @param institutionId 机构ID
+     * @return 本周收入金额
+     */
+    BigDecimal calculateInstitutionWeeklyIncome(Long institutionId);
+    
+    /**
+     * 获取本周机构退款
+     *
+     * @param institutionId 机构ID
+     * @return 本周退款金额
+     */
+    BigDecimal calculateInstitutionWeeklyRefund(Long institutionId);
+    
+    /**
+     * 获取本周机构净收入
+     *
+     * @param institutionId 机构ID
+     * @return 本周净收入金额
+     */
+    BigDecimal calculateInstitutionWeeklyNetIncome(Long institutionId);
+    
+    /**
+     * 获取本月机构收入
+     *
+     * @param institutionId 机构ID
+     * @return 本月收入金额
+     */
+    BigDecimal calculateInstitutionMonthlyIncome(Long institutionId);
+    
+    /**
+     * 获取本月机构退款
+     *
+     * @param institutionId 机构ID
+     * @return 本月退款金额
+     */
+    BigDecimal calculateInstitutionMonthlyRefund(Long institutionId);
+    
+    /**
+     * 获取本月机构净收入
+     *
+     * @param institutionId 机构ID
+     * @return 本月净收入金额
+     */
+    BigDecimal calculateInstitutionMonthlyNetIncome(Long institutionId);
     
     /**
      * 执行支付宝退款
@@ -117,7 +221,7 @@ public interface OrderService {
      * @param refundReason 退款原因
      * @return 退款结果，true表示成功，false表示失败
      */
-    boolean executeAlipayRefund(String orderNo, java.math.BigDecimal refundAmount, String refundReason);
+    boolean executeAlipayRefund(String orderNo, BigDecimal refundAmount, String refundReason);
     
     /**
      * 处理支付成功回调

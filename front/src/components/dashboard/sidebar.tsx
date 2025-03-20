@@ -64,6 +64,12 @@ const menuItems: MenuItem[] = [
     icon: <Search className="w-5 h-5" />,
   },
   {
+    title: '我的课程',
+    href: '/dashboard/my-courses',
+    icon: <BookOpenIcon className="w-5 h-5" />,
+    roles: [UserRole.USER],
+  },
+  {
     title: '资源管理',
     href: '/dashboard/media',
     icon: <Film className="w-5 h-5" />,

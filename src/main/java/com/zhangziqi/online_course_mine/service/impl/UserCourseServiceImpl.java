@@ -2,10 +2,8 @@ package com.zhangziqi.online_course_mine.service.impl;
 
 import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.exception.ResourceNotFoundException;
-import com.zhangziqi.online_course_mine.model.entity.Course;
-import com.zhangziqi.online_course_mine.model.entity.UserCourse;
-import com.zhangziqi.online_course_mine.model.entity.User;
-import com.zhangziqi.online_course_mine.model.entity.Order;
+import com.zhangziqi.online_course_mine.model.dto.LearningProgressUpdateDTO;
+import com.zhangziqi.online_course_mine.model.entity.*;
 import com.zhangziqi.online_course_mine.model.enums.UserCourseStatus;
 import com.zhangziqi.online_course_mine.model.vo.CourseVO;
 import com.zhangziqi.online_course_mine.model.vo.UserCourseVO;
@@ -43,24 +41,26 @@ public class UserCourseServiceImpl implements UserCourseService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<CourseVO> getUserPurchasedCourses(Long userId) {
-        List<UserCourse> userCourses = userCourseRepository.findByUser_Id(userId);
+    public List<UserCourseVO> getUserPurchasedCourses(Long userId) {
+        // 只查询正常状态的课程
+        List<UserCourse> userCourses = userCourseRepository.findByUser_IdAndStatus(userId, UserCourseStatus.NORMAL.getValue());
         
         return userCourses.stream()
-                .map(userCourse -> CourseVO.fromEntity(userCourse.getCourse()))
+                .map(UserCourseVO::fromEntity)
                 .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<CourseVO> getUserPurchasedCourses(Long userId, Pageable pageable) {
-        Page<UserCourse> userCoursePage = userCourseRepository.findByUser_Id(userId, pageable);
+    public Page<UserCourseVO> getUserPurchasedCourses(Long userId, Pageable pageable) {
+        // 只查询正常状态的课程
+        Page<UserCourse> userCoursePage = userCourseRepository.findByUser_IdAndStatus(userId, UserCourseStatus.NORMAL.getValue(), pageable);
         
-        List<CourseVO> courseVOs = userCoursePage.getContent().stream()
-                .map(userCourse -> CourseVO.fromEntity(userCourse.getCourse()))
+        List<UserCourseVO> userCourseVOs = userCoursePage.getContent().stream()
+                .map(UserCourseVO::fromEntity)
                 .collect(Collectors.toList());
         
-        return new PageImpl<>(courseVOs, pageable, userCoursePage.getTotalElements());
+        return new PageImpl<>(userCourseVOs, pageable, userCoursePage.getTotalElements());
     }
 
     @Override
@@ -74,9 +74,9 @@ public class UserCourseServiceImpl implements UserCourseService {
 
     @Override
     @Transactional
-    public UserCourseVO updateLearningProgress(Long userId, Long courseId, Integer progress) {
+    public UserCourseVO updateLearningProgress(Long userId, Long courseId, LearningProgressUpdateDTO dto) {
         // 验证进度范围
-        if (progress < 0 || progress > 100) {
+        if (dto.getSectionProgress() < 0 || dto.getSectionProgress() > 100) {
             throw new BusinessException(400, "学习进度必须在0-100之间");
         }
         
@@ -84,15 +84,55 @@ public class UserCourseServiceImpl implements UserCourseService {
         UserCourse userCourse = userCourseRepository.findByUser_IdAndCourse_Id(userId, courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("未找到学习记录，请先购买课程"));
         
+        // 更新当前学习位置
+        userCourse.setCurrentChapterId(dto.getChapterId());
+        userCourse.setCurrentSectionId(dto.getSectionId());
+        userCourse.setCurrentSectionProgress(dto.getSectionProgress());
+        
+        // 计算课程总进度
+        Course course = userCourse.getCourse();
+        int totalSections = getTotalSections(course);
+        int currentSectionIndex = getSectionIndex(course, dto.getChapterId(), dto.getSectionId());
+        int newProgress = Math.min(100, (int)((currentSectionIndex * 100.0) / totalSections));
+        
         // 只有当新进度大于原进度时才更新
-        if (progress > userCourse.getProgress()) {
-            userCourse.setProgress(progress);
+        if (newProgress > userCourse.getProgress()) {
+            userCourse.setProgress(newProgress);
             userCourse.setLastLearnAt(LocalDateTime.now());
-            
-            userCourseRepository.save(userCourse);
         }
         
+        userCourseRepository.save(userCourse);
         return UserCourseVO.fromEntity(userCourse);
+    }
+    
+    /**
+     * 获取课程的总小节数
+     */
+    private int getTotalSections(Course course) {
+        return course.getChapters().stream()
+            .mapToInt(chapter -> chapter.getSections().size())
+            .sum();
+    }
+    
+    /**
+     * 获取小节在课程中的索引位置
+     */
+    private int getSectionIndex(Course course, Long chapterId, Long sectionId) {
+        int index = 0;
+        boolean found = false;
+        
+        for (Chapter chapter : course.getChapters()) {
+            for (Section section : chapter.getSections()) {
+                index++;
+                if (chapter.getId().equals(chapterId) && section.getId().equals(sectionId)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (found) break;
+        }
+        
+        return found ? index : 0;
     }
 
     @Override

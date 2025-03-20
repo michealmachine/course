@@ -1,5 +1,6 @@
 package com.zhangziqi.online_course_mine.controller;
 
+import com.zhangziqi.online_course_mine.model.dto.LearningProgressUpdateDTO;
 import com.zhangziqi.online_course_mine.model.entity.UserCourse;
 import com.zhangziqi.online_course_mine.model.enums.UserCourseStatus;
 import com.zhangziqi.online_course_mine.model.vo.CourseVO;
@@ -41,11 +42,11 @@ public class UserCourseController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "获取已购课程", description = "获取当前用户的已购课程列表")
-    public Result<List<CourseVO>> getUserPurchasedCourses() {
+    public Result<List<UserCourseVO>> getUserPurchasedCourses() {
         Long userId = SecurityUtil.getCurrentUserId();
         log.info("获取用户已购课程列表, 用户ID: {}", userId);
         
-        List<CourseVO> courses = userCourseService.getUserPurchasedCourses(userId);
+        List<UserCourseVO> courses = userCourseService.getUserPurchasedCourses(userId);
         return Result.success(courses);
     }
     
@@ -56,12 +57,12 @@ public class UserCourseController {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "分页获取已购课程", description = "分页获取当前用户的已购课程列表")
-    public Result<Page<CourseVO>> getUserPurchasedCoursesWithPagination(
+    public Result<Page<UserCourseVO>> getUserPurchasedCoursesWithPagination(
             @PageableDefault(size = 10) Pageable pageable) {
         Long userId = SecurityUtil.getCurrentUserId();
         log.info("分页获取用户已购课程列表, 用户ID: {}", userId);
         
-        Page<CourseVO> coursePage = userCourseService.getUserPurchasedCourses(userId, pageable);
+        Page<UserCourseVO> coursePage = userCourseService.getUserPurchasedCourses(userId, pageable);
         return Result.success(coursePage);
     }
     
@@ -111,11 +112,12 @@ public class UserCourseController {
     @Operation(summary = "更新学习进度", description = "更新当前用户的指定课程学习进度")
     public Result<UserCourseVO> updateLearningProgress(
             @Parameter(description = "课程ID") @PathVariable Long courseId,
-            @Parameter(description = "进度百分比(0-100)") @RequestParam Integer progress) {
+            @Parameter(description = "学习进度更新信息") @RequestBody LearningProgressUpdateDTO dto) {
         Long userId = SecurityUtil.getCurrentUserId();
-        log.info("更新用户课程学习进度, 用户ID: {}, 课程ID: {}, 进度: {}%", userId, courseId, progress);
+        log.info("更新用户课程学习进度, 用户ID: {}, 课程ID: {}, 章节ID: {}, 小节ID: {}, 进度: {}%", 
+                userId, courseId, dto.getChapterId(), dto.getSectionId(), dto.getSectionProgress());
         
-        UserCourseVO userCourseVO = userCourseService.updateLearningProgress(userId, courseId, progress);
+        UserCourseVO userCourseVO = userCourseService.updateLearningProgress(userId, courseId, dto);
         return Result.success(userCourseVO);
     }
     

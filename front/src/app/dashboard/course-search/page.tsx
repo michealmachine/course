@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,6 +11,9 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Empty } from '@/components/ui/empty';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 import { 
   Search, 
   Filter, 
@@ -24,14 +27,17 @@ import {
   Sparkles,
   GraduationCap,
   Heart,
-  HeartOff
+  HeartOff,
+  ChevronRight,
+  Tag,
+  DollarSign,
+  ArrowUpDown
 } from 'lucide-react';
 import { Course, CoursePaymentType, CourseDifficulty } from '@/types/course';
 import { Category } from '@/types/course';
-import { Tag } from '@/types/course';
+import { Tag as TagType } from '@/types/course';
 import courseService from '@/services/course-service';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
 import { categoryService, tagService } from '@/services';
 import useDebounce from '@/hooks/useDebounce';
 import favoriteService from '@/services/favorite-service';
@@ -74,12 +80,13 @@ export default function CourseSearchPage() {
   });
   const [courses, setCourses] = useState<Course[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]);
+  const [tags, setTags] = useState<TagType[]>([]);
   const [loading, setLoading] = useState(false);
   const [totalElements, setTotalElements] = useState(0);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [favoriteStates, setFavoriteStates] = useState<Record<number, boolean>>({});
   const [favoritesLoading, setFavoritesLoading] = useState<Record<number, boolean>>({});
+  const [filterOpen, setFilterOpen] = useState(true);
 
   // 使用防抖处理搜索
   const debouncedFilters = useDebounce(filters, 300);
@@ -204,150 +211,50 @@ export default function CourseSearchPage() {
     router.push(`/dashboard/course-detail/${courseId}`);
   };
 
+  // 计算激活过滤器数量
+  const activeFilterCount = [
+    filters.categoryId !== undefined,
+    filters.difficulty !== undefined,
+    filters.paymentType !== undefined,
+    filters.tagIds.length > 0,
+    filters.priceRange[0] > 0 || filters.priceRange[1] < 1000
+  ].filter(Boolean).length;
+
   return (
-    <div className="flex gap-6">
-      {/* 左侧过滤器 */}
-      <Card className="w-72 shrink-0 h-[calc(100vh-6rem)] sticky top-20">
-        <CardHeader className="border-b">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Filter className="w-5 h-5" />
-            过滤器
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <ScrollArea className="h-[calc(100vh-12rem)]">
-            <div className="space-y-6 p-6">
-              {/* 分类选择 */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <GraduationCap className="w-4 h-4" />
-                  课程分类
-                </label>
-                <Select
-                  value={filters.categoryId?.toString()}
-                  onValueChange={(value) => handleFilterChange('categoryId', parseInt(value))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="选择分类" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id.toString()}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+    <div className="w-full px-2 py-4">
+      {/* 页面标题 */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight">课程探索</h1>
+        <p className="text-muted-foreground mt-1">发现适合你的优质课程，开启学习之旅</p>
+      </div>
 
-              {/* 难度选择 */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <Sparkles className="w-4 h-4" />
-                  课程难度
-                </label>
-                <Select
-                  value={filters.difficulty?.toString()}
-                  onValueChange={(value) => handleFilterChange('difficulty', parseInt(value))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="课程难度" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={CourseDifficulty.BEGINNER.toString()}>初级</SelectItem>
-                    <SelectItem value={CourseDifficulty.INTERMEDIATE.toString()}>中级</SelectItem>
-                    <SelectItem value={CourseDifficulty.ADVANCED.toString()}>高级</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* 付费类型 */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">付费类型</label>
-                <Select
-                  value={filters.paymentType?.toString()}
-                  onValueChange={(value) => handleFilterChange('paymentType', parseInt(value))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="付费类型" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={CoursePaymentType.FREE.toString()}>免费</SelectItem>
-                    <SelectItem value={CoursePaymentType.PAID.toString()}>付费</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* 价格范围滑块 */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">价格范围</label>
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>¥{filters.priceRange[0]}</span>
-                  <span>¥{filters.priceRange[1]}</span>
-                </div>
-                <Slider
-                  value={filters.priceRange}
-                  min={0}
-                  max={1000}
-                  step={10}
-                  onValueChange={(value: [number, number]) => handleFilterChange('priceRange', value)}
-                  className="mt-2"
-                />
-              </div>
-
-              {/* 标签选择 */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">课程标签</label>
-                <div className="flex flex-wrap gap-2">
-                  {tags.map((tag) => (
-                    <Badge
-                      key={tag.id}
-                      variant={filters.tagIds.includes(tag.id) ? 'default' : 'outline'}
-                      className="cursor-pointer hover:bg-primary/90 transition-colors"
-                      onClick={() => {
-                        const newTagIds = filters.tagIds.includes(tag.id)
-                          ? filters.tagIds.filter(id => id !== tag.id)
-                          : [...filters.tagIds, tag.id];
-                        handleFilterChange('tagIds', newTagIds);
-                      }}
-                    >
-                      {tag.name}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              {/* 清除按钮 */}
-              <Button
-                variant="outline"
-                className="w-full hover:bg-destructive hover:text-destructive-foreground transition-colors"
-                onClick={clearFilters}
-              >
-                <X className="w-4 h-4 mr-2" />
-                清除过滤器
-              </Button>
-            </div>
-          </ScrollArea>
-        </CardContent>
-      </Card>
-
-      {/* 右侧内容 */}
-      <div className="flex-1 space-y-6">
-        {/* 搜索和工具栏 */}
-        <div className="flex items-center gap-4 sticky top-20 z-10 bg-background pb-4 border-b">
-          <div className="flex-1 flex gap-2">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="搜索课程..."
-                value={filters.keyword}
-                onChange={(e) => handleFilterChange('keyword', e.target.value)}
-                className="pl-9"
-              />
-            </div>
+      {/* 搜索栏 - 固定在顶部 */}
+      <div className="sticky top-0 z-30 pt-2 pb-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="搜索课程、技能或关键词..."
+              value={filters.keyword}
+              onChange={(e) => handleFilterChange('keyword', e.target.value)}
+              className="pl-9 w-full"
+            />
           </div>
-
-          <div className="flex items-center gap-2">
+          
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="whitespace-nowrap"
+              onClick={() => setFilterOpen(!filterOpen)}
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              筛选
+              {activeFilterCount > 0 && (
+                <Badge variant="secondary" className="ml-2">{activeFilterCount}</Badge>
+              )}
+            </Button>
+            
             <Select
               value={filters.sortBy}
               onValueChange={(value) => handleFilterChange('sortBy', value)}
@@ -384,7 +291,7 @@ export default function CourseSearchPage() {
                 variant={viewMode === 'grid' ? 'default' : 'ghost'}
                 size="icon"
                 onClick={() => setViewMode('grid')}
-                className="rounded-r-none"
+                className="rounded-r-none h-9 w-9"
               >
                 <LayoutGrid className="w-4 h-4" />
               </Button>
@@ -392,137 +299,274 @@ export default function CourseSearchPage() {
                 variant={viewMode === 'list' ? 'default' : 'ghost'}
                 size="icon"
                 onClick={() => setViewMode('list')}
-                className="rounded-l-none"
+                className="rounded-l-none h-9 w-9"
               >
                 <List className="w-4 h-4" />
               </Button>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* 课程列表 */}
-        {loading ? (
-          // 加载状态
-          <div className={cn(
-            "grid gap-6",
-            viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'
-          )}>
-            {Array(6).fill(0).map((_, index) => (
-              <Card key={index} className={cn(
-                "overflow-hidden hover:shadow-lg transition-shadow",
-                viewMode === 'list' && "flex"
-              )}>
-                <div className={cn(
-                  "bg-muted animate-pulse",
-                  viewMode === 'grid' ? 'h-48' : 'h-32 w-48'
-                )} />
-                <CardContent className={cn(
-                  "space-y-3",
-                  viewMode === 'grid' ? 'p-4' : 'flex-1 p-4'
-                )}>
-                  <div className="h-4 bg-muted rounded w-3/4 animate-pulse" />
-                  <div className="h-4 bg-muted rounded w-1/2 animate-pulse" />
-                  <div className="flex justify-between">
-                    <div className="h-4 bg-muted rounded w-1/4 animate-pulse" />
-                    <div className="h-4 bg-muted rounded w-1/4 animate-pulse" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : courses.length > 0 ? (
-          // 课程卡片
-          <div className={cn(
-            "grid gap-6",
-            viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'
-          )}>
-            {courses.map((course) => (
-              <Card 
-                key={course.id} 
-                className={cn(
-                  "overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group",
-                  viewMode === 'list' && "flex"
-                )}
-                onClick={() => handleCourseClick(course.id)}
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-[250px_1fr]">
+        {/* 左侧过滤器面板 */}
+        {filterOpen && (
+          <div className="md:sticky top-[80px] self-start rounded-lg border bg-card text-card-foreground shadow-sm overflow-hidden h-[calc(100vh-180px)]">
+            <div className="p-3 border-b flex justify-between items-center">
+              <h3 className="font-semibold flex items-center text-sm">
+                <Filter className="w-4 h-4 mr-2" />
+                筛选选项
+              </h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="h-7 px-2"
               >
-                {course.coverUrl && (
-                  <div className={cn(
-                    "relative overflow-hidden",
-                    viewMode === 'grid' ? 'h-48' : 'h-32 w-48'
-                  )}>
-                    <img
-                      src={course.coverUrl}
-                      alt={course.title}
-                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                <X className="w-3 h-3 mr-1" />
+                清除
+              </Button>
+            </div>
+            
+            <ScrollArea className="h-[calc(100vh-220px)]">
+              <div className="p-3 space-y-5">
+                {/* 课程分类 */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center text-xs font-medium mb-1">
+                    <GraduationCap className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+                    课程分类
+                  </div>
+                  <Select
+                    value={filters.categoryId?.toString()}
+                    onValueChange={(value) => handleFilterChange('categoryId', parseInt(value))}
+                  >
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue placeholder="选择分类" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">全部分类</SelectItem>
+                      {categories.map((category) => (
+                        <SelectItem key={category.id} value={category.id.toString()}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Separator className="my-3" />
+
+                {/* 难度选择 */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center text-xs font-medium mb-1">
+                    <Sparkles className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+                    课程难度
+                  </div>
+                  <Tabs 
+                    defaultValue="all"
+                    value={filters.difficulty?.toString() || "all"}
+                    onValueChange={(value) => handleFilterChange('difficulty', value === "all" ? undefined : parseInt(value))}
+                    className="w-full"
+                  >
+                    <TabsList className="grid grid-cols-4 w-full h-7 text-xs">
+                      <TabsTrigger value="all">全部</TabsTrigger>
+                      <TabsTrigger value={CourseDifficulty.BEGINNER.toString()}>初级</TabsTrigger>
+                      <TabsTrigger value={CourseDifficulty.INTERMEDIATE.toString()}>中级</TabsTrigger>
+                      <TabsTrigger value={CourseDifficulty.ADVANCED.toString()}>高级</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+
+                <Separator className="my-3" />
+
+                {/* 付费类型 */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center text-xs font-medium mb-1">
+                    <DollarSign className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+                    付费类型
+                  </div>
+                  <Tabs 
+                    defaultValue="all"
+                    value={filters.paymentType?.toString() || "all"}
+                    onValueChange={(value) => handleFilterChange('paymentType', value === "all" ? undefined : parseInt(value))}
+                    className="w-full"
+                  >
+                    <TabsList className="grid grid-cols-3 w-full h-7 text-xs">
+                      <TabsTrigger value="all">全部</TabsTrigger>
+                      <TabsTrigger value={CoursePaymentType.FREE.toString()}>免费</TabsTrigger>
+                      <TabsTrigger value={CoursePaymentType.PAID.toString()}>付费</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+
+                <Separator className="my-3" />
+
+                {/* 价格范围滑块 */}
+                <div className="space-y-2">
+                  <div className="flex items-center text-xs font-medium">
+                    <ArrowUpDown className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+                    价格范围
+                  </div>
+                  <div className="px-1">
+                    <div className="flex justify-between text-xs mb-1.5">
+                      <span className="text-muted-foreground">¥{filters.priceRange[0]}</span>
+                      <span className="text-muted-foreground">¥{filters.priceRange[1]}</span>
+                    </div>
+                    <Slider
+                      value={filters.priceRange}
+                      min={0}
+                      max={1000}
+                      step={10}
+                      onValueChange={(value: [number, number]) => handleFilterChange('priceRange', value)}
                     />
+                  </div>
+                </div>
+
+                <Separator className="my-3" />
+
+                {/* 标签选择 */}
+                <div className="space-y-2">
+                  <div className="flex items-center text-xs font-medium">
+                    <Tag className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+                    课程标签
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {tags.slice(0, 16).map((tag) => (
+                      <Badge
+                        key={tag.id}
+                        variant={filters.tagIds.includes(tag.id) ? 'default' : 'outline'}
+                        className={cn(
+                          "cursor-pointer transition-all duration-200 text-xs py-0 h-5",
+                          filters.tagIds.includes(tag.id) 
+                            ? "hover:bg-primary/80" 
+                            : "hover:bg-secondary/80"
+                        )}
+                        onClick={() => {
+                          const newTagIds = filters.tagIds.includes(tag.id)
+                            ? filters.tagIds.filter(id => id !== tag.id)
+                            : [...filters.tagIds, tag.id];
+                          handleFilterChange('tagIds', newTagIds);
+                        }}
+                      >
+                        {tag.name}
+                      </Badge>
+                    ))}
+                    {tags.length > 16 && (
+                      <Badge variant="outline" className="cursor-default text-xs py-0 h-5">
+                        +{tags.length - 16} 更多
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </ScrollArea>
+          </div>
+        )}
+
+        {/* 右侧课程列表 */}
+        <div className="space-y-4">
+          {/* 结果统计 */}
+          <div className="text-sm text-muted-foreground">
+            {loading ? (
+              <Skeleton className="h-4 w-40" />
+            ) : (
+              <>找到 <span className="font-medium text-foreground">{totalElements}</span> 个课程</>
+            )}
+          </div>
+
+          {/* 课程列表 */}
+          {loading ? (
+            // 加载状态
+            <div className={cn(
+              "grid gap-4",
+              viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'
+            )}>
+              {Array(6).fill(0).map((_, index) => (
+                <Card key={index} className="overflow-hidden animate-pulse">
+                  {/* 骨架屏 */}
+                  <div className={cn(
+                    "bg-muted",
+                    viewMode === 'grid' 
+                      ? 'h-36' 
+                      : viewMode === 'list'
+                      ? 'h-24 w-40 flex-shrink-0'
+                      : 'aspect-video h-32 sm:aspect-auto sm:h-full sm:w-40 flex-shrink-0'
+                  )} />
+                  <CardContent className="p-3 space-y-2">
+                    <div className="h-4 bg-muted rounded-md w-3/4" />
+                    <div className="h-3 bg-muted rounded-md w-1/2" />
+                    <div className="flex justify-between">
+                      <div className="h-4 bg-muted rounded-md w-1/4" />
+                      <div className="h-4 bg-muted rounded-md w-1/4" />
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="h-5 bg-muted rounded-full w-16" />
+                      <div className="h-5 bg-muted rounded-full w-16" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : courses.length > 0 ? (
+            // 课程卡片列表
+            <div className={cn(
+              "grid gap-4",
+              viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'
+            )}>
+              {courses.map((course) => (
+                <Card 
+                  key={course.id} 
+                  className={cn(
+                    "overflow-hidden hover:shadow-md transition-all duration-300 cursor-pointer group",
+                    viewMode === 'list' ? "flex" : ""
+                  )}
+                  onClick={() => handleCourseClick(course.id)}
+                >
+                  <div className={cn(
+                    "relative bg-muted overflow-hidden",
+                    viewMode === 'grid' 
+                      ? 'aspect-video' 
+                      : 'h-24 w-40 flex-shrink-0'
+                  )}>
+                    {course.coverUrl ? (
+                      <img
+                        src={course.coverUrl}
+                        alt={course.title}
+                        className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center w-full h-full">
+                        <BookOpen className="w-8 h-8 text-muted-foreground/50" />
+                      </div>
+                    )}
+                    
                     {/* 收藏按钮 */}
                     <Button
-                      variant="ghost"
+                      variant="secondary"
                       size="icon"
-                      className="absolute top-2 right-2 bg-white/80 hover:bg-white/90 rounded-full w-8 h-8 p-1.5"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleToggleFavorite(course.id, e);
-                      }}
+                      className={cn(
+                        "absolute top-1 right-1 rounded-full size-6",
+                        "bg-white/90 hover:bg-white shadow-sm",
+                        "transition-transform duration-200 group-hover:scale-110"
+                      )}
+                      onClick={(e) => handleToggleFavorite(course.id, e)}
                       disabled={favoritesLoading[course.id]}
                     >
                       {favoritesLoading[course.id] ? (
-                        <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent" />
+                        <span className="inline-block size-3 animate-spin rounded-full border-2 border-solid border-current border-r-transparent" />
                       ) : favoriteStates[course.id] ? (
-                        <Heart className="h-4 w-4 text-red-500 fill-red-500" />
+                        <Heart className="size-3 text-red-500 fill-red-500" />
                       ) : (
-                        <Heart className="h-4 w-4" />
+                        <Heart className="size-3" />
                       )}
                     </Button>
-                  </div>
-                )}
-                <CardContent className={cn(
-                  "space-y-3",
-                  viewMode === 'grid' ? 'p-4' : 'flex-1 p-4'
-                )}>
-                  <h3 className="font-semibold text-lg line-clamp-1 group-hover:text-primary transition-colors">
-                    {course.title}
-                  </h3>
-                  <p className="text-sm text-muted-foreground line-clamp-2">
-                    {course.description}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-1">
-                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                      <span className="font-medium">{course.averageRating?.toFixed(1) || '暂无评分'}</span>
-                      <span className="text-sm text-muted-foreground">
-                        ({course.ratingCount || 0})
-                      </span>
-                    </div>
-                    <div>
-                      {course.paymentType === CoursePaymentType.FREE ? (
-                        <span className="text-green-600 font-medium">免费</span>
-                      ) : (
-                        <div className="text-right">
-                          <span className="text-primary font-medium text-lg">
-                            ¥{course.discountPrice || course.price}
-                          </span>
-                          {course.discountPrice && course.price && (
-                            <div className="text-sm text-muted-foreground line-through">
-                              ¥{course.price}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="secondary" className="text-xs">
-                      <Users className="w-3 h-3 mr-1" />
-                      {course.studentCount || 0} 人学习
-                    </Badge>
-                    <Badge variant="secondary" className="text-xs">
-                      <Heart className="w-3 h-3 mr-1" />
-                      {course.favoriteCount || 0} 人收藏
-                    </Badge>
-                    {course.difficulty && (
-                      <Badge variant="outline" className="text-xs">
+                    
+                    {/* 难度标签 */}
+                    {course.difficulty !== undefined && (
+                      <Badge 
+                        variant="secondary" 
+                        className="absolute bottom-1 left-1 bg-black/60 text-white text-xs py-0 px-1.5"
+                      >
                         <Sparkles className="w-3 h-3 mr-1" />
                         {course.difficulty === CourseDifficulty.BEGINNER
                           ? '初级'
@@ -531,25 +575,140 @@ export default function CourseSearchPage() {
                           : '高级'}
                       </Badge>
                     )}
-                    {course.category && (
-                      <Badge variant="outline" className="text-xs">
-                        <GraduationCap className="w-3 h-3 mr-1" />
-                        {course.category.name}
-                      </Badge>
+                  </div>
+                  
+                  <div className="flex flex-col flex-1">
+                    <CardContent className={cn(
+                      "p-3 flex-1",
+                      viewMode === 'list' ? "flex flex-row items-center gap-4" : "space-y-2"
+                    )}>
+                      <div className={cn(
+                        viewMode === 'list' ? "flex-1 min-w-0" : ""
+                      )}>
+                        <h3 className="font-semibold text-base line-clamp-1 group-hover:text-primary transition-colors duration-200">
+                          {course.title}
+                        </h3>
+                        <p className={cn(
+                          "text-xs text-muted-foreground",
+                          viewMode === 'list' ? "line-clamp-1 mt-0.5" : "line-clamp-2 mt-1"
+                        )}>
+                          {course.description || "暂无描述"}
+                        </p>
+                        
+                        {/* 元数据标签 - 列表模式不显示 */}
+                        {viewMode !== 'list' && (
+                          <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                            {course.category && (
+                              <Badge variant="outline" className="text-xs py-0 h-5">
+                                <GraduationCap className="w-2.5 h-2.5 mr-1" />
+                                {course.category.name}
+                              </Badge>
+                            )}
+                            <Badge variant="outline" className="text-xs py-0 h-5">
+                              <Users className="w-2.5 h-2.5 mr-1" />
+                              {course.studentCount || 0}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs py-0 h-5">
+                              <Heart className="w-2.5 h-2.5 mr-1" />
+                              {course.favoriteCount || 0}
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* 列表模式的评分和价格 */}
+                      {viewMode === 'list' && (
+                        <div className="flex items-center gap-6">
+                          <div className="flex items-center">
+                            <Badge variant="outline" className="text-xs py-0 h-5 mr-2">
+                              <Users className="w-2.5 h-2.5 mr-1" />
+                              {course.studentCount || 0}
+                            </Badge>
+                            <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
+                            <span className="ml-1 font-medium text-sm">{course.averageRating?.toFixed(1) || '暂无'}</span>
+                          </div>
+                          
+                          <div>
+                            {course.paymentType === CoursePaymentType.FREE ? (
+                              <span className="text-green-600 font-medium text-sm">免费</span>
+                            ) : (
+                              <div className="text-right whitespace-nowrap">
+                                <span className="text-primary font-medium text-sm">
+                                  ¥{course.discountPrice || course.price}
+                                </span>
+                                {course.discountPrice && course.price && course.discountPrice < course.price && (
+                                  <span className="text-xs text-muted-foreground line-through ml-1">
+                                    ¥{course.price}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                    
+                    {/* 非列表模式时显示卡片底部 */}
+                    {viewMode !== 'list' && (
+                      <CardFooter className="p-3 pt-0 border-t mt-auto flex justify-between items-center">
+                        <div className="flex items-center">
+                          <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
+                          <span className="ml-1 font-medium text-sm">{course.averageRating?.toFixed(1) || '暂无'}</span>
+                          {course.ratingCount && course.ratingCount > 0 && (
+                            <span className="text-xs text-muted-foreground ml-1">
+                              ({course.ratingCount})
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div>
+                          {course.paymentType === CoursePaymentType.FREE ? (
+                            <span className="text-green-600 font-medium text-sm">免费</span>
+                          ) : (
+                            <div className="text-right">
+                              <span className="text-primary font-medium text-sm">
+                                ¥{course.discountPrice || course.price}
+                              </span>
+                              {course.discountPrice && course.price && course.discountPrice < course.price && (
+                                <div className="text-xs text-muted-foreground line-through">
+                                  ¥{course.price}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </CardFooter>
                     )}
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          // 空状态
-          <Empty
-            icon={<BookOpen className="w-12 h-12" />}
-            title="暂无课程"
-            description="没有找到符合条件的课程，请尝试调整搜索条件"
-          />
-        )}
+                </Card>
+              ))}
+            </div>
+          ) : (
+            // 空状态
+            <Card className="p-6">
+              <Empty
+                icon={<BookOpen className="w-10 h-10" />}
+                title="未找到课程"
+                description="没有找到符合条件的课程，请尝试调整搜索条件或检查筛选选项"
+                action={
+                  <Button onClick={clearFilters} variant="outline" className="mt-3">
+                    <X className="w-3.5 h-3.5 mr-1.5" />
+                    清除所有筛选
+                  </Button>
+                }
+              />
+            </Card>
+          )}
+          
+          {/* 分页 - 将在未来添加 */}
+          {!loading && courses.length > 0 && totalElements > 12 && (
+            <div className="flex justify-center mt-6">
+              <Button variant="outline" size="sm" disabled>
+                加载更多
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 package com.zhangziqi.online_course_mine.service;
 
+import com.zhangziqi.online_course_mine.model.dto.LearningProgressUpdateDTO;
 import com.zhangziqi.online_course_mine.model.entity.UserCourse;
 import com.zhangziqi.online_course_mine.model.vo.CourseVO;
 import com.zhangziqi.online_course_mine.model.vo.UserCourseVO;
@@ -18,18 +19,18 @@ public interface UserCourseService {
      * 获取用户的已购课程
      *
      * @param userId 用户ID
-     * @return 课程VO列表
+     * @return 用户课程VO列表
      */
-    List<CourseVO> getUserPurchasedCourses(Long userId);
+    List<UserCourseVO> getUserPurchasedCourses(Long userId);
 
     /**
      * 分页获取用户的已购课程
      *
      * @param userId 用户ID
      * @param pageable 分页参数
-     * @return 分页课程VO
+     * @return 分页用户课程VO
      */
-    Page<CourseVO> getUserPurchasedCourses(Long userId, Pageable pageable);
+    Page<UserCourseVO> getUserPurchasedCourses(Long userId, Pageable pageable);
 
     /**
      * 获取用户的课程学习记录
@@ -45,10 +46,10 @@ public interface UserCourseService {
      *
      * @param userId 用户ID
      * @param courseId 课程ID
-     * @param progress 进度百分比（0-100）
+     * @param dto 学习进度更新DTO
      * @return 更新后的用户课程VO
      */
-    UserCourseVO updateLearningProgress(Long userId, Long courseId, Integer progress);
+    UserCourseVO updateLearningProgress(Long userId, Long courseId, LearningProgressUpdateDTO dto);
 
     /**
      * 记录用户的学习时长

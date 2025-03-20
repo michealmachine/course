@@ -92,6 +92,22 @@ public class UserCourse extends BaseEntity {
     private Integer learnDuration = 0;
     
     /**
+     * 当前学习章节ID
+     */
+    private Long currentChapterId;
+    
+    /**
+     * 当前学习小节ID
+     */
+    private Long currentSectionId;
+    
+    /**
+     * 当前小节学习进度（百分比）
+     */
+    @Builder.Default
+    private Integer currentSectionProgress = 0;
+    
+    /**
      * 获取用户ID
      */
     public Long getUserId() {

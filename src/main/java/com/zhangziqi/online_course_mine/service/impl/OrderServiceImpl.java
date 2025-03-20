@@ -918,4 +918,180 @@ public class OrderServiceImpl implements OrderService {
         // 生成支付表单
         return generatePayLink(order);
     }
+
+    /**
+     * 统计指定时间范围内的机构收入
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal calculateInstitutionTotalIncome(Long institutionId, LocalDateTime startTime, LocalDateTime endTime) {
+        log.info("统计机构在时间范围内的总收入，机构ID: {}, 开始时间: {}, 结束时间: {}", institutionId, startTime, endTime);
+        
+        // 查询指定时间范围内状态为"已支付"和"申请退款"的订单
+        List<Order> validOrders = orderRepository.findByInstitution_IdAndStatusInAndPaidAtBetween(
+                institutionId, 
+                List.of(OrderStatus.PAID.getValue(), OrderStatus.REFUNDING.getValue()),
+                startTime,
+                endTime
+        );
+        
+        BigDecimal totalIncome = validOrders.stream()
+                .map(Order::getAmount)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        log.info("机构在时间范围内的总收入: {}", totalIncome);
+        return totalIncome;
+    }
+
+    /**
+     * 统计指定时间范围内的机构退款
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal calculateInstitutionTotalRefund(Long institutionId, LocalDateTime startTime, LocalDateTime endTime) {
+        log.info("统计机构在时间范围内的总退款，机构ID: {}, 开始时间: {}, 结束时间: {}", institutionId, startTime, endTime);
+        
+        // 只统计指定时间范围内状态为"已退款"的订单
+        List<Order> refundedOrders = orderRepository.findByInstitution_IdAndStatusAndRefundedAtBetween(
+                institutionId, 
+                OrderStatus.REFUNDED.getValue(),
+                startTime,
+                endTime
+        );
+        
+        BigDecimal totalRefund = refundedOrders.stream()
+                .map(Order::getRefundAmount)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        log.info("机构在时间范围内的总退款: {}", totalRefund);
+        return totalRefund;
+    }
+
+    /**
+     * 获取指定时间范围内的机构净收入
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal calculateInstitutionNetIncome(Long institutionId, LocalDateTime startTime, LocalDateTime endTime) {
+        BigDecimal totalIncome = calculateInstitutionTotalIncome(institutionId, startTime, endTime);
+        BigDecimal totalRefund = calculateInstitutionTotalRefund(institutionId, startTime, endTime);
+        
+        return totalIncome.subtract(totalRefund);
+    }
+    
+    /**
+     * 获取当日机构收入
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal calculateInstitutionDailyIncome(Long institutionId) {
+        LocalDateTime today = LocalDateTime.now().toLocalDate().atStartOfDay();
+        LocalDateTime tomorrow = today.plusDays(1);
+        
+        return calculateInstitutionTotalIncome(institutionId, today, tomorrow);
+    }
+    
+    /**
+     * 获取当日机构退款
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal calculateInstitutionDailyRefund(Long institutionId) {
+        LocalDateTime today = LocalDateTime.now().toLocalDate().atStartOfDay();
+        LocalDateTime tomorrow = today.plusDays(1);
+        
+        return calculateInstitutionTotalRefund(institutionId, today, tomorrow);
+    }
+    
+    /**
+     * 获取当日机构净收入
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal calculateInstitutionDailyNetIncome(Long institutionId) {
+        LocalDateTime today = LocalDateTime.now().toLocalDate().atStartOfDay();
+        LocalDateTime tomorrow = today.plusDays(1);
+        
+        return calculateInstitutionNetIncome(institutionId, today, tomorrow);
+    }
+    
+    /**
+     * 获取本周机构收入
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal calculateInstitutionWeeklyIncome(Long institutionId) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startOfWeek = now.toLocalDate().minusDays(now.getDayOfWeek().getValue() - 1).atStartOfDay();
+        LocalDateTime endOfWeek = startOfWeek.plusDays(7);
+        
+        return calculateInstitutionTotalIncome(institutionId, startOfWeek, endOfWeek);
+    }
+    
+    /**
+     * 获取本周机构退款
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal calculateInstitutionWeeklyRefund(Long institutionId) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startOfWeek = now.toLocalDate().minusDays(now.getDayOfWeek().getValue() - 1).atStartOfDay();
+        LocalDateTime endOfWeek = startOfWeek.plusDays(7);
+        
+        return calculateInstitutionTotalRefund(institutionId, startOfWeek, endOfWeek);
+    }
+    
+    /**
+     * 获取本周机构净收入
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal calculateInstitutionWeeklyNetIncome(Long institutionId) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startOfWeek = now.toLocalDate().minusDays(now.getDayOfWeek().getValue() - 1).atStartOfDay();
+        LocalDateTime endOfWeek = startOfWeek.plusDays(7);
+        
+        return calculateInstitutionNetIncome(institutionId, startOfWeek, endOfWeek);
+    }
+    
+    /**
+     * 获取本月机构收入
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal calculateInstitutionMonthlyIncome(Long institutionId) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startOfMonth = now.toLocalDate().withDayOfMonth(1).atStartOfDay();
+        LocalDateTime endOfMonth = startOfMonth.plusMonths(1);
+        
+        return calculateInstitutionTotalIncome(institutionId, startOfMonth, endOfMonth);
+    }
+    
+    /**
+     * 获取本月机构退款
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal calculateInstitutionMonthlyRefund(Long institutionId) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startOfMonth = now.toLocalDate().withDayOfMonth(1).atStartOfDay();
+        LocalDateTime endOfMonth = startOfMonth.plusMonths(1);
+        
+        return calculateInstitutionTotalRefund(institutionId, startOfMonth, endOfMonth);
+    }
+    
+    /**
+     * 获取本月机构净收入
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal calculateInstitutionMonthlyNetIncome(Long institutionId) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startOfMonth = now.toLocalDate().withDayOfMonth(1).atStartOfDay();
+        LocalDateTime endOfMonth = startOfMonth.plusMonths(1);
+        
+        return calculateInstitutionNetIncome(institutionId, startOfMonth, endOfMonth);
+    }
 }

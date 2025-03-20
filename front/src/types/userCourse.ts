@@ -29,7 +29,9 @@ export interface UserCourseVO {
 
 // 学习进度更新请求
 export interface LearningProgressDTO {
-  progress: number;
+  chapterId: number;
+  sectionId: number;
+  sectionProgress: number;
 }
 
 // 学习时长记录请求

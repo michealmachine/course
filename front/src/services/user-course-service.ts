@@ -13,9 +13,9 @@ const userCourseService = {
   /**
    * 获取用户已购课程列表
    */
-  getUserPurchasedCourses: async (): Promise<Course[]> => {
+  getUserPurchasedCourses: async (): Promise<UserCourseVO[]> => {
     try {
-      const response = await request.get<Course[]>('/user-courses');
+      const response = await request.get<UserCourseVO[]>('/user-courses');
       return response.data.data;
     } catch (error) {
       console.error('获取用户已购课程列表失败:', error);
@@ -26,9 +26,9 @@ const userCourseService = {
   /**
    * 分页获取用户已购课程列表
    */
-  getUserPurchasedCoursesWithPagination: async (page: number = 0, size: number = 10): Promise<PaginationResult<Course>> => {
+  getUserPurchasedCoursesWithPagination: async (page: number = 0, size: number = 10): Promise<PaginationResult<UserCourseVO>> => {
     try {
-      const response = await request.get<PaginationResult<Course>>('/user-courses/page', {
+      const response = await request.get<PaginationResult<UserCourseVO>>('/user-courses/page', {
         params: { page, size }
       });
       return response.data.data;
@@ -54,10 +54,15 @@ const userCourseService = {
   /**
    * 更新用户课程学习进度
    */
-  updateLearningProgress: async (courseId: number, progress: number): Promise<UserCourseVO> => {
+  updateLearningProgress: async (courseId: number, chapterId: number, sectionId: number, sectionProgress: number): Promise<UserCourseVO> => {
     try {
       const response = await request.put<UserCourseVO>(
-        `/user-courses/${courseId}/progress?progress=${progress}`
+        `/user-courses/${courseId}/progress`,
+        {
+          chapterId,
+          sectionId,
+          sectionProgress
+        }
       );
       return response.data.data;
     } catch (error) {
@@ -99,9 +104,9 @@ const userCourseService = {
   /**
    * 获取用户最近学习的课程
    */
-  getRecentLearnedCourses: async (limit: number = 5): Promise<Course[]> => {
+  getRecentLearnedCourses: async (limit: number = 5): Promise<UserCourseVO[]> => {
     try {
-      const response = await request.get<Course[]>(`/user-courses/recent?limit=${limit}`);
+      const response = await request.get<UserCourseVO[]>(`/user-courses/recent?limit=${limit}`);
       return response.data.data;
     } catch (error) {
       console.error('获取用户最近学习的课程失败:', error);

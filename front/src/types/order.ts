@@ -71,4 +71,34 @@ export interface InstitutionIncomeVO {
   totalIncome: number;
   totalRefund: number;
   netIncome: number;
+}
+
+// 机构日收入统计
+export interface InstitutionDailyIncomeVO {
+  dailyIncome: number;
+  dailyRefund: number;
+  dailyNetIncome: number;
+}
+
+// 机构周收入统计
+export interface InstitutionWeeklyIncomeVO {
+  weeklyIncome: number;
+  weeklyRefund: number;
+  weeklyNetIncome: number;
+}
+
+// 机构月收入统计
+export interface InstitutionMonthlyIncomeVO {
+  monthlyIncome: number;
+  monthlyRefund: number;
+  monthlyNetIncome: number;
+}
+
+// 机构自定义时间范围收入统计
+export interface InstitutionCustomIncomeVO {
+  customIncome: number;
+  customRefund: number;
+  customNetIncome: number;
+  startTime: number;
+  endTime: number;
 } 
