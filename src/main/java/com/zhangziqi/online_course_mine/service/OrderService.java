@@ -57,6 +57,15 @@ public interface OrderService {
     OrderVO getOrderById(Long id);
     
     /**
+     * 取消订单
+     *
+     * @param id 订单ID
+     * @param userId 用户ID
+     * @return 取消后的订单VO
+     */
+    OrderVO cancelOrder(Long id, Long userId);
+    
+    /**
      * 申请退款
      *
      * @param id 订单ID
@@ -150,4 +159,12 @@ public interface OrderService {
      * @return 待处理退款申请列表
      */
     List<OrderVO> getInstitutionPendingRefunds(Long institutionId);
-} 
+    
+    /**
+     * 生成支付表单
+     *
+     * @param orderNo 订单号
+     * @return 支付表单HTML字符串
+     */
+    String generatePaymentForm(String orderNo);
+}

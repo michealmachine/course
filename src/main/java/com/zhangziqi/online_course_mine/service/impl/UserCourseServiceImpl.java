@@ -119,7 +119,8 @@ public class UserCourseServiceImpl implements UserCourseService {
     @Override
     @Transactional(readOnly = true)
     public boolean hasPurchasedCourse(Long userId, Long courseId) {
-        return userCourseRepository.existsByUser_IdAndCourse_Id(userId, courseId);
+        // 只检查正常状态(0)的记录，忽略已退款(2)的记录
+        return userCourseRepository.existsByUser_IdAndCourse_IdAndStatus(userId, courseId, UserCourseStatus.NORMAL.getValue());
     }
 
     @Override
@@ -278,5 +279,17 @@ public class UserCourseServiceImpl implements UserCourseService {
     public Page<UserCourse> findByUserIdAndStatus(Long userId, Integer status, Pageable pageable) {
         log.info("分页查询用户指定状态的课程关系, 用户ID: {}, 状态: {}, 分页: {}", userId, status, pageable);
         return userCourseRepository.findByUser_IdAndStatus(userId, status, pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<UserCourse> findByUserIdAndCourseIdAndStatus(Long userId, Long courseId, Integer status) {
+        return userCourseRepository.findByUser_IdAndCourse_IdAndStatus(userId, courseId, status);
+    }
+
+    @Override
+    @Transactional
+    public UserCourse save(UserCourse userCourse) {
+        return userCourseRepository.save(userCourse);
     }
 } 

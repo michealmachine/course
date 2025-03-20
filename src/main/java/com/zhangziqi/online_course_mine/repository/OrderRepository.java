@@ -84,6 +84,11 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
     List<Order> findByInstitution_IdAndStatus(Long institutionId, Integer status);
     
     /**
+     * 根据机构ID和多个订单状态查询订单
+     */
+    List<Order> findByInstitution_IdAndStatusIn(Long institutionId, List<Integer> statuses);
+    
+    /**
      * 分页查询机构订单状态
      */
     Page<Order> findByInstitution_IdAndStatus(Long institutionId, Integer status, Pageable pageable);
@@ -117,4 +122,6 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
      * 统计订单状态总数
      */
     long countByStatus(Integer status);
+
+    List<Order> findByUser_IdAndCourse_IdAndStatus(Long userId, Long courseId, Integer status);
 } 

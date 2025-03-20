@@ -1,12 +1,15 @@
 package com.zhangziqi.online_course_mine.controller;
 
+import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.model.dto.order.OrderCreateDTO;
 import com.zhangziqi.online_course_mine.model.dto.order.OrderRefundDTO;
 import com.zhangziqi.online_course_mine.model.dto.order.OrderSearchDTO;
+import com.zhangziqi.online_course_mine.model.enums.OrderStatus;
 import com.zhangziqi.online_course_mine.model.vo.OrderVO;
 import com.zhangziqi.online_course_mine.model.vo.Result;
 import com.zhangziqi.online_course_mine.security.SecurityUtil;
 import com.zhangziqi.online_course_mine.service.OrderService;
+import com.zhangziqi.online_course_mine.service.impl.RedisOrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,6 +40,7 @@ import java.util.HashMap;
 public class OrderController {
 
     private final OrderService orderService;
+    private final RedisOrderService redisOrderService;
 
     /**
      * 创建订单
@@ -77,8 +81,9 @@ public class OrderController {
      */
     @GetMapping("/query")
     @ResponseStatus(HttpStatus.OK)
-    @Operation(summary = "根据订单号查询订单", description = "前端根据订单号轮询查询订单状态")
-    public Result<OrderVO> queryOrderByOrderNo(@Parameter(description = "订单号") @RequestParam String orderNo) {
+    @Operation(summary = "查询订单状态", description = "根据订单号查询订单状态和剩余支付时间")
+    public Result<OrderVO> queryOrderByOrderNo(
+            @Parameter(description = "订单号") @RequestParam String orderNo) {
         Long userId = SecurityUtil.getCurrentUserId();
         log.info("查询订单状态, 订单号: {}, 用户ID: {}", orderNo, userId);
         
@@ -87,6 +92,17 @@ public class OrderController {
         // 验证订单所有者或管理员权限
         if (!orderVO.getUserId().equals(userId) && !SecurityUtil.isAdmin()) {
             return Result.fail(403, "无权访问此订单");
+        }
+        
+        // 如果订单为待支付状态，获取剩余支付时间
+        if (orderVO.getStatus() == OrderStatus.PENDING.getValue()) {
+            Long remainingTime = redisOrderService.getOrderRemainingTime(orderNo);
+            if (remainingTime <= 0) {
+                // 订单已超时，自动取消
+                orderService.cancelOrder(orderVO.getId(), userId);
+                return Result.fail(400, "订单已超时，请重新下单");
+            }
+            orderVO.setRemainingTime(remainingTime);
         }
         
         return Result.success(orderVO);
@@ -146,7 +162,7 @@ public class OrderController {
      * 处理退款申请（机构管理员或平台管理员）
      */
     @PostMapping("/admin/{id}/process-refund")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'INSTITUTION_ADMIN')")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_INSTITUTION')")
     @ResponseStatus(HttpStatus.OK)
     @Operation(summary = "处理退款申请", description = "处理订单退款申请")
     public Result<OrderVO> processRefund(
@@ -189,6 +205,20 @@ public class OrderController {
     }
 
     /**
+     * 取消未支付订单
+     */
+    @PostMapping("/{id}/cancel")
+    @ResponseStatus(HttpStatus.OK)
+    @Operation(summary = "取消订单", description = "取消待支付状态的订单")
+    public Result<OrderVO> cancelOrder(@Parameter(description = "订单ID") @PathVariable Long id) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        log.info("取消订单, 订单ID: {}, 用户ID: {}", id, userId);
+        
+        OrderVO orderVO = orderService.cancelOrder(id, userId);
+        return Result.success(orderVO);
+    }
+
+    /**
      * 获取机构待处理退款申请（机构管理员）
      */
     @GetMapping("/institution/pending-refunds")
@@ -215,5 +245,29 @@ public class OrderController {
         
         Page<OrderVO> orderPage = orderService.searchAllOrders(searchDTO);
         return Result.success(orderPage);
+    }
+
+    /**
+     * 获取订单支付表单
+     */
+    @GetMapping("/{orderNo}/payment-form")
+    @ResponseStatus(HttpStatus.OK)
+    @Operation(summary = "获取支付表单", description = "获取订单的支付表单HTML")
+    public Result<String> getPaymentForm(
+            @Parameter(description = "订单号") @PathVariable String orderNo) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        log.info("获取订单支付表单, 订单号: {}, 用户ID: {}", orderNo, userId);
+        
+        // 查询订单
+        OrderVO orderVO = orderService.getOrderByOrderNo(orderNo);
+        
+        // 验证订单所有者或管理员权限
+        if (!orderVO.getUserId().equals(userId) && !SecurityUtil.isAdmin()) {
+            throw new BusinessException(403, "无权访问此订单");
+        }
+        
+        // 生成支付表单
+        String form = orderService.generatePaymentForm(orderNo);
+        return Result.success(form);
     }
 } 

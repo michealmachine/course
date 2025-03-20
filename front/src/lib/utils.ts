@@ -27,3 +27,10 @@ export function formatDate(date: string | Date | undefined): string {
   
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
+
+export function formatPrice(amount: number) {
+  return new Intl.NumberFormat('zh-CN', {
+    style: 'currency',
+    currency: 'CNY',
+  }).format(amount);
+}

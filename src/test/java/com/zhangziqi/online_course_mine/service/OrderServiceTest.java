@@ -21,9 +21,9 @@ import com.zhangziqi.online_course_mine.model.enums.OrderStatus;
 import com.zhangziqi.online_course_mine.model.vo.OrderVO;
 import com.zhangziqi.online_course_mine.repository.CourseRepository;
 import com.zhangziqi.online_course_mine.repository.OrderRepository;
-import com.zhangziqi.online_course_mine.repository.UserCourseRepository;
 import com.zhangziqi.online_course_mine.repository.UserRepository;
 import com.zhangziqi.online_course_mine.service.impl.OrderServiceImpl;
+import com.zhangziqi.online_course_mine.service.impl.RedisOrderService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -58,9 +58,6 @@ public class OrderServiceTest {
     private CourseRepository courseRepository;
 
     @Mock
-    private UserCourseRepository userCourseRepository;
-
-    @Mock
     private UserCourseService userCourseService;
 
     @Mock
@@ -68,6 +65,9 @@ public class OrderServiceTest {
 
     @Mock
     private AlipayConfig alipayConfig;
+
+    @Mock
+    private RedisOrderService redisOrderService;
 
     @InjectMocks
     private OrderServiceImpl orderService;
@@ -114,7 +114,7 @@ public class OrderServiceTest {
                 .course(testCourse)
                 .institution(testInstitution)
                 .amount(BigDecimal.valueOf(99.99))
-                .status(OrderStatus.CREATED)
+                .status(OrderStatus.PENDING.getValue())
                 .createdAt(LocalDateTime.now())
                 .build();
 
@@ -123,57 +123,56 @@ public class OrderServiceTest {
                 orderRepository,
                 userRepository,
                 courseRepository,
-                userCourseRepository,
                 userCourseService,
                 alipayClient,
-                alipayConfig
+                alipayConfig,
+                redisOrderService
         );
     }
 
     @Test
     @DisplayName("创建订单 - 付费课程成功")
     void createOrder_PaidCourseSuccess() throws AlipayApiException {
-        // 修改课程为付费课程
-        testCourse.setPaymentType(CoursePaymentType.PAID.getValue());
-        testCourse.setPrice(new BigDecimal("100.00"));
+        // 准备测试数据
+        Long userId = 1L;
+        Long courseId = 1L;
         
-        // 修改订单状态为待支付
-        testOrder.setStatus(OrderStatus.PENDING.getValue());
-        testOrder.setPaidAt(null);
+        User user = new User();
+        user.setId(userId);
         
-        // 模拟支付宝支付链接生成
-        AlipayTradePagePayResponse mockResponse = mock(AlipayTradePagePayResponse.class);
-        lenient().when(mockResponse.isSuccess()).thenReturn(true);
-        when(mockResponse.getBody()).thenReturn("https://example.com/pay");
-        when(alipayClient.pageExecute(any(AlipayTradePagePayRequest.class))).thenReturn(mockResponse);
+        Course course = new Course();
+        course.setId(courseId);
+        course.setPrice(new BigDecimal("100.00"));
+        course.setTitle("测试课程");
+        course.setPublishedVersionId(1L); // 设置已发布版本ID
         
-        when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
-        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
-        when(userCourseService.hasPurchasedCourse(anyLong(), anyLong())).thenReturn(false);
+        // Mock依赖方法
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
+        when(userCourseService.hasPurchasedCourse(userId, courseId)).thenReturn(false);
+        when(orderRepository.findByUser_IdAndCourse_IdAndStatus(eq(userId), eq(courseId), eq(OrderStatus.PENDING.getValue())))
+            .thenReturn(Collections.emptyList());
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
             Order order = invocation.getArgument(0);
-            order.setOrderNo("TEST12345678");
-            return testOrder;
+            order.setId(1L);
+            return order;
         });
         
-        // 执行方法
-        OrderVO result = orderService.createOrder(testCourse.getId(), testUser.getId());
+        // 执行测试
+        OrderVO result = orderService.createOrder(courseId, userId);
         
         // 验证结果
         assertNotNull(result);
-        assertEquals("TEST12345678", result.getOrderNo());
-        assertEquals(testUser.getId(), result.getUserId());
-        assertEquals(testCourse.getId(), result.getCourseId());
-        assertEquals(new BigDecimal("100.00"), result.getAmount());
+        assertEquals(course.getTitle(), result.getTitle());
+        assertEquals(course.getPrice(), result.getAmount());
         assertEquals(OrderStatus.PENDING.getValue(), result.getStatus());
+        assertNotNull(result.getOrderNo());
+        assertEquals(1800L, result.getRemainingTime());
         
-        // 验证方法调用
-        verify(userRepository).findById(testUser.getId());
-        verify(courseRepository).findById(testCourse.getId());
-        verify(userCourseService).hasPurchasedCourse(testUser.getId(), testCourse.getId());
+        // 验证调用
         verify(orderRepository).save(any(Order.class));
-        verify(userCourseService, never()).createUserCourseRelation(anyLong(), anyLong(), any(), anyBoolean());
-        verify(alipayClient).pageExecute(any(AlipayTradePagePayRequest.class));
+        verify(redisOrderService).setOrderTimeout(anyString(), eq(userId), any());
+        verify(userCourseService, never()).createUserCourseRelation(any(), any(), any(), anyBoolean());
     }
 
     @Test
@@ -186,12 +185,15 @@ public class OrderServiceTest {
         // 修改订单状态为已支付
         testOrder.setStatus(OrderStatus.PAID.getValue());
         testOrder.setPaidAt(LocalDateTime.now());
+        testOrder.setTitle(testCourse.getTitle());
         
         when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
         when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
         when(userCourseService.hasPurchasedCourse(anyLong(), anyLong())).thenReturn(false);
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
             Order order = invocation.getArgument(0);
+            assertNotNull(order.getTitle(), "订单标题不应该为null");
+            assertEquals(testCourse.getTitle(), order.getTitle(), "订单标题应该是课程标题");
             order.setOrderNo("TEST12345678");
             return testOrder;
         });
@@ -207,6 +209,7 @@ public class OrderServiceTest {
         assertEquals(testCourse.getId(), result.getCourseId());
         assertEquals(BigDecimal.ZERO, result.getAmount());
         assertEquals(OrderStatus.PAID.getValue(), result.getStatus());
+        assertEquals(testCourse.getTitle(), result.getTitle(), "OrderVO应该包含课程标题");
         
         // 验证方法调用
         verify(userRepository).findById(testUser.getId());
@@ -404,7 +407,7 @@ public class OrderServiceTest {
     @DisplayName("申请退款 - 订单状态不支持")
     void refundOrder_InvalidOrderStatus() {
         // 准备测试数据
-        testOrder.setStatus(OrderStatus.CREATED);
+        testOrder.setStatus(OrderStatus.CREATED.getValue()); // Fix: 使用OrderStatus.CREATED
         
         OrderRefundDTO refundDTO = new OrderRefundDTO();
         refundDTO.setRefundAmount(testOrder.getAmount());
@@ -967,5 +970,94 @@ public class OrderServiceTest {
         // 验证方法调用
         verify(orderRepository).findByInstitution_IdAndStatus(
                 testInstitution.getId(), OrderStatus.REFUNDING.getValue());
+    }
+    
+    @Test
+    @DisplayName("取消订单 - 成功")
+    void cancelOrder_Success() {
+        // 准备测试数据
+        testOrder.setStatus(OrderStatus.PENDING.getValue());
+        
+        when(orderRepository.findById(anyLong())).thenReturn(Optional.of(testOrder));
+        when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
+        
+        // 执行方法
+        OrderVO result = orderService.cancelOrder(testOrder.getId(), testUser.getId());
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(OrderStatus.CLOSED.getValue(), result.getStatus());
+        
+        // 验证方法调用
+        verify(orderRepository).findById(testOrder.getId());
+        verify(orderRepository).save(testOrder);
+    }
+    
+    @Test
+    @DisplayName("取消订单 - 订单不存在")
+    void cancelOrder_OrderNotFound() {
+        // 准备测试数据
+        when(orderRepository.findById(anyLong())).thenReturn(Optional.empty());
+        
+        // 验证抛出异常
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, 
+                () -> orderService.cancelOrder(999L, testUser.getId()));
+        
+        assertTrue(exception.getMessage().contains("订单不存在"));
+        
+        // 验证方法调用
+        verify(orderRepository).findById(999L);
+        verify(orderRepository, never()).save(any(Order.class));
+    }
+
+    
+    @Test
+    @DisplayName("取消订单 - 订单状态不是待支付")
+    void cancelOrder_InvalidOrderStatus() {
+        // 准备测试数据
+        testOrder.setStatus(OrderStatus.PAID.getValue());
+        
+        when(orderRepository.findById(anyLong())).thenReturn(Optional.of(testOrder));
+        
+        // 验证抛出异常
+        BusinessException exception = assertThrows(BusinessException.class, 
+                () -> orderService.cancelOrder(testOrder.getId(), testUser.getId()));
+        
+        assertTrue(exception.getMessage().contains("只能取消待支付的订单"));
+        
+        // 验证方法调用
+        verify(orderRepository).findById(testOrder.getId());
+        verify(orderRepository, never()).save(any(Order.class));
+    }
+    
+    @Test
+    @DisplayName("查询待支付订单 - 找到")
+    void findPendingOrderForCourse_Found() {
+        // 准备测试数据
+        List<Order> pendingOrders = List.of(testOrder);
+        
+        when(orderRepository.findByUser_IdAndCourse_IdAndStatus(
+                anyLong(), anyLong(), eq(OrderStatus.PENDING.getValue())))
+                .thenReturn(pendingOrders);
+        
+        // 执行方法 - 通过创建订单间接调用findPendingOrderForCourse
+        when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
+        when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
+        when(userCourseService.hasPurchasedCourse(anyLong(), anyLong())).thenReturn(false);
+        when(redisOrderService.getOrderRemainingTime(anyString())).thenReturn(1800L);
+        
+        // 执行创建订单方法，此时应该返回已有的待支付订单
+        OrderVO result = orderService.createOrder(testCourse.getId(), testUser.getId());
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(testOrder.getOrderNo(), result.getOrderNo());
+        assertEquals(1800L, result.getRemainingTime());
+        
+        // 验证方法调用
+        verify(orderRepository).findByUser_IdAndCourse_IdAndStatus(
+                testUser.getId(), testCourse.getId(), OrderStatus.PENDING.getValue());
+        // 验证没有创建新订单
+        verify(orderRepository, never()).save(any(Order.class));
     }
 } 

@@ -23,12 +23,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { Star, Heart, HeartOff, BookOpen, Building, Tag, Clock, AlertCircle } from 'lucide-react';
+import { Star, Heart, HeartOff, BookOpen, Building, Tag, Clock, AlertCircle, Search, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import favoriteService, { UserFavoriteVO } from '@/services/favorite-service';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { Page } from '@/types/api';
+import { orderService } from '@/services';
+import { OrderVO, OrderStatus } from '@/types/order';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export default function FavoritesPage() {
   const router = useRouter();
@@ -39,6 +42,15 @@ export default function FavoritesPage() {
   const [totalElements, setTotalElements] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // 支付相关状态
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const [currentOrderNo, setCurrentOrderNo] = useState<string | null>(null);
+  const [currentCourseId, setCurrentCourseId] = useState<number | null>(null);
+  const [paymentTimer, setPaymentTimer] = useState<NodeJS.Timeout | null>(null);
+  const [currentOrder, setCurrentOrder] = useState<OrderVO | null>(null);
+  const [showOrderDialog, setShowOrderDialog] = useState(false);
+  const [isLoadingPaymentForm, setIsLoadingPaymentForm] = useState(false);
 
   // 加载收藏列表
   useEffect(() => {
@@ -138,6 +150,145 @@ export default function FavoritesPage() {
       ));
   };
 
+  // 处理课程购买
+  const handlePurchase = async (courseId: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    try {
+      // 创建订单
+      const order = await orderService.createOrder({ courseId });
+      setCurrentOrderNo(order.orderNo);
+      setCurrentCourseId(courseId);
+      setCurrentOrder(order);
+      setShowOrderDialog(true);
+    } catch (err: any) {
+      console.error('创建订单失败:', err);
+      toast.error('创建订单失败，请重试');
+    }
+  };
+  
+  // 处理去支付
+  const handleGoToPay = async () => {
+    if (!currentOrderNo) return;
+    
+    try {
+      setIsLoadingPaymentForm(true);
+      // 获取支付表单
+      const paymentFormHtml = await orderService.getPaymentForm(currentOrderNo);
+      
+      // 创建一个临时div来保存支付宝返回的表单HTML
+      const div = document.createElement('div');
+      div.innerHTML = paymentFormHtml;
+      document.body.appendChild(div);
+      
+      // 获取表单并提交
+      const form = div.getElementsByTagName('form')[0];
+      if (form) {
+        form.setAttribute('target', '_blank');
+        form.submit();
+        // 提交后移除临时div
+        setTimeout(() => {
+          document.body.removeChild(div);
+        }, 100);
+        
+        // 开始轮询订单状态
+        setShowOrderDialog(false);
+        setPaymentProcessing(true);
+        startPollingOrderStatus(currentOrderNo);
+      } else {
+        console.error('支付表单不存在');
+        toast.error('打开支付页面失败');
+      }
+    } catch (err: any) {
+      console.error('获取支付表单失败:', err);
+      toast.error('获取支付表单失败，请重试');
+    } finally {
+      setIsLoadingPaymentForm(false);
+    }
+  };
+  
+  // 轮询订单状态
+  const startPollingOrderStatus = (orderNo: string) => {
+    // 清除之前的计时器
+    if (paymentTimer) {
+      clearInterval(paymentTimer);
+    }
+    
+    // 设置最大轮询时间（5分钟）
+    const maxPollTime = 5 * 60 * 1000;
+    const startTime = Date.now();
+    
+    // 创建轮询
+    const timer = setInterval(async () => {
+      try {
+        // 检查是否超时
+        if (Date.now() - startTime > maxPollTime) {
+          clearInterval(timer);
+          setPaymentProcessing(false);
+          toast.error('支付超时，请查看订单状态');
+          return;
+        }
+        
+        // 查询订单状态
+        const orderStatus = await orderService.getOrderByOrderNo(orderNo);
+        
+        // 如果支付成功
+        if (orderStatus.status === OrderStatus.PAID) {
+          clearInterval(timer);
+          setPaymentProcessing(false);
+          
+          // 处理成功购买
+          if (currentCourseId) {
+            handleSuccessfulPurchase(currentCourseId);
+          }
+        }
+      } catch (err) {
+        console.error('查询订单状态失败:', err);
+      }
+    }, 3000); // 每3秒查询一次
+    
+    setPaymentTimer(timer);
+  };
+  
+  // 处理成功购买
+  const handleSuccessfulPurchase = async (courseId: number) => {
+    toast.success('购买成功！课程已加入您的学习列表');
+    
+    try {
+      // 从收藏中移除
+      await favoriteService.removeFavorite(courseId);
+      
+      // 更新收藏列表，移除已购买的课程
+      setFavorites(prevFavorites => prevFavorites.filter(f => f.courseId !== courseId));
+      
+      // 提示用户
+      toast('您可以在"我的课程"中开始学习', {
+        description: "课程已经成功添加到您的课程列表中"
+      });
+    } catch (err) {
+      console.error('从收藏中移除失败:', err);
+    }
+  };
+  
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      if (paymentTimer) {
+        clearInterval(paymentTimer);
+      }
+    };
+  }, [paymentTimer]);
+
+  // 格式化价格
+  const formatPrice = (amount: number) => {
+    return new Intl.NumberFormat('zh-CN', {
+      style: 'currency',
+      currency: 'CNY',
+      minimumFractionDigits: 2
+    }).format(amount);
+  };
+
   // 渲染收藏列表
   const renderFavorites = () => {
     if (isLoading) {
@@ -175,14 +326,16 @@ export default function FavoritesPage() {
               <BookOpen className="h-12 w-12 text-slate-400" />
             </div>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-2 right-2 bg-white/80 hover:bg-white/90 rounded-full w-8 h-8 p-1.5"
-            onClick={(e) => handleRemoveFavorite(favorite.courseId, e)}
-          >
-            <HeartOff className="h-4 w-4 text-red-500" />
-          </Button>
+          <div className="absolute top-2 right-2 flex gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="bg-white/80 hover:bg-white/90 rounded-full w-8 h-8 p-1.5"
+              onClick={(e) => handleRemoveFavorite(favorite.courseId, e)}
+            >
+              <HeartOff className="h-4 w-4 text-red-500" />
+            </Button>
+          </div>
         </div>
         <CardContent className="p-4 space-y-3">
           <h3 className="font-semibold text-lg line-clamp-1 group-hover:text-primary transition-colors">
@@ -216,10 +369,32 @@ export default function FavoritesPage() {
               <span className="text-sm">已收藏</span>
             </div>
             
-            <div>
+            <div className="flex items-center gap-2">
               <span className={`${favorite.coursePrice === '免费' ? 'text-green-600' : 'text-primary'} font-medium`}>
                 {favorite.coursePrice}
               </span>
+              
+              {/* 购买按钮 */}
+              {favorite.coursePrice !== '免费' && (
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  className="ml-2"
+                  onClick={(e) => handlePurchase(favorite.courseId, e)}
+                >
+                  购买
+                </Button>
+              )}
+              {favorite.coursePrice === '免费' && (
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="text-green-600 border-green-600 hover:bg-green-50 ml-2"
+                  onClick={(e) => handlePurchase(favorite.courseId, e)}
+                >
+                  免费学习
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>
@@ -347,31 +522,141 @@ export default function FavoritesPage() {
 
   return (
     <div className="container py-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">我的收藏</h1>
-          <p className="text-muted-foreground mt-1">
-            共 {totalElements} 个收藏课程
+          <p className="text-muted-foreground">
+            浏览和管理您收藏的课程
           </p>
         </div>
         
-        <Button
-          onClick={() => router.push('/dashboard/course-search')}
-          variant="outline"
-        >
-          浏览更多课程
+        <Button onClick={() => router.push('/dashboard/course-search')}>
+          <Search className="w-4 h-4 mr-2" />
+          浏览课程
         </Button>
       </div>
       
-      <Separator />
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>错误</AlertTitle>
+          <AlertDescription>
+            {error}
+          </AlertDescription>
+        </Alert>
+      )}
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {renderFavorites()}
       </div>
       
-      <div className="mt-8 flex justify-center">
-        {renderPagination()}
-      </div>
+      {renderPagination()}
+      
+      {/* 订单信息对话框 */}
+      <Dialog open={showOrderDialog} onOpenChange={setShowOrderDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>订单信息</DialogTitle>
+            <DialogDescription>
+              请确认订单信息并完成支付
+            </DialogDescription>
+          </DialogHeader>
+          
+          {currentOrder && (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col">
+                  <span className="text-sm text-muted-foreground">订单号</span>
+                  <span className="font-medium">{currentOrder.orderNo}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm text-muted-foreground">金额</span>
+                  <span className="font-medium text-primary">{formatPrice(currentOrder.amount)}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm text-muted-foreground">课程</span>
+                  <span className="font-medium truncate">{currentOrder.courseTitle}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm text-muted-foreground">机构</span>
+                  <span className="font-medium">{currentOrder.institutionName}</span>
+                </div>
+              </div>
+              
+              <Separator />
+              
+              {currentOrder.remainingTime !== undefined && (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">支付剩余时间</span>
+                  <span className="font-medium text-orange-500">
+                    {Math.floor(currentOrder.remainingTime / 60)}分{currentOrder.remainingTime % 60}秒
+                  </span>
+                </div>
+              )}
+              
+              <div className="pt-2 text-center">
+                <span className="text-xs text-muted-foreground">
+                  请在规定时间内完成支付，超时订单将自动关闭
+                </span>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter className="flex justify-between items-center">
+            <Button variant="outline" onClick={() => setShowOrderDialog(false)}>
+              取消
+            </Button>
+            <Button 
+              onClick={handleGoToPay} 
+              disabled={isLoadingPaymentForm}
+              className="min-w-24"
+            >
+              {isLoadingPaymentForm ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  处理中...
+                </>
+              ) : '去支付'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* 支付处理中弹窗 */}
+      <Dialog open={paymentProcessing} onOpenChange={(open) => {
+        if (!open && paymentTimer) {
+          clearInterval(paymentTimer);
+          setPaymentTimer(null);
+        }
+        setPaymentProcessing(open);
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>支付处理中</DialogTitle>
+            <DialogDescription>
+              请在新窗口中完成支付。系统正在等待支付结果，支付完成后会自动处理。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center py-6 space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">订单号: {currentOrderNo}</p>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                if (paymentTimer) {
+                  clearInterval(paymentTimer);
+                  setPaymentTimer(null);
+                }
+                setPaymentProcessing(false);
+              }}
+            >
+              取消
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 

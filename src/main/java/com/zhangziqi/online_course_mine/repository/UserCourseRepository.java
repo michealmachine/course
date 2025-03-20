@@ -125,4 +125,14 @@ public interface UserCourseRepository extends JpaRepository<UserCourse, Long> {
      */
     @Query("SELECT uc FROM UserCourse uc WHERE uc.course.institution.id = :institutionId")
     Page<UserCourse> findByInstitutionId(@Param("institutionId") Long institutionId, Pageable pageable);
+    
+    /**
+     * 根据用户ID、课程ID和状态查询用户课程记录
+     */
+    Optional<UserCourse> findByUser_IdAndCourse_IdAndStatus(Long userId, Long courseId, Integer status);
+    
+    /**
+     * 检查用户是否购买了指定课程（指定状态）
+     */
+    boolean existsByUser_IdAndCourse_IdAndStatus(Long userId, Long courseId, Integer status);
 } 

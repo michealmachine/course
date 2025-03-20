@@ -46,7 +46,7 @@ public interface UserFavoriteRepository extends JpaRepository<UserFavorite, Long
      */
     @Modifying
     @Query("DELETE FROM UserFavorite uf WHERE uf.user.id = :userId AND uf.course.id = :courseId")
-    long deleteByUserAndCourseIds(@Param("userId") Long userId, @Param("courseId") Long courseId);
+    int deleteByUserAndCourseIds(@Param("userId") Long userId, @Param("courseId") Long courseId);
     
     /**
      * 统计课程被收藏次数

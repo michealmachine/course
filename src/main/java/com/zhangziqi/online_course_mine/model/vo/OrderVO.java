@@ -120,11 +120,6 @@ public class OrderVO {
     private String refundTradeNo;
     
     /**
-     * 支付链接（仅在创建付费订单时返回）
-     */
-    private String payUrl;
-    
-    /**
      * 创建时间
      */
     private LocalDateTime createdAt;
@@ -133,6 +128,16 @@ public class OrderVO {
      * 更新时间
      */
     private LocalDateTime updatedAt;
+    
+    /**
+     * 剩余支付时间（秒）
+     */
+    private Long remainingTime;
+    
+    /**
+     * 支付链接
+     */
+    private String payUrl;
     
     /**
      * 从实体转换为VO
@@ -160,7 +165,6 @@ public class OrderVO {
                 .refundAmount(order.getRefundAmount())
                 .refundReason(order.getRefundReason())
                 .refundTradeNo(order.getRefundTradeNo())
-                .payUrl(order.getPayUrl())
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt());
         
@@ -168,6 +172,11 @@ public class OrderVO {
         if (order.getInstitution() != null) {
             builder.institutionId(order.getInstitution().getId())
                   .institutionName(order.getInstitution().getName());
+        }
+        
+        // 设置支付链接
+        if (order.getPayUrl() != null) {
+            builder.payUrl(order.getPayUrl());
         }
         
         return builder.build();

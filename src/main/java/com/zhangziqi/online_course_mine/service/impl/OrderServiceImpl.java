@@ -13,12 +13,14 @@ import com.zhangziqi.online_course_mine.model.dto.order.OrderRefundDTO;
 import com.zhangziqi.online_course_mine.model.dto.order.OrderSearchDTO;
 import com.zhangziqi.online_course_mine.model.entity.Course;
 import com.zhangziqi.online_course_mine.model.entity.*;
+import com.zhangziqi.online_course_mine.model.enums.UserCourseStatus;
 import com.zhangziqi.online_course_mine.model.vo.OrderVO;
 import com.zhangziqi.online_course_mine.repository.CourseRepository;
 import com.zhangziqi.online_course_mine.repository.OrderRepository;
 import com.zhangziqi.online_course_mine.repository.UserCourseRepository;
 import com.zhangziqi.online_course_mine.repository.UserRepository;
 import com.zhangziqi.online_course_mine.service.OrderService;
+import com.zhangziqi.online_course_mine.service.impl.RedisOrderService;
 import com.zhangziqi.online_course_mine.service.UserCourseService;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +44,7 @@ import java.util.Random;
 import java.util.ArrayList;
 import com.zhangziqi.online_course_mine.model.enums.OrderStatus;
 import com.zhangziqi.online_course_mine.constant.OrderConstants;
+import java.util.Optional;
 
 /**
  * 订单服务实现类
@@ -58,6 +61,7 @@ public class OrderServiceImpl implements OrderService {
     private final UserCourseService userCourseService;
     private final AlipayClient alipayClient;
     private final AlipayConfig alipayConfig;
+    private final RedisOrderService redisOrderService;
 
     @Override
     @Transactional
@@ -96,18 +100,33 @@ public class OrderServiceImpl implements OrderService {
             order.setUser(user);
             order.setCourse(course);
             order.setInstitution(course.getInstitution());
-            order.setAmount(course.getPrice());
-            order.setStatus(OrderStatus.CREATED);
+            
+            // 设置订单金额 - 考虑折扣价格
+            if (course.getDiscountPrice() != null && course.getDiscountPrice().compareTo(BigDecimal.ZERO) > 0) {
+                order.setAmount(course.getDiscountPrice());
+                log.info("使用折扣价格：{}", course.getDiscountPrice());
+            } else {
+                order.setAmount(course.getPrice());
+                log.info("使用原价：{}", course.getPrice());
+            }
+            
+            order.setStatus(OrderStatus.PENDING.getValue());
             order.setCreatedAt(LocalDateTime.now());
+            order.setTitle(course.getTitle());
             
             orderRepository.save(order);
             log.info("付费课程订单创建成功：{}", order.getOrderNo());
+            
+            // 设置订单超时（30分钟后自动取消）
+            redisOrderService.setOrderTimeout(order.getOrderNo(), userId, order.getId());
             
             // 生成支付链接
             String payLink = generatePayLink(order);
             
             OrderVO orderVO = OrderVO.fromEntity(order);
-            orderVO.setPayUrl(payLink);
+            // 获取订单剩余支付时间并设置
+            long remainingTime = redisOrderService.getOrderRemainingTime(order.getOrderNo());
+            orderVO.setRemainingTime(remainingTime);
             
             return orderVO;
         }
@@ -235,7 +254,15 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findByOrderNo(orderNo)
                 .orElseThrow(() -> new ResourceNotFoundException("订单不存在，订单号: " + orderNo));
         
-        return OrderVO.fromEntity(order);
+        OrderVO orderVO = OrderVO.fromEntity(order);
+        
+        // 如果是待支付订单，设置剩余支付时间
+        if (OrderStatus.PENDING.getValue() == order.getStatus()) {
+            long remainingTime = redisOrderService.getOrderRemainingTime(order.getOrderNo());
+            orderVO.setRemainingTime(remainingTime);
+        }
+        
+        return orderVO;
     }
 
     @Override
@@ -244,7 +271,15 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("订单不存在，ID: " + id));
         
-        return OrderVO.fromEntity(order);
+        OrderVO orderVO = OrderVO.fromEntity(order);
+        
+        // 如果是待支付订单，设置剩余支付时间
+        if (OrderStatus.PENDING.getValue() == order.getStatus()) {
+            long remainingTime = redisOrderService.getOrderRemainingTime(order.getOrderNo());
+            orderVO.setRemainingTime(remainingTime);
+        }
+        
+        return orderVO;
     }
 
     @Override
@@ -337,7 +372,7 @@ public class OrderServiceImpl implements OrderService {
      * 生成支付宝支付链接
      */
     private String generatePayLink(Order order) {
-        log.info("生成支付链接，订单号：{}", order.getOrderNo());
+        log.info("生成支付链接，订单号：{}，金额：{}", order.getOrderNo(), order.getAmount());
         
         try {
             // 创建API对应的request
@@ -372,9 +407,13 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional(readOnly = true)
     public BigDecimal calculateInstitutionTotalIncome(Long institutionId) {
-        List<Order> paidOrders = orderRepository.findByInstitution_IdAndStatus(institutionId, OrderStatus.PAID.getValue());
+        // 查询状态为"已支付"和"申请退款"的订单，因为申请退款中的订单仍然应该计入收入
+        List<Order> validOrders = orderRepository.findByInstitution_IdAndStatusIn(
+                institutionId, 
+                List.of(OrderStatus.PAID.getValue(), OrderStatus.REFUNDING.getValue())
+        );
         
-        return paidOrders.stream()
+        return validOrders.stream()
                 .map(Order::getAmount)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -386,7 +425,9 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional(readOnly = true)
     public BigDecimal calculateInstitutionTotalRefund(Long institutionId) {
-        List<Order> refundedOrders = orderRepository.findByInstitution_IdAndStatus(institutionId, OrderStatus.REFUNDED.getValue());
+        // 只统计状态为"已退款"的订单
+        List<Order> refundedOrders = orderRepository.findByInstitution_IdAndStatus(
+                institutionId, OrderStatus.REFUNDED.getValue());
         
         return refundedOrders.stream()
                 .map(Order::getRefundAmount)
@@ -492,6 +533,7 @@ public class OrderServiceImpl implements OrderService {
         order.setStatus(OrderStatus.PAID.getValue()); // 免费课程直接标记为已支付
         order.setCreatedAt(LocalDateTime.now());
         order.setPaidAt(LocalDateTime.now());
+        order.setTitle(course.getTitle());
         
         // 保存订单
         orderRepository.save(order);
@@ -526,14 +568,74 @@ public class OrderServiceImpl implements OrderService {
         order.setPaidAt(LocalDateTime.now());
         orderRepository.save(order);
         
-        // 创建用户课程关系并标记为已支付
-        userCourseService.createUserCourseRelation(
+        // 检查是否存在退款记录
+        Optional<UserCourse> refundedRecord = userCourseService.findByUserIdAndCourseIdAndStatus(
                 order.getUser().getId(), 
                 order.getCourse().getId(), 
-                order.getId(), 
-                true);
+                UserCourseStatus.REFUNDED.getValue());
+        
+        if (refundedRecord.isPresent()) {
+            // 如果存在退款记录，更新为正常状态
+            UserCourse userCourse = refundedRecord.get();
+            userCourse.setStatusEnum(UserCourseStatus.NORMAL);
+            userCourse.setOrder(order);
+            userCourse.setPurchasedAt(LocalDateTime.now());
+            userCourseService.save(userCourse);
+            log.info("更新退款记录为正常状态，用户课程ID：{}", userCourse.getId());
+        } else {
+            // 如果不存在退款记录，创建新的用户课程关系
+            userCourseService.createUserCourseRelation(
+                    order.getUser().getId(), 
+                    order.getCourse().getId(), 
+                    order.getId(), 
+                    true);
+            log.info("创建新的用户课程关系");
+        }
+        
+        // 取消订单超时
+        redisOrderService.cancelOrderTimeout(orderNo);
         
         log.info("支付成功处理完成，订单号：{}", orderNo);
+    }
+
+    /**
+     * 取消订单
+     *
+     * @param id 订单ID
+     * @param userId 用户ID
+     * @return 取消后的订单VO
+     */
+    @Override
+    @Transactional
+    public OrderVO cancelOrder(Long id, Long userId) {
+        log.info("取消订单，订单ID：{}，用户ID：{}", id, userId);
+        
+        // 查询订单
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("订单不存在，ID: " + id));
+        
+        // 验证用户权限
+        if (!order.getUser().getId().equals(userId)) {
+            throw new BusinessException(403, "无权操作此订单");
+        }
+        
+        // 检查订单状态
+        if (order.getStatus() != OrderStatus.PENDING.getValue()) {
+            throw new BusinessException(400, "当前订单状态不允许取消");
+        }
+        
+        // 更新订单状态
+        order.setStatus(OrderStatus.CLOSED.getValue());
+        orderRepository.save(order);
+        
+        // 取消Redis中的订单超时
+        if (order.getOrderNo() != null) {
+            redisOrderService.cancelOrderTimeout(order.getOrderNo());
+        }
+        
+        log.info("订单取消成功，订单ID：{}", id);
+        
+        return OrderVO.fromEntity(order);
     }
 
     @Override
@@ -555,8 +657,20 @@ public class OrderServiceImpl implements OrderService {
         
         log.info("用户订单搜索结果: 共{}条记录", orderPage.getTotalElements());
         
-        // 转换为VO
-        return orderPage.map(OrderVO::fromEntity);
+        // 转换为VO并为待支付订单设置剩余支付时间
+        Page<OrderVO> result = orderPage.map(order -> {
+            OrderVO orderVO = OrderVO.fromEntity(order);
+            
+            // 如果是待支付订单，设置剩余支付时间
+            if (OrderStatus.PENDING.getValue() == order.getStatus()) {
+                long remainingTime = redisOrderService.getOrderRemainingTime(order.getOrderNo());
+                orderVO.setRemainingTime(remainingTime);
+            }
+            
+            return orderVO;
+        });
+        
+        return result;
     }
     
     @Override
@@ -578,8 +692,20 @@ public class OrderServiceImpl implements OrderService {
         
         log.info("机构订单搜索结果: 共{}条记录", orderPage.getTotalElements());
         
-        // 转换为VO
-        return orderPage.map(OrderVO::fromEntity);
+        // 转换为VO并设置剩余支付时间
+        Page<OrderVO> result = orderPage.map(order -> {
+            OrderVO orderVO = OrderVO.fromEntity(order);
+            
+            // 如果是待支付订单，设置剩余支付时间
+            if (OrderStatus.PENDING.getValue() == order.getStatus()) {
+                long remainingTime = redisOrderService.getOrderRemainingTime(order.getOrderNo());
+                orderVO.setRemainingTime(remainingTime);
+            }
+            
+            return orderVO;
+        });
+        
+        return result;
     }
     
     @Override
@@ -598,8 +724,20 @@ public class OrderServiceImpl implements OrderService {
         
         log.info("所有订单搜索结果: 共{}条记录", orderPage.getTotalElements());
         
-        // 转换为VO
-        return orderPage.map(OrderVO::fromEntity);
+        // 转换为VO并设置剩余支付时间
+        Page<OrderVO> result = orderPage.map(order -> {
+            OrderVO orderVO = OrderVO.fromEntity(order);
+            
+            // 如果是待支付订单，设置剩余支付时间
+            if (OrderStatus.PENDING.getValue() == order.getStatus()) {
+                long remainingTime = redisOrderService.getOrderRemainingTime(order.getOrderNo());
+                orderVO.setRemainingTime(remainingTime);
+            }
+            
+            return orderVO;
+        });
+        
+        return result;
     }
     
     /**
@@ -618,7 +756,17 @@ public class OrderServiceImpl implements OrderService {
         
         // 转换为VO
         return pendingRefunds.stream()
-                .map(OrderVO::fromEntity)
+                .map(order -> {
+                    OrderVO orderVO = OrderVO.fromEntity(order);
+                    
+                    // 如果是待支付订单，设置剩余支付时间
+                    if (OrderStatus.PENDING.getValue() == order.getStatus()) {
+                        long remainingTime = redisOrderService.getOrderRemainingTime(order.getOrderNo());
+                        orderVO.setRemainingTime(remainingTime);
+                    }
+                    
+                    return orderVO;
+                })
                 .collect(Collectors.toList());
     }
     
@@ -699,4 +847,33 @@ public class OrderServiceImpl implements OrderService {
             return cb.and(predicates.toArray(new Predicate[0]));
         };
     }
-} 
+
+    /**
+     * 生成支付表单
+     */
+    @Override
+    public String generatePaymentForm(String orderNo) {
+        log.info("生成订单支付表单，订单号：{}", orderNo);
+        
+        // 查询订单
+        Order order = orderRepository.findByOrderNo(orderNo)
+                .orElseThrow(() -> new ResourceNotFoundException("订单不存在，订单号: " + orderNo));
+        
+        // 验证订单状态是否为待支付
+        if (order.getStatus() != OrderStatus.PENDING.getValue()) {
+            throw new BusinessException(400, "当前订单状态不支持支付");
+        }
+        
+        // 检查订单是否已超时
+        Long remainingTime = redisOrderService.getOrderRemainingTime(orderNo);
+        if (remainingTime <= 0) {
+            // 更新订单状态为已关闭
+            order.setStatus(OrderStatus.CLOSED.getValue());
+            orderRepository.save(order);
+            throw new BusinessException(400, "订单已超时，请重新下单");
+        }
+        
+        // 生成支付表单
+        return generatePayLink(order);
+    }
+}

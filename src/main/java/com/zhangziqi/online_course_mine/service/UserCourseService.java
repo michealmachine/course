@@ -148,4 +148,14 @@ public interface UserCourseService {
      * @return 分页用户课程关系
      */
     Page<UserCourse> findByUserIdAndStatus(Long userId, Integer status, Pageable pageable);
+
+    /**
+     * 根据用户ID、课程ID和状态查询用户课程记录
+     */
+    Optional<UserCourse> findByUserIdAndCourseIdAndStatus(Long userId, Long courseId, Integer status);
+
+    /**
+     * 保存用户课程记录
+     */
+    UserCourse save(UserCourse userCourse);
 } 

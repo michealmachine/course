@@ -509,7 +509,7 @@ public class CourseServiceImpl implements CourseService {
             BeanUtils.copyProperties(savedCourse, publishedVersion, 
                 "id", "dataVersion", "chapters", "tags", "category", "institution",
                 "isPublishedVersion", "publishedVersionId", "status", "versionType",
-                "studentCount", "averageRating", "ratingCount", "favoriteUsers");
+                "studentCount", "averageRating", "ratingCount", "favoriteUsers", "enrolledUsers", "orders");
             publishedVersion.setId(null); // 确保新对象没有ID
             publishedVersion.setIsPublishedVersion(true); // 标记为发布版本
             publishedVersion.setPublishedVersionId(savedCourse.getId());
@@ -595,7 +595,7 @@ public class CourseServiceImpl implements CourseService {
                 BeanUtils.copyProperties(course, publishedVersion, 
                     "id", "dataVersion", "chapters", "tags", "category", "institution",
                     "isPublishedVersion", "publishedVersionId", "status", "versionType",
-                    "studentCount", "averageRating", "ratingCount", "favoriteUsers");
+                    "studentCount", "averageRating", "ratingCount", "favoriteUsers", "enrolledUsers", "orders");
                 
                 // 确保发布版本的状态为已发布
                 publishedVersion.setStatusEnum(CourseStatus.PUBLISHED);
