@@ -96,4 +96,23 @@ public class CourseReviewController {
         ReviewVO review = reviewService.getUserReviewOnCourse(userId, courseId);
         return Result.success(review);
     }
+    
+    /**
+     * 更新评论
+     */
+    @PutMapping("/reviews/{reviewId}")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "更新评论", description = "更新用户自己的评论")
+    public Result<ReviewVO> updateReview(
+            @PathVariable @Parameter(description = "评论ID") Long reviewId,
+            @RequestBody @Valid ReviewCreateDTO reviewDTO) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        
+        log.info("更新课程评论, 评论ID: {}, 用户ID: {}, 新评分: {}", 
+                reviewId, userId, reviewDTO.getRating());
+        
+        ReviewVO updatedReview = reviewService.updateReview(reviewId, reviewDTO, userId);
+        return Result.success(updatedReview);
+    }
 } 

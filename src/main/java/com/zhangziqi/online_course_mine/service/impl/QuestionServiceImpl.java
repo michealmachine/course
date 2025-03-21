@@ -179,6 +179,9 @@ public class QuestionServiceImpl implements QuestionService {
         }
         
         try {
+            // 先删除题目的所有标签映射
+            questionTagService.deleteAllTagsByQuestionId(questionId);
+            
             // 删除题目选项
             optionRepository.deleteByQuestionId(questionId);
             

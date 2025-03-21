@@ -1269,4 +1269,38 @@ public class CourseServiceImpl implements CourseService {
         log.info("课程{}评分更新，当前评分: {}，评分人数: {}", 
              courseId, course.getAverageRating(), course.getRatingCount());
     }
+
+    @Override
+    @Transactional
+    public void updateCourseRating(Long courseId, Integer oldRating, Integer newRating) {
+        if (newRating == null || newRating < 1 || newRating > 5) {
+            throw new BusinessException(400, "评分必须在1-5之间");
+        }
+        
+        Course course = courseRepository.findById(courseId)
+            .orElseThrow(() -> new ResourceNotFoundException("课程不存在，ID: " + courseId));
+        
+        // 只能更新发布版本的统计数据
+        if (!Boolean.TRUE.equals(course.getIsPublishedVersion())) {
+            throw new BusinessException(400, "只能更新发布版本的课程统计数据");
+        }
+        
+        Float currentAvg = course.getAverageRating();
+        Integer currentCount = course.getRatingCount();
+        
+        if (currentAvg == null || currentCount == null || currentCount == 0) {
+            // 异常情况：没有评分记录却要更新
+            course.setAverageRating(newRating.floatValue());
+            course.setRatingCount(1);
+        } else {
+            // 从总评分中减去旧评分，加上新评分
+            Float totalScore = currentAvg * currentCount;
+            totalScore = totalScore - oldRating + newRating;
+            course.setAverageRating(totalScore / currentCount);
+        }
+        
+        courseRepository.save(course);
+        log.info("课程{}评分修改，从{}修改为{}，当前评分: {}，评分人数: {}", 
+            courseId, oldRating, newRating, course.getAverageRating(), course.getRatingCount());
+    }
 } 

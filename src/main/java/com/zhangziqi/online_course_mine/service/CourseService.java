@@ -263,12 +263,21 @@ public interface CourseService {
     void incrementStudentCount(Long courseId);
     
     /**
-     * 更新课程评分
-     * 
+     * 更新课程评分（用于添加新评分）
+     *
      * @param courseId 课程ID
-     * @param newRating 新的评分(1-5)
+     * @param newRating 新评分
      */
     void updateCourseRating(Long courseId, Integer newRating);
+    
+    /**
+     * 更新课程评分（用于修改已有评分）
+     *
+     * @param courseId 课程ID
+     * @param oldRating 旧评分
+     * @param newRating 新评分
+     */
+    void updateCourseRating(Long courseId, Integer oldRating, Integer newRating);
 
     /**
      * 获取课程的公开预览结构（免费课程或付费课程的试学部分）

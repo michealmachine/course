@@ -15,6 +15,7 @@ import com.zhangziqi.online_course_mine.repository.CourseReviewRepository;
 import com.zhangziqi.online_course_mine.repository.UserRepository;
 import com.zhangziqi.online_course_mine.service.CourseReviewService;
 import com.zhangziqi.online_course_mine.service.CourseService;
+import com.zhangziqi.online_course_mine.service.UserCourseService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +46,7 @@ public class CourseReviewServiceImpl implements CourseReviewService {
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
     private final CourseService courseService;
+    private final UserCourseService userCourseService;
     
     @Override
     @Transactional
@@ -58,7 +60,10 @@ public class CourseReviewServiceImpl implements CourseReviewService {
             throw new BusinessException(400, "您已经评价过该课程");
         }
         
-        // TODO: 后续增加检查用户是否购买了该课程的逻辑
+        // 检查用户是否购买了该课程
+        if (!userCourseService.hasPurchasedCourse(userId, dto.getCourseId())) {
+            throw new BusinessException(403, "您尚未购买该课程，不能评价");
+        }
         
         // 创建评论实体
         CourseReview review = CourseReview.builder()
@@ -253,7 +258,47 @@ public class CourseReviewServiceImpl implements CourseReviewService {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("用户不存在，ID: " + userId));
         
-        // 转换为VO并返回
+        // 返回评论VO
         return ReviewVO.fromEntity(review, user.getUsername(), user.getAvatar());
+    }
+    
+    @Override
+    @Transactional
+    public ReviewVO updateReview(Long reviewId, ReviewCreateDTO dto, Long userId) {
+        // 查找评论
+        CourseReview review = reviewRepository.findById(reviewId)
+            .orElseThrow(() -> new ResourceNotFoundException("评论不存在，ID: " + reviewId));
+        
+        // 检查是否是评论的作者
+        if (!review.getUserId().equals(userId)) {
+            throw new BusinessException(403, "无权修改此评论");
+        }
+        
+        // 验证评分范围
+        if (dto.getRating() < 1 || dto.getRating() > 5) {
+            throw new BusinessException(400, "评分必须在1-5之间");
+        }
+        
+        // 保存旧评分用于更新课程评分
+        Integer oldRating = review.getRating();
+        
+        // 更新评论
+        review.setRating(dto.getRating());
+        review.setContent(dto.getContent());
+        
+        // 保存更新
+        CourseReview updatedReview = reviewRepository.save(review);
+        
+        // 更新课程评分（如果评分改变）
+        if (!oldRating.equals(dto.getRating())) {
+            courseService.updateCourseRating(review.getCourseId(), oldRating, dto.getRating());
+        }
+        
+        // 获取用户信息
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("用户不存在，ID: " + userId));
+        
+        // 返回更新的评论VO
+        return ReviewVO.fromEntity(updatedReview, user.getUsername(), user.getAvatar());
     }
 } 

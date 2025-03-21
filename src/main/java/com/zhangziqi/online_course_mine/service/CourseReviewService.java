@@ -67,4 +67,14 @@ public interface CourseReviewService {
      * @return 用户的评论
      */
     ReviewVO getUserReviewOnCourse(Long userId, Long courseId);
+    
+    /**
+     * 更新课程评论
+     *
+     * @param reviewId 评论ID
+     * @param dto 评论更新DTO
+     * @param userId 用户ID
+     * @return 更新后的评论
+     */
+    ReviewVO updateReview(Long reviewId, ReviewCreateDTO dto, Long userId);
 } 

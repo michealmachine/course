@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -80,6 +80,8 @@ export default function CourseForm({ course, onSuccess }: CourseFormProps) {
   const [searchingTag, setSearchingTag] = useState('');
   const [categorySearchTimeout, setCategorySearchTimeout] = useState<NodeJS.Timeout | null>(null);
   const [tagSearchTimeout, setTagSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  // 添加isMounted引用以跟踪组件挂载状态
+  const isMounted = useRef(true);
   
   // 表单默认值
   const defaultValues: Partial<CourseCreateDTO> = {
@@ -123,13 +125,17 @@ export default function CourseForm({ course, onSuccess }: CourseFormProps) {
       const result = await categoryService.getCategoryList(keyword, page, pageSize);
       
       if (page === 0) {
-        // 重置数据
-        setCategories(result.content);
+        // 重置数据，确保没有重复ID
+        setCategories(result.content.filter((cat, index, self) => 
+          self.findIndex(c => c.id === cat.id) === index
+        ));
       } else {
-        // 追加数据
-        setCategories(prev => [...prev, ...result.content.filter(
-          cat => !prev.some(p => p.id === cat.id)
-        )]);
+        // 追加数据，过滤掉已存在的ID
+        setCategories(prev => {
+          const existingIds = new Set(prev.map(c => c.id));
+          const newItems = result.content.filter(cat => !existingIds.has(cat.id));
+          return [...prev, ...newItems];
+        });
       }
       
       // 判断是否还有更多数据
@@ -152,13 +158,17 @@ export default function CourseForm({ course, onSuccess }: CourseFormProps) {
       const result = await tagService.getTagList(keyword, page, pageSize);
       
       if (page === 0) {
-        // 重置数据
-        setTags(result.content);
+        // 重置数据，确保没有重复ID
+        setTags(result.content.filter((tag, index, self) => 
+          self.findIndex(t => t.id === tag.id) === index
+        ));
       } else {
-        // 追加数据
-        setTags(prev => [...prev, ...result.content.filter(
-          tag => !prev.some(p => p.id === tag.id)
-        )]);
+        // 追加数据，过滤掉已存在的ID
+        setTags(prev => {
+          const existingIds = new Set(prev.map(t => t.id));
+          const newItems = result.content.filter(tag => !existingIds.has(tag.id));
+          return [...prev, ...newItems];
+        });
       }
       
       // 判断是否还有更多数据
@@ -214,8 +224,9 @@ export default function CourseForm({ course, onSuccess }: CourseFormProps) {
     loadCategories();
     loadTags();
     
-    // 组件卸载时清除定时器
+    // 组件卸载时清除定时器和更新挂载状态
     return () => {
+      isMounted.current = false;
       if (categorySearchTimeout) clearTimeout(categorySearchTimeout);
       if (tagSearchTimeout) clearTimeout(tagSearchTimeout);
     };
@@ -231,7 +242,13 @@ export default function CourseForm({ course, onSuccess }: CourseFormProps) {
             setIsLoadingCategories(true);
             const categoryDetail = await categoryService.getCategoryById(course.category!.id);
             if (categoryDetail && !categories.some(c => c.id === categoryDetail.id)) {
-              setCategories(prev => [categoryDetail, ...prev]);
+              setCategories(prev => {
+                // 确保不添加重复ID的分类
+                if (prev.some(c => c.id === categoryDetail.id)) {
+                  return prev;
+                }
+                return [categoryDetail, ...prev];
+              });
             }
           } catch (err) {
             console.error('加载分类详情失败:', err);
@@ -250,7 +267,10 @@ export default function CourseForm({ course, onSuccess }: CourseFormProps) {
             const existingIds = new Set(prev.map(t => t.id));
             // 过滤出prev中不存在的标签
             const newTags = validTags.filter(tag => !existingIds.has(tag.id));
-            return [...newTags, ...prev];
+            // 确保没有重复
+            return [...newTags, ...prev].filter((tag, index, self) => 
+              self.findIndex(t => t.id === tag.id) === index
+            );
           });
           
           // 确保表单的tagIds值是正确的
@@ -287,22 +307,29 @@ export default function CourseForm({ course, onSuccess }: CourseFormProps) {
     try {
       setIsSubmitting(true);
       const updatedCourse = await courseService.updateCourseCover(course.id, coverFile);
-      // 更新预览图片
-      setPreviewImage(updatedCourse.coverUrl || null);
-      // 通知上层组件
-      if (onSuccess) {
-        onSuccess(updatedCourse);
+      
+      // 检查组件是否仍挂载
+      if (isMounted.current) {
+        // 更新预览图片
+        setPreviewImage(updatedCourse.coverUrl || null);
+        // 通知上层组件
+        if (onSuccess) {
+          onSuccess(updatedCourse);
+        }
+        setCoverFile(null);
+        
+        // 重置文件输入
+        const fileInput = document.getElementById('cover-upload') as HTMLInputElement;
+        if (fileInput) fileInput.value = '';
       }
-      setCoverFile(null);
-      
-      // 重置文件输入
-      const fileInput = document.getElementById('cover-upload') as HTMLInputElement;
-      if (fileInput) fileInput.value = '';
-      
     } catch (err: any) {
-      setError(err.message || '上传封面失败');
+      if (isMounted.current) {
+        setError(err.message || '上传封面失败');
+      }
     } finally {
-      setIsSubmitting(false);
+      if (isMounted.current) {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -322,19 +349,23 @@ export default function CourseForm({ course, onSuccess }: CourseFormProps) {
         result = await courseService.createCourse(data);
       }
       
-      // 成功后使用setTimeout安全地处理回调或导航
-      setTimeout(() => {
+      // 移除setTimeout，直接执行回调或导航，但首先检查组件是否仍然挂载
+      if (isMounted.current) {
         if (onSuccess) {
           onSuccess(result);
         } else {
           // 默认跳转到课程编辑页
           router.push(`/dashboard/courses/${result.id}`);
         }
-      }, 100);
+      }
     } catch (err: any) {
-      setError(err.message || '提交失败，请稍后重试');
+      if (isMounted.current) {
+        setError(err.message || '提交失败，请稍后重试');
+      }
     } finally {
-      setIsSubmitting(false);
+      if (isMounted.current) {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -441,8 +472,11 @@ export default function CourseForm({ course, onSuccess }: CourseFormProps) {
                               </div>
                             ) : categories.length > 0 ? (
                               <>
-                                {categories.map((category) => (
-                                  <SelectItem key={category.id} value={category.id.toString()}>
+                                {categories.map((category, index) => (
+                                  <SelectItem 
+                                    key={`category-${category.id}-${index}-${Math.random().toString(36).substr(2, 9)}`} 
+                                    value={category.id.toString()}
+                                  >
                                     {category.name}
                                   </SelectItem>
                                 ))}
@@ -492,9 +526,9 @@ export default function CourseForm({ course, onSuccess }: CourseFormProps) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value={CourseDifficulty.BEGINNER.toString()}>初级</SelectItem>
-                          <SelectItem value={CourseDifficulty.INTERMEDIATE.toString()}>中级</SelectItem>
-                          <SelectItem value={CourseDifficulty.ADVANCED.toString()}>高级</SelectItem>
+                          <SelectItem key="difficulty-beginner" value={CourseDifficulty.BEGINNER.toString()}>初级</SelectItem>
+                          <SelectItem key="difficulty-intermediate" value={CourseDifficulty.INTERMEDIATE.toString()}>中级</SelectItem>
+                          <SelectItem key="difficulty-advanced" value={CourseDifficulty.ADVANCED.toString()}>高级</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormDescription>
@@ -531,16 +565,16 @@ export default function CourseForm({ course, onSuccess }: CourseFormProps) {
                           <div className="flex flex-wrap gap-2">
                             {tags.length > 0 ? (
                               <>
-                                {tags.map((tag) => (
+                                {tags.map((tag, index) => (
                                   <div
-                                    key={tag.id}
+                                    key={`tag-${tag.id}-${index}-${Math.random().toString(36).substr(2, 9)}`}
                                     className={`px-3 py-1 rounded-full text-sm cursor-pointer transition-colors 
-                                      ${field.value?.includes(tag.id) 
+                                      ${Array.isArray(field.value) && field.value.includes(tag.id) 
                                         ? 'bg-primary text-primary-foreground' 
                                         : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                                       }`}
                                     onClick={() => {
-                                      const currentTags = field.value || [];
+                                      const currentTags = Array.isArray(field.value) ? field.value : [];
                                       if (currentTags.includes(tag.id)) {
                                         field.onChange(currentTags.filter(id => id !== tag.id));
                                       } else {
@@ -606,8 +640,8 @@ export default function CourseForm({ course, onSuccess }: CourseFormProps) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value={CoursePaymentType.FREE.toString()}>免费</SelectItem>
-                          <SelectItem value={CoursePaymentType.PAID.toString()}>付费</SelectItem>
+                          <SelectItem key="payment-free" value={CoursePaymentType.FREE.toString()}>免费</SelectItem>
+                          <SelectItem key="payment-paid" value={CoursePaymentType.PAID.toString()}>付费</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormDescription>

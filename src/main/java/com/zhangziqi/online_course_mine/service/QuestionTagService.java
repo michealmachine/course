@@ -100,4 +100,11 @@ public interface QuestionTagService {
      * @return 标签视图对象
      */
     QuestionTagVO getTagByName(Long institutionId, String name);
+    
+    /**
+     * 删除题目的所有标签映射
+     *
+     * @param questionId 题目ID
+     */
+    void deleteAllTagsByQuestionId(Long questionId);
 } 

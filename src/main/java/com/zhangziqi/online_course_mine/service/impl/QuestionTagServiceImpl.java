@@ -288,7 +288,7 @@ public class QuestionTagServiceImpl implements QuestionTagService {
         
         // 查找标签
         QuestionTag tag = tagRepository.findByInstitutionAndName(institution, name)
-                .orElseThrow(() -> new ResourceNotFoundException("标签不存在"));
+                .orElseThrow(() -> new ResourceNotFoundException("标签不存在: " + name));
         
         // 获取标签关联的题目数量
         long questionCount = tagMappingRepository.countQuestionsByTagId(tag.getId());
@@ -298,9 +298,25 @@ public class QuestionTagServiceImpl implements QuestionTagService {
     }
 
     /**
-     * 构建标签视图对象
+     * 删除题目的所有标签映射
      */
-    private QuestionTagVO buildTagVO(QuestionTag tag, Long questionCount) {
+    @Override
+    @Transactional
+    public void deleteAllTagsByQuestionId(Long questionId) {
+        try {
+            log.info("删除题目的所有标签映射, 题目ID: {}", questionId);
+            tagMappingRepository.deleteByQuestionId(questionId);
+            log.info("成功删除题目的所有标签映射");
+        } catch (Exception e) {
+            log.error("删除题目标签映射失败", e);
+            throw new BusinessException("删除题目标签映射失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 构建标签VO对象
+     */
+    private QuestionTagVO buildTagVO(QuestionTag tag, long questionCount) {
         return QuestionTagVO.builder()
                 .id(tag.getId())
                 .institutionId(tag.getInstitutionId())
