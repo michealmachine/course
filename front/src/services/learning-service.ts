@@ -147,10 +147,79 @@ const learningService = {
    */
   getSectionQuestionGroup: async (sectionId: string | number): Promise<QuestionGroupVO> => {
     try {
+      console.log(`开始获取章节问题组, 章节ID: ${sectionId}`);
       const response: AxiosResponse<ApiResponse<QuestionGroupVO>> = 
         await request.get(`/learning/sections/${sectionId}/question-group`);
       
-      return response.data.data;
+      console.log(`获取章节问题组成功, 章节ID: ${sectionId}, 响应:`, response.data);
+      
+      // 检查返回的数据格式
+      const questionGroup = response.data.data;
+      if (!questionGroup) {
+        console.error(`章节问题组数据为空, 章节ID: ${sectionId}`);
+        throw new Error('题组数据为空');
+      }
+      
+      // 处理后端返回的数据结构
+      // 1. 从items数组中提取questions
+      if (questionGroup.items && Array.isArray(questionGroup.items)) {
+        console.log(`题组包含 ${questionGroup.items.length} 个题目项`);
+        
+        // 将items中的question对象提取到questions数组
+        const questions = questionGroup.items.map(item => {
+          if (item.question) {
+            // 如果有完整的question对象，直接使用
+            return {
+              ...item.question,
+              // 使用item中的分值覆盖question中的分值（如果存在）
+              score: item.score !== undefined ? item.score : item.question.score
+            };
+          } else {
+            // 如果没有完整的question对象，构建一个基本的题目对象
+            return {
+              id: item.questionId || 0,
+              title: '未知题目',
+              type: 0,
+              score: item.score || 0
+            };
+          }
+        });
+        
+        // 将提取的题目添加到questionGroup
+        questionGroup.questions = questions;
+        console.log('提取的题目数据:', questions);
+      }
+      
+      // 2. 处理title和name的兼容性
+      if (questionGroup.name && !questionGroup.title) {
+        questionGroup.title = questionGroup.name;
+      }
+      
+      // 3. 添加sectionId字段（如果没有）
+      if (!questionGroup.sectionId) {
+        console.log(`为问题组添加sectionId字段: ${sectionId}`);
+        questionGroup.sectionId = Number(sectionId);
+      }
+      
+      // 4. 添加必要的统计字段
+      // 使用questionCount或计算questions长度
+      questionGroup.totalQuestions = questionGroup.questionCount || 
+                                     (questionGroup.questions ? questionGroup.questions.length : 0);
+      
+      // 计算总分
+      if (questionGroup.questions && !questionGroup.totalScore) {
+        questionGroup.totalScore = questionGroup.questions.reduce((sum, q) => sum + (q.score || 0), 0);
+      }
+      
+      console.log('处理后的题组数据:', {
+        id: questionGroup.id,
+        title: questionGroup.title || questionGroup.name,
+        sectionId: questionGroup.sectionId,
+        questionCount: questionGroup.totalQuestions,
+        totalScore: questionGroup.totalScore
+      });
+      
+      return questionGroup;
     } catch (error) {
       console.error(`获取章节问题组失败, 章节ID: ${sectionId}:`, error);
       throw error;

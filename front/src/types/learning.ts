@@ -62,24 +62,62 @@ export interface QuestionVO {
   id: number;
   title: string;
   content?: string;
-  type: string;
-  options?: string[];
+  // 后端返回的 type 是 Integer 类型，可能为数值或字符串
+  type: string | number;
+  typeDesc?: string;  // 题目类型描述
+  options?: string[] | any[];  // 可能是字符串数组或对象数组
   correctOptions?: string[];
   explanation?: string;
-  score: number;
+  analysis?: string;  // 后端返回的解析字段名
+  score?: number;
+  
+  // 后端返回的其他字段
+  difficulty?: number;
+  difficultyDesc?: string;
+  answer?: string; 
+  institutionId?: number;
+  creatorId?: number;
+  creatorName?: string;
+  createdTime?: string;
+  updatedTime?: string;
+  tags?: any[];
 }
 
 /**
- * 问题组视图对象
+ * 题目组视图对象
  */
 export interface QuestionGroupVO {
   id: number;
-  title: string;
+  title?: string;
+  name?: string;  // 后端返回的字段名是name
   description?: string;
   sectionId: number;
-  questions: QuestionVO[];
-  totalQuestions: number;
-  totalScore: number;
+  questions?: QuestionVO[];  // 前端使用的题目列表
+  totalQuestions?: number;
+  totalScore?: number;
+  
+  // 后端数据结构字段
+  items?: QuestionGroupItemVO[];  // 后端返回的题目项列表
+  questionCount?: number;  // 题目数量
+  institutionId?: number;
+  creatorId?: number;
+  creatorName?: string;
+  createdTime?: string;
+  updatedTime?: string;
+}
+
+/**
+ * 题目组项视图对象 - 对应后端的QuestionGroupItemVO
+ */
+export interface QuestionGroupItemVO {
+  id?: number;
+  groupId?: number;
+  questionId?: number;
+  question?: QuestionVO;  // 题目详细信息
+  orderIndex?: number;
+  difficulty?: number;
+  difficultyDesc?: string;
+  score?: number;
 }
 
 /**
@@ -105,6 +143,7 @@ export interface SectionVO {
   order: number;
   duration: number;
   resourceType?: 'MEDIA' | 'QUESTION_GROUP';
+  resourceTypeDiscriminator?: 'MEDIA' | 'QUESTION_GROUP' | 'NONE'; // 与后端一致的资源类型鉴别器
   progress?: number;
   completed?: boolean;
 }

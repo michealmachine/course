@@ -55,6 +55,7 @@ import { LearningCourseStructureVO } from '@/services/learning-service';
 // 为了适配SectionVO的类型要求，创建接口拓展
 interface SectionWithResource extends SectionVO {
   resourceType: 'MEDIA' | 'QUESTION_GROUP';
+  resourceTypeDiscriminator?: 'MEDIA' | 'QUESTION_GROUP' | 'NONE';
   progress: number;
   completed: boolean;
 }
@@ -233,7 +234,10 @@ export default function LearnCoursePage() {
         const found = chapter.sections.find(s => s.id === currentSectionId);
         if (found) {
           // 类型断言，确保有所需的属性
-          section = found as unknown as SectionWithResource;
+          section = {
+            ...found,
+            resourceType: found.resourceType || 'MEDIA' // 如果没有resourceType，默认为MEDIA
+          } as SectionWithResource;
           break;
         }
       }
@@ -245,13 +249,23 @@ export default function LearnCoursePage() {
       
       setCurrentSection(section);
       
+      // 获取后端返回的资源类型，优先使用resourceTypeDiscriminator
+      const resourceTypeDiscriminator = section.resourceTypeDiscriminator || null;
+      const resourceType = section.resourceType || null;
+      const effectiveResourceType = resourceTypeDiscriminator || resourceType || null;
+      
+      console.log(`小节 ${section.id} 的资源类型:`, {
+        resourceTypeDiscriminator, 
+        resourceType,
+        effectiveResourceType
+      });
+      
       // 根据资源类型加载不同内容
-      // 首先尝试获取媒体资源
-      try {
-        console.log(`尝试加载小节 ${section.id} 的媒体资源`);
-        const media = await learningService.getSectionMedia(section.id);
-        
-        if (media) {
+      if (effectiveResourceType === 'MEDIA') {
+        // 加载媒体资源
+        console.log(`加载小节 ${section.id} 的媒体资源`);
+        try {
+          const media = await learningService.getSectionMedia(section.id);
           console.log('成功加载媒体资源:', media);
           setSectionContent({
             id: section.id,
@@ -263,39 +277,128 @@ export default function LearnCoursePage() {
           } as SectionResourceVO);
           // 更新小节的资源类型
           section.resourceType = 'MEDIA';
+          section.resourceTypeDiscriminator = 'MEDIA';
           return;
+        } catch (mediaErr) {
+          console.error('加载媒体资源失败:', mediaErr);
+          throw mediaErr; // 重新抛出错误，让外层catch处理
         }
-      } catch (mediaErr) {
-        console.log('加载媒体资源失败，尝试加载题组资源');
-      }
-      
-      // 如果没有媒体资源或加载失败，尝试获取题组资源
-      try {
-        console.log(`尝试加载小节 ${section.id} 的题组资源`);
-        const questionGroup = await learningService.getSectionQuestionGroup(section.id);
-        
-        if (questionGroup) {
+      } else if (effectiveResourceType === 'QUESTION_GROUP') {
+        // 加载题组资源
+        console.log(`加载小节 ${section.id} 的题组资源`);
+        try {
+          const questionGroup = await learningService.getSectionQuestionGroup(section.id);
           console.log('成功加载题组资源:', questionGroup);
-          setSectionContent({
+          
+          // 确保questionGroup有所需属性
+          if (!questionGroup || typeof questionGroup !== 'object') {
+            console.error('题组资源格式无效:', questionGroup);
+            throw new Error('题组资源格式无效');
+          }
+          
+          // 确保questionGroup有sectionId
+          const questionGroupWithSection = {
+            ...questionGroup,
+            sectionId: section.id
+          };
+          
+          // 创建完整的SectionResourceVO对象
+          const sectionResource: SectionResourceVO = {
             id: section.id,
             title: section.title,
             description: section.description,
             type: 'section',
             resourceType: 'QUESTION_GROUP',
-            questionGroup: questionGroup
-          } as SectionResourceVO);
+            questionGroup: questionGroupWithSection
+          };
+          
+          console.log('创建的SectionResourceVO对象:', sectionResource);
+          setSectionContent(sectionResource);
+          
           // 更新小节的资源类型
           section.resourceType = 'QUESTION_GROUP';
+          section.resourceTypeDiscriminator = 'QUESTION_GROUP';
           return;
+        } catch (questionErr) {
+          console.error('加载题组资源失败:', questionErr);
+          throw questionErr; // 重新抛出错误，让外层catch处理
         }
-      } catch (questionErr) {
-        console.log('加载题组资源失败');
+      } else {
+        // 资源类型未知或为NONE，尝试自动检测
+        console.log(`小节 ${section.id} 的资源类型未知或为NONE，尝试自动检测`);
+        let mediaLoaded = false;
+        let questionGroupLoaded = false;
+        
+        try {
+          // 尝试加载题组资源（先检查题组，因为题组加载更轻量）
+          console.log(`尝试加载小节 ${section.id} 的题组资源`);
+          const questionGroup = await learningService.getSectionQuestionGroup(section.id);
+          
+          if (questionGroup) {
+            console.log('成功加载题组资源:', questionGroup);
+            
+            // 确保questionGroup有sectionId
+            const questionGroupWithSection = {
+              ...questionGroup,
+              sectionId: section.id
+            };
+            
+            // 创建完整的SectionResourceVO对象
+            const sectionResource: SectionResourceVO = {
+              id: section.id,
+              title: section.title,
+              description: section.description,
+              type: 'section',
+              resourceType: 'QUESTION_GROUP',
+              questionGroup: questionGroupWithSection
+            };
+            
+            console.log('自动检测创建的SectionResourceVO对象:', sectionResource);
+            setSectionContent(sectionResource);
+            
+            // 更新小节的资源类型
+            section.resourceType = 'QUESTION_GROUP';
+            section.resourceTypeDiscriminator = 'QUESTION_GROUP';
+            questionGroupLoaded = true;
+            return;
+          }
+        } catch (questionErr) {
+          console.log('加载题组资源失败，尝试加载媒体资源');
+        }
+        
+        // 如果题组资源加载失败，尝试媒体资源
+        if (!questionGroupLoaded) {
+          try {
+            console.log(`尝试加载小节 ${section.id} 的媒体资源`);
+            const media = await learningService.getSectionMedia(section.id);
+            
+            if (media) {
+              console.log('成功加载媒体资源:', media);
+              setSectionContent({
+                id: section.id,
+                title: section.title,
+                description: section.description,
+                type: 'section',
+                resourceType: 'MEDIA',
+                media: media
+              } as SectionResourceVO);
+              // 更新小节的资源类型
+              section.resourceType = 'MEDIA';
+              section.resourceTypeDiscriminator = 'MEDIA';
+              mediaLoaded = true;
+              return;
+            }
+          } catch (mediaErr) {
+            console.log('加载媒体资源失败');
+          }
+        }
+        
+        // 如果两种资源都没有，设置为无内容
+        if (!mediaLoaded && !questionGroupLoaded) {
+          console.log('该小节没有关联任何媒体或题组资源');
+          setSectionContent(null);
+        }
       }
-      
-      // 如果两种资源都没有，设置为无内容
-      console.log('该小节没有关联任何媒体或题组资源');
-      setSectionContent(null);
-      
     } catch (err: any) {
       console.error('加载小节内容失败:', err);
       toast.error('加载小节内容失败: ' + (err.message || '未知错误'));
@@ -517,6 +620,8 @@ export default function LearnCoursePage() {
                   {chapter.sections.map((section) => {
                     // 类型断言，确保section有resourceType属性
                     const sectionWithResource = section as unknown as SectionWithResource;
+                    // 优先使用resourceTypeDiscriminator字段，其次是resourceType
+                    const resourceType = sectionWithResource.resourceTypeDiscriminator || sectionWithResource.resourceType || 'NONE';
                     return (
                       <div
                         key={section.id}
@@ -526,9 +631,9 @@ export default function LearnCoursePage() {
                         )}
                         onClick={() => handleSectionClick(chapter.id, section.id)}
                       >
-                        {sectionWithResource.resourceType === 'MEDIA' ? (
+                        {resourceType === 'MEDIA' ? (
                           <Video className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
-                        ) : sectionWithResource.resourceType === 'QUESTION_GROUP' ? (
+                        ) : resourceType === 'QUESTION_GROUP' ? (
                           <FileText className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
                         ) : (
                           <FileText className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
@@ -584,6 +689,9 @@ export default function LearnCoursePage() {
       );
     }
 
+    // 添加调试信息，确认sectionContent的具体内容
+    console.log("渲染内容区域，sectionContent:", sectionContent);
+
     if (sectionContent.resourceType === 'MEDIA' && sectionContent.media) {
       return (
         <CourseMediaPlayer 
@@ -593,19 +701,40 @@ export default function LearnCoursePage() {
         />
       );
     } else if (sectionContent.resourceType === 'QUESTION_GROUP' && sectionContent.questionGroup) {
+      // 添加调试信息，确认questionGroup的具体内容
+      console.log("渲染题组内容，questionGroup:", sectionContent.questionGroup);
       return (
         <CourseQuestionGroup 
           questionGroup={sectionContent.questionGroup}
-          onComplete={() => updateLearningProgress(100)}
-          onError={(error) => toast.error(error.toString())}
+          onComplete={(isAllCorrect) => {
+            console.log("题组完成，是否全部正确:", isAllCorrect);
+            updateLearningProgress(100);
+          }}
+          onError={(error) => {
+            console.error("题组渲染错误:", error);
+            toast.error(error.toString());
+          }}
         />
       );
     } else {
+      // 更详细的错误信息
+      console.error("无法渲染内容，资源类型不匹配:", {
+        resourceType: sectionContent.resourceType,
+        hasMedia: !!sectionContent.media,
+        hasQuestionGroup: !!sectionContent.questionGroup,
+        sectionContent
+      });
+      
       return (
         <div className="flex flex-col items-center justify-center h-[500px] text-center">
           <FileText className="h-12 w-12 mb-4 text-muted-foreground" />
           <h3 className="text-lg font-medium">未知内容类型</h3>
           <p className="text-muted-foreground">系统无法加载此类型的内容</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            资源类型: {sectionContent.resourceType || '未知'}，
+            媒体: {sectionContent.media ? '有效' : '无效'}，
+            题组: {sectionContent.questionGroup ? '有效' : '无效'}
+          </p>
           <Button 
             variant="outline" 
             className="mt-4"
