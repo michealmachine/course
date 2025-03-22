@@ -29,6 +29,9 @@ import { ReviewContentPlayer } from '@/components/dashboard/reviews/review-conte
 import { formatDate } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import favoriteService from '@/services/favorite-service';
+import { CourseReviewSection } from '@/components/course/course-review-section';
+import { useAuthStore } from '@/stores/auth-store';
+import { userCourseService } from '@/services';
 
 // 将SectionVO转换为Section
 function convertSectionVOToSection(sectionVO: SectionVO, chapterId: number): Section {
@@ -59,6 +62,7 @@ export default function CourseDetailPage() {
   const params = useParams();
   const router = useRouter();
   const courseId = Number(params.id);
+  const { isAuthenticated } = useAuthStore();
   
   // 状态管理
   const [course, setCourse] = useState<CourseStructureVO | null>(null);
@@ -71,6 +75,8 @@ export default function CourseDetailPage() {
   const [expandedChapters, setExpandedChapters] = useState<Set<number>>(new Set());
   const [isFavorite, setIsFavorite] = useState<boolean>(false);
   const [favoritesLoading, setFavoritesLoading] = useState<boolean>(false);
+  const [isUserEnrolled, setIsUserEnrolled] = useState<boolean>(false);
+  const [enrollmentLoading, setEnrollmentLoading] = useState<boolean>(false);
   
   // 加载课程结构数据
   useEffect(() => {
@@ -107,6 +113,31 @@ export default function CourseDetailPage() {
     
     loadCourseData();
   }, [courseId]);
+  
+  // 检查用户是否已购买课程
+  useEffect(() => {
+    const checkEnrollment = async () => {
+      if (!courseId || !isAuthenticated) {
+        setIsUserEnrolled(false);
+        return;
+      }
+      
+      try {
+        setEnrollmentLoading(true);
+        
+        // 调用API检查用户是否已购买课程
+        const userCourse = await userCourseService.getUserCourseRecord(courseId);
+        setIsUserEnrolled(!!userCourse);
+      } catch (err) {
+        console.error('检查课程购买状态失败:', err);
+        setIsUserEnrolled(false);
+      } finally {
+        setEnrollmentLoading(false);
+      }
+    };
+    
+    checkEnrollment();
+  }, [courseId, isAuthenticated]);
   
   // 检查是否已收藏
   useEffect(() => {
@@ -187,6 +218,14 @@ export default function CourseDetailPage() {
   // 返回按钮处理
   const handleBack = () => {
     router.back();
+  };
+  
+  // 处理购买课程
+  const handleEnrollCourse = () => {
+    if (!course) return;
+    
+    // 跳转到课程购买页面 (可根据实际情况调整)
+    router.push(`/dashboard/checkout/${course.course.id}`);
   };
   
   // 渲染章节目录
@@ -373,6 +412,12 @@ export default function CourseDetailPage() {
                     >
                       课程内容
                     </TabsTrigger>
+                    <TabsTrigger 
+                      value="reviews" 
+                      className="flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                    >
+                      评论
+                    </TabsTrigger>
                   </TabsList>
                 </CardHeader>
                 
@@ -554,6 +599,33 @@ export default function CourseDetailPage() {
                         </div>
                       </div>
                     )}
+                  </TabsContent>
+                  
+                  <TabsContent value="reviews" className="mt-0 h-full">
+                    <ScrollArea className="h-[calc(100vh-240px)] pr-4">
+                      <div className="pb-6">
+                        {!isUserEnrolled && !enrollmentLoading && course && course.course.paymentType !== 0 && (
+                          <div className="mb-6 bg-gradient-to-r from-primary/10 to-primary/5 p-4 rounded-lg border border-primary/20 flex justify-between items-center">
+                            <div>
+                              <h3 className="font-medium text-primary mb-1">购买课程，参与评论</h3>
+                              <p className="text-sm text-slate-600">
+                                购买课程后，您可以为课程评分并分享您的学习体验
+                              </p>
+                            </div>
+                            <Button onClick={handleEnrollCourse} className="whitespace-nowrap">
+                              购买课程
+                            </Button>
+                          </div>
+                        )}
+                        
+                        {course && (
+                          <CourseReviewSection 
+                            courseId={course.course.id} 
+                            isUserEnrolled={isUserEnrolled}
+                          />
+                        )}
+                      </div>
+                    </ScrollArea>
                   </TabsContent>
                 </CardContent>
               </Tabs>

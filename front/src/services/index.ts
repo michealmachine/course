@@ -14,6 +14,7 @@ import orderService from './order-service';
 import userCourseService from './user-course-service';
 import wrongQuestionService from './wrong-question-service';
 import learningService from './learning-service';
+import courseReviewService from './course-review-service';
 
 export {
   courseService,
@@ -31,5 +32,6 @@ export {
   orderService,
   userCourseService,
   wrongQuestionService,
-  learningService
+  learningService,
+  courseReviewService
 }; 
