@@ -33,6 +33,9 @@ public class InstitutionVO {
     @Schema(description = "状态：0-待审核，1-正常，2-禁用")
     private Integer status;
     
+    @Schema(description = "机构注册码")
+    private String registerCode;
+    
     @Schema(description = "联系人")
     private String contactPerson;
     

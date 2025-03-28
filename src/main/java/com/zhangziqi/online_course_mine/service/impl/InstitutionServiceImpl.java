@@ -5,6 +5,7 @@ import com.zhangziqi.online_course_mine.model.converter.InstitutionApplicationCo
 import com.zhangziqi.online_course_mine.model.converter.InstitutionConverter;
 import com.zhangziqi.online_course_mine.model.dto.InstitutionApplyDTO;
 import com.zhangziqi.online_course_mine.model.dto.InstitutionApplicationQueryDTO;
+import com.zhangziqi.online_course_mine.model.dto.InstitutionUpdateDTO;
 import com.zhangziqi.online_course_mine.model.entity.Institution;
 import com.zhangziqi.online_course_mine.model.entity.InstitutionApplication;
 import com.zhangziqi.online_course_mine.model.entity.User;
@@ -16,6 +17,7 @@ import com.zhangziqi.online_course_mine.repository.InstitutionRepository;
 import com.zhangziqi.online_course_mine.repository.UserRepository;
 import com.zhangziqi.online_course_mine.service.EmailService;
 import com.zhangziqi.online_course_mine.service.InstitutionService;
+import com.zhangziqi.online_course_mine.service.MinioService;
 import com.zhangziqi.online_course_mine.service.StorageQuotaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,8 +28,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.net.URI;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
  * 机构服务实现
@@ -42,6 +48,7 @@ public class InstitutionServiceImpl implements InstitutionService {
     private final UserRepository userRepository;
     private final EmailService emailService;
     private final StorageQuotaService storageQuotaService;
+    private final MinioService minioService;
     
     @Override
     @Transactional
@@ -274,5 +281,226 @@ public class InstitutionServiceImpl implements InstitutionService {
     private String generateApplicationId() {
         return "APP" + System.currentTimeMillis() % 10000000 + 
                RandomStringUtils.randomNumeric(4);
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isInstitutionAdmin(String username, Long institutionId) {
+        log.debug("检查用户是否为机构管理员: username={}, institutionId={}", username, institutionId);
+        
+        // 查找用户
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new BusinessException("用户不存在"));
+        
+        // 检查用户是否属于该机构
+        if (user.getInstitutionId() == null || !user.getInstitutionId().equals(institutionId)) {
+            log.debug("用户不属于该机构: username={}, userInstitutionId={}, requestedInstitutionId={}",
+                    username, user.getInstitutionId(), institutionId);
+            return false;
+        }
+        
+        // 获取用户邮箱
+        String userEmail = user.getEmail();
+        if (userEmail == null || userEmail.isEmpty()) {
+            log.debug("用户邮箱为空: username={}", username);
+            return false;
+        }
+        
+        // 查找机构
+        Institution institution = institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new BusinessException("机构不存在"));
+        
+        // 获取机构联系邮箱
+        String institutionEmail = institution.getContactEmail();
+        if (institutionEmail == null || institutionEmail.isEmpty()) {
+            log.debug("机构联系邮箱为空: institutionId={}", institutionId);
+            return false;
+        }
+        
+        // 比较邮箱是否匹配
+        boolean isAdmin = userEmail.equalsIgnoreCase(institutionEmail);
+        log.debug("用户邮箱与机构联系邮箱比较结果: username={}, isAdmin={}, userEmail={}, institutionEmail={}",
+                username, isAdmin, userEmail, institutionEmail);
+        
+        return isAdmin;
+    }
+    
+    /**
+     * 获取机构详情
+     *
+     * @param institutionId 机构ID
+     * @return 机构信息
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public InstitutionVO getInstitutionDetail(Long institutionId) {
+        log.info("获取机构详情: {}", institutionId);
+        
+        Institution institution = institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new BusinessException("机构不存在"));
+        
+        return InstitutionConverter.toVO(institution);
+    }
+    
+    /**
+     * 获取机构详情，可控制是否返回注册码
+     *
+     * @param institutionId 机构ID
+     * @param username 用户名
+     * @return 机构信息
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public InstitutionVO getInstitutionDetail(Long institutionId, String username) {
+        log.info("获取机构详情: institutionId={}, username={}", institutionId, username);
+        
+        Institution institution = institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new BusinessException("机构不存在"));
+        
+        // 查找用户
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new BusinessException("用户不存在"));
+        
+        // 判断用户是否属于该机构
+        boolean belongsToInstitution = user.getInstitutionId() != null && 
+                user.getInstitutionId().equals(institutionId);
+        
+        // 只有属于该机构的用户才能看到注册码
+        return InstitutionConverter.toVO(institution, belongsToInstitution);
+    }
+    
+    /**
+     * 更新机构信息
+     *
+     * @param institutionId 机构ID
+     * @param updateDTO 更新信息DTO
+     * @param username 当前操作用户名
+     * @return 更新后的机构信息
+     */
+    @Override
+    @Transactional
+    public InstitutionVO updateInstitution(Long institutionId, InstitutionUpdateDTO updateDTO, String username) {
+        log.info("更新机构信息: institutionId={}, username={}", institutionId, username);
+        
+        // 检查用户是否为机构管理员
+        if (!isInstitutionAdmin(username, institutionId)) {
+            throw new BusinessException("权限不足，只有机构管理员可以更新机构信息");
+        }
+        
+        // 查找机构
+        Institution institution = institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new BusinessException("机构不存在"));
+        
+        // 更新机构信息
+        institution.setName(updateDTO.getName());
+        institution.setDescription(updateDTO.getDescription());
+        institution.setContactPerson(updateDTO.getContactPerson());
+        institution.setContactPhone(updateDTO.getContactPhone());
+        institution.setAddress(updateDTO.getAddress());
+        
+        // 保存更新后的机构信息
+        institution = institutionRepository.save(institution);
+        log.info("机构信息更新成功: {}", institutionId);
+        
+        return InstitutionConverter.toVO(institution);
+    }
+    
+    /**
+     * 更新机构Logo
+     *
+     * @param institutionId 机构ID
+     * @param file Logo文件
+     * @param username 当前操作用户名
+     * @return 更新后的机构信息
+     */
+    @Override
+    @Transactional
+    public InstitutionVO updateInstitutionLogo(Long institutionId, MultipartFile file, String username) 
+            throws IOException {
+        log.info("更新机构Logo: institutionId={}, username={}", institutionId, username);
+        
+        // 检查用户是否为机构管理员
+        if (!isInstitutionAdmin(username, institutionId)) {
+            throw new BusinessException("权限不足，只有机构管理员可以更新机构Logo");
+        }
+        
+        // 检查文件类型
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new BusinessException(400, "只支持上传图片文件");
+        }
+        
+        // 检查文件大小（最大2MB）
+        if (file.getSize() > 2 * 1024 * 1024) {
+            throw new BusinessException(400, "文件大小不能超过2MB");
+        }
+        
+        // 查找机构
+        Institution institution = institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new BusinessException("机构不存在"));
+        
+        // 生成唯一的对象名
+        String objectName = "institutions/logos/" + institutionId + "/" + UUID.randomUUID() + "-" + file.getOriginalFilename();
+        
+        // 上传到MinIO
+        String logoUrl = minioService.uploadFile(objectName, file.getInputStream(), file.getContentType());
+        
+        // 如果机构已有Logo，删除旧Logo
+        if (institution.getLogo() != null && !institution.getLogo().isEmpty()) {
+            try {
+                // 从URL中提取对象名
+                String oldLogoUrl = institution.getLogo();
+                URI uri = new URI(oldLogoUrl);
+                String path = uri.getPath();
+                // 移除开头的'/'和桶名
+                String oldObjectName = path.replaceFirst("^/[^/]+/", "");
+                
+                // 删除旧文件
+                minioService.deleteFile(oldObjectName);
+                log.info("已删除旧的机构Logo: {}", oldObjectName);
+            } catch (Exception e) {
+                log.warn("删除旧Logo文件失败: {}", e.getMessage());
+                // 继续执行，不影响更新新Logo
+            }
+        }
+        
+        // 更新机构Logo
+        institution.setLogo(logoUrl);
+        institution = institutionRepository.save(institution);
+        log.info("机构Logo更新成功: {}", institutionId);
+        
+        return InstitutionConverter.toVO(institution);
+    }
+    
+    /**
+     * 重置机构注册码
+     *
+     * @param institutionId 机构ID
+     * @param username 当前操作用户名
+     * @return 新的注册码
+     */
+    @Override
+    @Transactional
+    public String resetInstitutionRegisterCode(Long institutionId, String username) {
+        log.info("重置机构注册码: institutionId={}, username={}", institutionId, username);
+        
+        // 检查用户是否为机构管理员
+        if (!isInstitutionAdmin(username, institutionId)) {
+            throw new BusinessException("权限不足，只有机构管理员可以重置注册码");
+        }
+        
+        // 查找机构
+        Institution institution = institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new BusinessException("机构不存在"));
+        
+        // 生成新的注册码
+        String newRegisterCode = generateInstitutionCode();
+        
+        // 更新机构注册码
+        institution.setRegisterCode(newRegisterCode);
+        institutionRepository.save(institution);
+        log.info("机构注册码重置成功: {}", institutionId);
+        
+        return newRegisterCode;
     }
 } 

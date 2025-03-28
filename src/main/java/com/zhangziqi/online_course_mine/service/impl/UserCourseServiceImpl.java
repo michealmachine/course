@@ -95,13 +95,13 @@ public class UserCourseServiceImpl implements UserCourseService {
         int currentSectionIndex = getSectionIndex(course, dto.getChapterId(), dto.getSectionId());
         int newProgress = Math.min(100, (int)((currentSectionIndex * 100.0) / totalSections));
         
-        // 只有当新进度大于原进度时才更新
+        // 只有当新进度大于原进度时才更新进度和最后学习时间，并保存更改
         if (newProgress > userCourse.getProgress()) {
             userCourse.setProgress(newProgress);
             userCourse.setLastLearnAt(LocalDateTime.now());
+            userCourseRepository.save(userCourse);
         }
         
-        userCourseRepository.save(userCourse);
         return UserCourseVO.fromEntity(userCourse);
     }
     

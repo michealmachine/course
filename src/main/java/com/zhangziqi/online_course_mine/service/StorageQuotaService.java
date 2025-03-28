@@ -56,4 +56,13 @@ public interface StorageQuotaService {
      * @param expiresAt 过期时间(可选)
      */
     void setQuota(Long institutionId, QuotaType type, Long totalQuota, LocalDateTime expiresAt);
+    
+    /**
+     * 增加存储配额
+     *
+     * @param institutionId 机构ID
+     * @param type 配额类型
+     * @param additionalQuota 增加的配额大小(字节)
+     */
+    void increaseQuota(Long institutionId, QuotaType type, Long additionalQuota);
 } 

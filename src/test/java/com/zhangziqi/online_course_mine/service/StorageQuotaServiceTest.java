@@ -1,6 +1,7 @@
 package com.zhangziqi.online_course_mine.service;
 
 import com.zhangziqi.online_course_mine.exception.ResourceNotFoundException;
+import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.model.entity.Institution;
 import com.zhangziqi.online_course_mine.model.entity.StorageQuota;
 import com.zhangziqi.online_course_mine.model.enums.QuotaType;
@@ -247,5 +248,84 @@ class StorageQuotaServiceTest {
         assertEquals(0L, savedQuota.getUsedQuota());
         assertEquals(expiresAt, savedQuota.getExpiresAt());
         assertTrue(savedQuota.getEnabled());
+    }
+
+    @Test
+    void increaseQuota_WhenInstitutionNotExists_ThrowsException() {
+        when(institutionRepository.findById(INSTITUTION_ID)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () ->
+                storageQuotaService.increaseQuota(INSTITUTION_ID, QuotaType.VIDEO, 1024L));
+    }
+    
+    @Test
+    void increaseQuota_WithNegativeValue_ThrowsException() {
+        assertThrows(BusinessException.class, () ->
+                storageQuotaService.increaseQuota(INSTITUTION_ID, QuotaType.VIDEO, -1024L));
+    }
+    
+    @Test
+    void increaseQuota_WhenQuotaExists_IncreaseSuccessfully() {
+        // Arrange
+        when(institutionRepository.findById(INSTITUTION_ID)).thenReturn(Optional.of(testInstitution));
+        
+        // 视频配额
+        StorageQuota videoQuota = new StorageQuota();
+        videoQuota.setId(1L);
+        videoQuota.setInstitution(testInstitution);
+        videoQuota.setType(QuotaType.VIDEO);
+        videoQuota.setTotalQuota(5L * 1024 * 1024 * 1024); // 5GB
+        videoQuota.setUsedQuota(1L * 1024 * 1024 * 1024);  // 1GB
+        
+        // 总配额
+        StorageQuota totalQuota = new StorageQuota();
+        totalQuota.setId(3L);
+        totalQuota.setInstitution(testInstitution);
+        totalQuota.setType(QuotaType.TOTAL);
+        totalQuota.setTotalQuota(7L * 1024 * 1024 * 1024); // 7GB
+        totalQuota.setUsedQuota(1L * 1024 * 1024 * 1024);  // 1GB
+        
+        when(storageQuotaRepository.findByInstitutionAndType(testInstitution, QuotaType.VIDEO))
+                .thenReturn(Optional.of(videoQuota));
+        when(storageQuotaRepository.findByInstitutionAndType(testInstitution, QuotaType.TOTAL))
+                .thenReturn(Optional.of(totalQuota));
+        
+        // 直接返回参数，不做任何修改
+        when(storageQuotaRepository.save(any(StorageQuota.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        
+        long additionalQuota = 1024L * 1024 * 1024; // 1GB
+        storageQuotaService.increaseQuota(INSTITUTION_ID, QuotaType.VIDEO, additionalQuota);
+        
+        // 验证方法调用
+        verify(institutionRepository, times(1)).findById(INSTITUTION_ID);
+        verify(storageQuotaRepository, times(1)).findByInstitutionAndType(testInstitution, QuotaType.VIDEO);
+        verify(storageQuotaRepository, times(1)).findByInstitutionAndType(testInstitution, QuotaType.TOTAL);
+        
+        // 使用ArgumentCaptor捕获保存的配额对象
+        ArgumentCaptor<StorageQuota> quotaCaptor = ArgumentCaptor.forClass(StorageQuota.class);
+        verify(storageQuotaRepository, times(2)).save(quotaCaptor.capture());
+        
+        // 获取所有被保存的配额对象
+        List<StorageQuota> capturedQuotas = quotaCaptor.getAllValues();
+        assertEquals(2, capturedQuotas.size());
+        
+        // 验证配额是否正确增加
+        boolean foundVideo = false;
+        boolean foundTotal = false;
+        
+        for (StorageQuota quota : capturedQuotas) {
+            if (quota.getType() == QuotaType.VIDEO) {
+                assertEquals(5L * 1024 * 1024 * 1024 + additionalQuota, quota.getTotalQuota());
+                foundVideo = true;
+            } else if (quota.getType() == QuotaType.TOTAL) {
+                assertEquals(7L * 1024 * 1024 * 1024 + additionalQuota, quota.getTotalQuota());
+                foundTotal = true;
+            }
+        }
+        
+        // 确保找到了两种类型的配额
+        assertTrue(foundVideo, "未找到保存的视频配额");
+        assertTrue(foundTotal, "未找到保存的总配额");
     }
 } 

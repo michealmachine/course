@@ -28,6 +28,7 @@ import {
   FileQuestion,
   Search,
   AlertCircle,
+  Settings,
 } from 'lucide-react';
 
 // 侧边栏菜单项
@@ -89,6 +90,12 @@ const menuItems: MenuItem[] = [
     roles: [UserRole.INSTITUTION],
   },
   {
+    title: '机构管理',
+    href: '/dashboard/institution-management',
+    icon: <Settings className="w-5 h-5" />,
+    roles: [UserRole.INSTITUTION],
+  },
+  {
     title: '题库管理',
     href: '/dashboard/questions',
     icon: <FileQuestion className="w-5 h-5" />,
@@ -116,6 +123,12 @@ const menuItems: MenuItem[] = [
     title: '权限管理',
     href: '/dashboard/permissions',
     icon: <ShieldCheck className="w-5 h-5" />,
+    roles: [UserRole.ADMIN],
+  },
+  {
+    title: '配额申请管理',
+    href: '/dashboard/quota-applications',
+    icon: <HardDrive className="w-5 h-5" />,
     roles: [UserRole.ADMIN],
   },
   {

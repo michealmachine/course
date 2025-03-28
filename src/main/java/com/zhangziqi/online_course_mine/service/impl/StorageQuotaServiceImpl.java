@@ -255,4 +255,54 @@ public class StorageQuotaServiceImpl implements StorageQuotaService {
         quotaRepository.save(quota);
         log.info("设置配额: 机构ID: {}, 类型: {}, 总配额: {}", institutionId, type, totalQuota);
     }
+
+    /**
+     * 增加存储配额
+     *
+     * @param institutionId 机构ID
+     * @param type 配额类型
+     * @param additionalQuota 增加的配额大小(字节)
+     */
+    @Override
+    @Transactional
+    public void increaseQuota(Long institutionId, QuotaType type, Long additionalQuota) {
+        log.info("增加机构 {} 的 {} 配额: {} 字节", institutionId, type, additionalQuota);
+        
+        if (additionalQuota <= 0) {
+            throw new BusinessException("增加的配额必须大于0");
+        }
+        
+        // 验证机构存在
+        Institution institution = institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new ResourceNotFoundException("机构不存在，ID: " + institutionId));
+        
+        // 获取当前配额
+        StorageQuota quota = quotaRepository.findByInstitutionAndType(institution, type)
+                .orElseGet(() -> {
+                    List<StorageQuota> quotas = initializeQuotas(institution);
+                    return quotas.stream()
+                            .filter(q -> q.getType() == type)
+                            .findFirst()
+                            .orElseThrow(() -> new BusinessException(500, "初始化配额失败"));
+                });
+        
+        // 增加配额
+        long newTotalQuota = quota.getTotalQuota() + additionalQuota;
+        quota.setTotalQuota(newTotalQuota);
+        quotaRepository.save(quota);
+        
+        // 如果更新的是特定类型，也要更新TOTAL类型
+        if (type != QuotaType.TOTAL) {
+            // 获取总配额
+            StorageQuota totalQuota = quotaRepository.findByInstitutionAndType(institution, QuotaType.TOTAL)
+                    .orElseThrow(() -> new BusinessException(500, "无法找到总配额信息"));
+            
+            // 增加总配额
+            totalQuota.setTotalQuota(totalQuota.getTotalQuota() + additionalQuota);
+            quotaRepository.save(totalQuota);
+        }
+        
+        log.info("配额增加成功，机构 {} 的 {} 配额当前为: {} 字节", 
+                institutionId, type, quota.getTotalQuota());
+    }
 } 

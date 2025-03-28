@@ -1083,8 +1083,15 @@ public class CourseServiceTest {
         testCourse.setStatus(CourseStatus.PUBLISHED.getValue());
         testCourse.setIsPublishedVersion(true);
         
-        when(courseRepository.findLatestCourses(eq(CourseStatus.PUBLISHED.getValue()), eq(true), any(Pageable.class)))
-                .thenReturn(List.of(testCourse));
+        // 修改mock方法，使用findByStatusAndIsPublishedVersion而不是findLatestCourses
+        Pageable pageable = PageRequest.of(0, limit);
+        List<Course> courses = List.of(testCourse);
+        Page<Course> coursePage = new PageImpl<>(courses, pageable, courses.size());
+        when(courseRepository.findByStatusAndIsPublishedVersion(
+            eq(CourseStatus.PUBLISHED.getValue()), 
+            eq(true), 
+            any(Pageable.class)
+        )).thenReturn(coursePage);
         
         // 执行方法
         List<CourseVO> result = courseService.getLatestCourses(limit);
@@ -1096,7 +1103,11 @@ public class CourseServiceTest {
         assertEquals(testCourse.getTitle(), result.get(0).getTitle());
         
         // 验证方法调用
-        verify(courseRepository).findLatestCourses(eq(CourseStatus.PUBLISHED.getValue()), eq(true), any(Pageable.class));
+        verify(courseRepository).findByStatusAndIsPublishedVersion(
+            eq(CourseStatus.PUBLISHED.getValue()), 
+            eq(true), 
+            any(Pageable.class)
+        );
     }
     
     @Test

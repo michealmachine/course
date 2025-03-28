@@ -1,0 +1,303 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36" version="26.1.2">
+  <diagram name="第 1 页" id="VeTnryH_7OS704gSLsXG">
+    <mxGraphModel dx="2074" dy="1106" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="1654" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- 用户和权限管理相关 -->
+        <mxCell id="user_entity" value="用户(User)" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="140" y="400" width="120" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="role_entity" value="角色(Role)" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="140" y="160" width="120" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="institution_entity" value="机构(Institution)" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="480" y="160" width="120" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- 课程结构相关 -->
+        <mxCell id="course_entity" value="课程(Course)" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="480" y="400" width="120" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="chapter_entity" value="章节(Chapter)" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="760" y="400" width="120" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="section_entity" value="小节(Section)" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="760" y="560" width="120" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- 内容资源相关 -->
+        <mxCell id="media_entity" value="媒体(Media)" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="920" y="480" width="120" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- 题目管理相关 -->
+        <mxCell id="question_entity" value="题目(Question)" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="520" y="760" width="120" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="question_group_entity" value="题目组(QuestionGroup)" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="520" y="560" width="120" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="question_group_item_entity" value="题目组项(QuestionGroupItem)" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="520" y="660" width="140" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- 用户交互相关 -->
+        <mxCell id="user_course_entity" value="用户课程(UserCourse)" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="140" y="560" width="120" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="order_entity" value="订单(Order)" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="140" y="760" width="120" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="user_favorite_entity" value="用户收藏(UserFavorite)" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="300" y="320" width="140" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="course_review_entity" value="课程评论(CourseReview)" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="300" y="420" width="140" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="user_wrong_question_entity" value="用户错题(UserWrongQuestion)" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="760" width="160" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- 关系 -->
+        <mxCell id="user_role_relation" value="拥有" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="160" y="280" width="80" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="user_institution_relation" value="所属" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="340" y="160" width="80" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="institution_course_relation" value="发布" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="500" y="280" width="80" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="course_chapter_relation" value="包含" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="640" y="400" width="80" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="chapter_section_relation" value="包含" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="780" y="480" width="80" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="section_media_relation" value="包含" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="920" y="560" width="80" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="section_question_group_relation" value="包含" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="640" y="500" width="80" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="question_group_item_relation" value="组成" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="580" y="620" width="80" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="question_group_item_question_relation" value="引用" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="580" y="720" width="80" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="user_course_order_relation" value="购买" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="480" width="80" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="user_learn_course_relation" value="学习" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="160" y="480" width="80" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="user_favorite_relation" value="收藏" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="240" y="240" width="80" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="course_review_relation" value="评论" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="470" y="480" width="80" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="user_wrong_question_relation" value="记录" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="660" width="80" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="wrong_question_relation" value="关联" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="440" y="760" width="80" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- 连接线 -->
+        <!-- 用户-角色关系 -->
+        <mxCell id="user_to_role_relation" value="n" style="endArrow=none;html=1;rounded=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="user_entity" target="user_role_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="role_to_user_relation" value="m" style="endArrow=none;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="role_entity" target="user_role_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- 用户-机构关系 -->
+        <mxCell id="user_to_institution_relation" value="n" style="endArrow=none;html=1;rounded=0;exitX=0.75;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="user_entity" target="user_institution_relation">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="230" y="190"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="institution_to_user_relation" value="1" style="endArrow=none;html=1;rounded=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="institution_entity" target="user_institution_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- 机构-课程关系 -->
+        <mxCell id="institution_to_course_relation" value="1" style="endArrow=none;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="institution_entity" target="institution_course_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="course_to_institution_relation" value="n" style="endArrow=none;html=1;rounded=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="course_entity" target="institution_course_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- 课程-章节关系 -->
+        <mxCell id="course_to_chapter_relation" value="1" style="endArrow=none;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="course_entity" target="course_chapter_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="chapter_to_course_relation" value="n" style="endArrow=none;html=1;rounded=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="chapter_entity" target="course_chapter_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- 章节-小节关系 -->
+        <mxCell id="chapter_to_section_relation" value="1" style="endArrow=none;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="chapter_entity" target="chapter_section_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="section_to_chapter_relation" value="n" style="endArrow=none;html=1;rounded=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="section_entity" target="chapter_section_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- 小节-媒体关系 -->
+        <mxCell id="section_to_media_relation" value="1" style="endArrow=none;html=1;rounded=0;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="section_entity" target="media_entity">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="media_to_section_relation" value="1" style="endArrow=none;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="media_entity" target="section_media_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- 小节-题目组关系 -->
+        <mxCell id="section_to_question_group_relation" value="1" style="endArrow=none;html=1;rounded=0;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="section_entity" target="section_question_group_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="question_group_to_section_relation" value="1" style="endArrow=none;html=1;rounded=0;exitX=0.75;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="question_group_entity" target="section_question_group_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- 题目组-题目组项关系 -->
+        <mxCell id="question_group_to_item_relation" value="1" style="endArrow=none;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="question_group_entity" target="question_group_item_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="question_group_item_to_group_relation" value="n" style="endArrow=none;html=1;rounded=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="question_group_item_entity" target="question_group_item_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- 题目组项-题目关系 -->
+        <mxCell id="question_group_item_to_question_relation" value="1" style="endArrow=none;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="question_group_item_entity" target="question_group_item_question_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="question_to_group_item_relation" value="1" style="endArrow=none;html=1;rounded=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="question_entity" target="question_group_item_question_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- 用户-课程购买关系 -->
+        <mxCell id="user_to_order_relation" value="1" style="endArrow=none;html=1;rounded=0;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="user_entity" target="user_course_order_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="course_to_order_relation" value="1" style="endArrow=none;html=1;rounded=0;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="course_entity" target="user_course_order_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="order_to_user_course_relation" value="n" style="endArrow=none;html=1;rounded=0;exitX=0.25;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="order_entity" target="user_course_order_relation">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="170" y="660"/>
+              <mxPoint x="360" y="660"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- 用户-学习-课程关系 -->
+        <mxCell id="user_to_usercourse_relation" value="1" style="endArrow=none;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="user_entity" target="user_learn_course_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="course_to_usercourse_relation" value="n" style="endArrow=none;html=1;rounded=0;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="course_entity" target="user_learn_course_relation">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="400" y="445"/>
+              <mxPoint x="400" y="510"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="usercourse_to_relation" value="1" style="endArrow=none;html=1;rounded=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="user_course_entity" target="user_learn_course_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- 用户-收藏-课程关系 -->
+        <mxCell id="user_to_favorite_relation" value="1" style="endArrow=none;html=1;rounded=0;exitX=0.75;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="user_entity" target="user_favorite_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="course_to_favorite_relation" value="n" style="endArrow=none;html=1;rounded=0;exitX=0.25;exitY=0;exitDx=0;exitDy=0;entryX=1;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="course_entity" target="user_favorite_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="favorite_entity_relation" value="1" style="endArrow=none;html=1;rounded=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="user_favorite_entity" target="user_favorite_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- 用户-评论-课程关系 -->
+        <mxCell id="user_to_review_relation" value="1" style="endArrow=none;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="user_entity" target="course_review_entity">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="course_to_review_relation" value="1" style="endArrow=none;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="course_entity" target="course_review_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="review_entity_relation" value="n" style="endArrow=none;html=1;rounded=0;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="course_review_entity" target="course_review_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- 用户-错题关系 -->
+        <mxCell id="user_to_wrong_question_relation" value="1" style="endArrow=none;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="user_course_entity" target="user_wrong_question_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="wrong_question_to_user_relation" value="n" style="endArrow=none;html=1;rounded=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="user_wrong_question_entity" target="user_wrong_question_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- 错题-题目关系 -->
+        <mxCell id="wrong_question_to_question_relation" value="n" style="endArrow=none;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="user_wrong_question_entity" target="wrong_question_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="question_to_wrong_question_relation" value="1" style="endArrow=none;html=1;rounded=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="question_entity" target="wrong_question_relation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -2,11 +2,14 @@ package com.zhangziqi.online_course_mine.security;
 
 import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.security.jwt.JwtTokenProvider.JwtAuthenticationToken;
+import com.zhangziqi.online_course_mine.service.InstitutionService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Component;
 import io.jsonwebtoken.Claims;
 
 import java.util.Set;
@@ -17,7 +20,16 @@ import java.util.stream.Collectors;
  * 用于从安全上下文中获取当前用户信息
  */
 @Slf4j
+@Component
 public class SecurityUtil {
+
+    // 机构服务实例
+    private static InstitutionService institutionService;
+
+    @Autowired
+    public void setInstitutionService(InstitutionService institutionService) {
+        SecurityUtil.institutionService = institutionService;
+    }
 
     /**
      * 获取当前认证对象
@@ -152,11 +164,38 @@ public class SecurityUtil {
     
     /**
      * 检查当前用户是否是机构管理员
+     * 通过比较用户邮箱和机构联系邮箱判断
      *
      * @return 是否是机构管理员
      */
     public static boolean isInstitutionAdmin() {
-        return hasRole("INSTITUTION_ADMIN");
+        // 首先检查是否为机构用户
+        if (!hasRole("INSTITUTION")) {
+            return false;
+        }
+        
+        try {
+            // 获取当前用户名和机构ID
+            String username = getCurrentUsername();
+            Long institutionId = getCurrentInstitutionId();
+            
+            // 如果无法获取机构ID，则不是机构管理员
+            if (institutionId == null || institutionId == 0L) {
+                log.warn("无法获取当前用户的机构ID: {}", username);
+                return false;
+            }
+            
+            // 使用机构服务判断用户是否为机构管理员
+            if (institutionService == null) {
+                log.error("InstitutionService未注入，无法判断用户是否为机构管理员");
+                return false;
+            }
+            
+            return institutionService.isInstitutionAdmin(username, institutionId);
+        } catch (Exception e) {
+            log.error("判断用户是否为机构管理员时发生错误", e);
+            return false;
+        }
     }
     
     /**

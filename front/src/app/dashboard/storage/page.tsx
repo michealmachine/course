@@ -3,21 +3,23 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { 
-  Database, 
-  HardDrive, 
-  FileText, 
+import {
+  Database,
+  HardDrive,
+  FileText,
   PieChart, 
   BarChart,
   RefreshCw,
-  Save
+  Save,
+  Plus,
+  Filter,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
@@ -28,9 +30,33 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+
 import { storageService } from '@/services/storage-service';
+import quotaApplicationService from '@/services/quota-application';
+import { 
+  QuotaApplicationVO, 
+  QuotaApplicationStatus, 
+  QuotaType,
+  QuotaUsage
+} from '@/types/quota';
 import type { QuotaInfoVO } from '@/types/api';
 
 // 配额类型
@@ -64,19 +90,38 @@ const convertQuotaInfo = (apiQuota: QuotaInfoVO): StorageQuota => ({
   updatedAt: apiQuota.lastUpdatedTime
 });
 
-// 存储配额页面
 export default function StoragePage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [quotas, setQuotas] = useState<StorageQuota[]>([]);
   const [activeTab, setActiveTab] = useState('overview');
-  const [useRequestDialogOpen, setUseRequestDialogOpen] = useState(false);
+  
+  // 申请存储空间对话框状态
+  const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [requestAmount, setRequestAmount] = useState(1); // 默认请求1GB
+  const [requestReason, setRequestReason] = useState('');
+  const [selectedQuotaType, setSelectedQuotaType] = useState(QUOTA_TYPES.TOTAL);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // 申请记录相关状态
+  const [applications, setApplications] = useState<QuotaApplicationVO[]>([]);
+  const [isLoadingApplications, setIsLoadingApplications] = useState(true);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(5);
   
   // 加载配额数据
   useEffect(() => {
     fetchQuotas();
   }, []);
+  
+  // 标签切换时加载申请记录
+  useEffect(() => {
+    if (activeTab === "applications") {
+      fetchApplications();
+    }
+  }, [activeTab, currentPage]);
   
   // 获取配额信息
   const fetchQuotas = async () => {
@@ -92,6 +137,25 @@ export default function StoragePage() {
       console.error('获取存储配额失败:', error);
       toast.error('获取存储配额信息失败');
       setIsLoading(false);
+    }
+  };
+  
+  // 获取配额申请记录
+  const fetchApplications = async () => {
+    setIsLoadingApplications(true);
+    try {
+      const response = await quotaApplicationService.getMyApplications({
+        pageNum: currentPage,
+        pageSize,
+      });
+      setApplications(response.content);
+      setTotalPages(response.totalPages);
+      setTotalItems(response.totalElements);
+      setIsLoadingApplications(false);
+    } catch (error) {
+      console.error('获取配额申请记录失败:', error);
+      toast.error('获取配额申请记录失败');
+      setIsLoadingApplications(false);
     }
   };
   
@@ -145,6 +209,91 @@ export default function StoragePage() {
     return 'bg-red-500';
   };
   
+  // 获取申请状态文本
+  const getStatusText = (status: QuotaApplicationStatus): string => {
+    switch (status) {
+      case QuotaApplicationStatus.PENDING: return '待审核';
+      case QuotaApplicationStatus.APPROVED: return '已通过';
+      case QuotaApplicationStatus.REJECTED: return '已拒绝';
+      case QuotaApplicationStatus.CANCELED: return '已取消';
+      default: return '未知';
+    }
+  };
+  
+  // 提交配额申请
+  const handleSubmitApplication = async () => {
+    if (!requestReason.trim()) {
+      toast.error('请输入申请原因');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    try {
+      // 转换GB为字节
+      const requestedBytes = requestAmount * 1024 * 1024 * 1024;
+      
+      // 映射配额类型
+      let quotaType: QuotaType;
+      switch (selectedQuotaType) {
+        case QUOTA_TYPES.VIDEO:
+          quotaType = QuotaType.VIDEO;
+          break;
+        case QUOTA_TYPES.DOCUMENT:
+          quotaType = QuotaType.DOCUMENT;
+          break;
+        case QUOTA_TYPES.TOTAL:
+        default:
+          quotaType = QuotaType.TOTAL;
+          break;
+      }
+      
+      await quotaApplicationService.createApplication({
+        quotaType,
+        requestedBytes,
+        reason: requestReason.trim()
+      });
+      
+      toast.success('配额申请已提交');
+      setRequestDialogOpen(false);
+      
+      // 重置表单
+      setSelectedQuotaType(QUOTA_TYPES.TOTAL);
+      setRequestAmount(1);
+      setRequestReason('');
+      
+      // 如果当前是在申请记录标签，刷新列表
+      if (activeTab === "applications") {
+        fetchApplications();
+      }
+    } catch (error) {
+      console.error('提交配额申请失败:', error);
+      toast.error('提交配额申请失败');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  // 取消申请
+  const handleCancelApplication = async (id: number) => {
+    try {
+      await quotaApplicationService.cancelApplication(id);
+      toast.success('申请已取消');
+      fetchApplications();
+    } catch (error) {
+      console.error(`取消申请失败, ID: ${id}:`, error);
+      toast.error('取消申请失败');
+    }
+  };
+  
+  // 同步刷新按钮的功能
+  const handleRefresh = () => {
+    if (activeTab === 'applications') {
+      fetchApplications();
+    } else {
+      fetchQuotas();
+    }
+  };
+  
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -156,16 +305,16 @@ export default function StoragePage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={fetchQuotas}
-            disabled={isLoading}
+            onClick={handleRefresh}
+            disabled={isLoading || isLoadingApplications}
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 mr-2 ${(isLoading || isLoadingApplications) ? 'animate-spin' : ''}`} />
             刷新
           </Button>
-          <Dialog open={useRequestDialogOpen} onOpenChange={setUseRequestDialogOpen}>
+          <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
             <DialogTrigger asChild>
               <Button size="sm">
-                <HardDrive className="h-4 w-4 mr-2" />
+                <Plus className="h-4 w-4 mr-2" />
                 申请存储空间
               </Button>
             </DialogTrigger>
@@ -178,7 +327,25 @@ export default function StoragePage() {
               </DialogHeader>
               
               <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
+                <div className="space-y-2">
+                  <Label htmlFor="quota-type">配额类型</Label>
+                  <Select
+                    value={selectedQuotaType}
+                    onValueChange={setSelectedQuotaType}
+                  >
+                    <SelectTrigger id="quota-type">
+                      <SelectValue placeholder="选择配额类型" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={QUOTA_TYPES.TOTAL}>总配额</SelectItem>
+                      <SelectItem value={QUOTA_TYPES.VIDEO}>视频配额</SelectItem>
+                      <SelectItem value={QUOTA_TYPES.DOCUMENT}>文档配额</SelectItem>
+                      <SelectItem value={QUOTA_TYPES.AUDIO}>音频配额</SelectItem>
+                      <SelectItem value={QUOTA_TYPES.IMAGE}>图片配额</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="amount">申请空间大小 (GB)</Label>
                   <Input 
                     id="amount" 
@@ -192,24 +359,30 @@ export default function StoragePage() {
                     当前总配额: {formatFileSize(getTotalQuota()?.totalSpace || 0)}
                   </p>
                 </div>
-                <div className="grid gap-2">
+                <div className="space-y-2">
                   <Label htmlFor="reason">申请原因</Label>
-                  <Input id="reason" placeholder="请简要说明申请原因" />
+                  <Textarea
+                    id="reason"
+                    value={requestReason}
+                    onChange={(e) => setRequestReason(e.target.value)}
+                    placeholder="请详细说明申请增加配额的原因和用途"
+                    className="min-h-32"
+                  />
                 </div>
               </div>
               
               <DialogFooter>
-                <Button variant="outline" onClick={() => setUseRequestDialogOpen(false)}>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setRequestDialogOpen(false)}
+                >
                   取消
                 </Button>
                 <Button 
-                  type="submit" 
-                  onClick={() => {
-                    toast.success(`存储空间申请已提交，申请${requestAmount}GB空间`);
-                    setUseRequestDialogOpen(false);
-                  }}
+                  onClick={handleSubmitApplication}
+                  disabled={isSubmitting}
                 >
-                  提交申请
+                  {isSubmitting ? '提交中...' : '提交申请'}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -222,6 +395,7 @@ export default function StoragePage() {
           <TabsTrigger value="overview">概览</TabsTrigger>
           <TabsTrigger value="details">详细信息</TabsTrigger>
           <TabsTrigger value="history">使用历史</TabsTrigger>
+          <TabsTrigger value="applications">申请记录</TabsTrigger>
         </TabsList>
         
         <TabsContent value="overview" className="mt-6">
@@ -387,6 +561,103 @@ export default function StoragePage() {
                   此功能将在后续版本中推出。您将能够查看存储使用的趋势和分析报告。
                 </p>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        {/* 新增申请记录标签页 */}
+        <TabsContent value="applications">
+          <Card>
+            <CardHeader>
+              <CardTitle>配额申请记录</CardTitle>
+              <CardDescription>
+                共 {totalItems} 条记录，当前显示第 {currentPage} 页
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingApplications ? (
+                <div className="space-y-4">
+                  <Skeleton className="h-10 w-full" />
+                  {Array(3).fill(0).map((_, i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              ) : applications.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground">
+                  暂无申请记录
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>申请编号</TableHead>
+                        <TableHead>配额类型</TableHead>
+                        <TableHead>申请容量</TableHead>
+                        <TableHead>申请时间</TableHead>
+                        <TableHead>状态</TableHead>
+                        <TableHead>审核意见</TableHead>
+                        <TableHead>操作</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {applications.map((app) => (
+                        <TableRow key={app.id}>
+                          <TableCell className="font-mono">{app.applicationId}</TableCell>
+                          <TableCell>{getQuotaTypeName(
+                            app.quotaType === QuotaType.TOTAL ? QUOTA_TYPES.TOTAL :
+                            app.quotaType === QuotaType.VIDEO ? QUOTA_TYPES.VIDEO :
+                            app.quotaType === QuotaType.DOCUMENT ? QUOTA_TYPES.DOCUMENT :
+                            '未知'
+                          )}</TableCell>
+                          <TableCell>{formatFileSize(app.requestedBytes)}</TableCell>
+                          <TableCell>{new Date(app.createdAt).toLocaleString()}</TableCell>
+                          <TableCell>{getStatusText(app.status)}</TableCell>
+                          <TableCell>
+                            {app.status === QuotaApplicationStatus.REJECTED ? app.reviewComment || '无' : '-'}
+                          </TableCell>
+                          <TableCell>
+                            {app.status === QuotaApplicationStatus.PENDING && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleCancelApplication(app.id)}
+                              >
+                                取消
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              
+              {/* 分页控件 */}
+              {totalPages > 1 && (
+                <div className="flex justify-center mt-4 gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    上一页
+                  </Button>
+                  <span className="py-2 px-4">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    下一页
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
