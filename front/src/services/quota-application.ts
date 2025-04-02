@@ -23,7 +23,7 @@ const quotaApplicationService = {
   getAllApplications: async (params: QuotaApplicationQueryParams): Promise<QuotaApplicationPage> => {
     try {
       const { status, pageNum = 1, pageSize = 10 } = params;
-      let url = `/quota-applications?pageNum=${pageNum}&pageSize=${pageSize}`;
+      let url = `/v1/quota-applications/admin?pageNum=${pageNum}&pageSize=${pageSize}`;
       
       if (status !== undefined) {
         url += `&status=${status}`;
@@ -46,7 +46,7 @@ const quotaApplicationService = {
   getApplicationDetail: async (id: number): Promise<QuotaApplicationVO> => {
     try {
       const response: AxiosResponse<ApiResponse<QuotaApplicationVO>> = 
-        await request.get<QuotaApplicationVO>(`/quota-applications/${id}`);
+        await request.get<QuotaApplicationVO>(`/v1/quota-applications/${id}`);
       return response.data.data;
     } catch (error) {
       console.error(`获取申请详情失败, ID: ${id}:`, error);
@@ -60,7 +60,7 @@ const quotaApplicationService = {
    */
   approveApplication: async (id: number): Promise<void> => {
     try {
-      await request.post(`/quota-applications/${id}/approve`);
+      await request.post(`/v1/quota-applications/approve/${id}`);
     } catch (error) {
       console.error(`批准申请失败, ID: ${id}:`, error);
       throw error;
@@ -74,7 +74,7 @@ const quotaApplicationService = {
    */
   rejectApplication: async (id: number, reason: string): Promise<void> => {
     try {
-      await request.post(`/quota-applications/${id}/reject`, { reason });
+      await request.post(`/v1/quota-applications/${id}/reject?reason=${encodeURIComponent(reason)}`);
     } catch (error) {
       console.error(`拒绝申请失败, ID: ${id}:`, error);
       throw error;
@@ -91,7 +91,7 @@ const quotaApplicationService = {
     reason: string;
   }): Promise<void> => {
     try {
-      await request.post('/quota-applications', data);
+      await request.post('/v1/quota-applications/apply', data);
     } catch (error) {
       console.error('创建配额申请失败:', error);
       throw error;
@@ -111,7 +111,7 @@ const quotaApplicationService = {
       const { pageNum = 1, pageSize = 10 } = params;
       const response: AxiosResponse<ApiResponse<QuotaApplicationPage>> = 
         await request.get<QuotaApplicationPage>(
-          `/quota-applications/my?pageNum=${pageNum}&pageSize=${pageSize}`
+          `/v1/quota-applications/user?pageNum=${pageNum}&pageSize=${pageSize}`
         );
       return response.data.data;
     } catch (error) {
@@ -119,19 +119,6 @@ const quotaApplicationService = {
       throw error;
     }
   },
-
-  /**
-   * 取消待审核的申请
-   * @param id 申请ID
-   */
-  cancelApplication: async (id: number): Promise<void> => {
-    try {
-      await request.post(`/quota-applications/${id}/cancel`);
-    } catch (error) {
-      console.error(`取消申请失败, ID: ${id}:`, error);
-      throw error;
-    }
-  }
 };
 
 export default quotaApplicationService; 

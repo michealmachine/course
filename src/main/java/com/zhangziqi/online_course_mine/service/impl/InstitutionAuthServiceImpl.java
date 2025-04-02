@@ -33,6 +33,8 @@ public class InstitutionAuthServiceImpl implements InstitutionAuthService {
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     
+    private static final int MAX_INSTITUTION_MEMBERS = 5;
+    
     @Override
     @Transactional
     public void registerWithInstitutionCode(InstitutionRegisterDTO registerDTO) {
@@ -52,6 +54,14 @@ public class InstitutionAuthServiceImpl implements InstitutionAuthService {
         if (institution.getStatus() != 1) {
             log.warn("机构状态异常，无法注册: institutionId={}, status={}", institution.getId(), institution.getStatus());
             throw new BusinessException("机构状态异常，无法注册");
+        }
+        
+        // 检查机构成员数量是否已达上限
+        long memberCount = userRepository.countByInstitutionId(institution.getId());
+        if (memberCount >= MAX_INSTITUTION_MEMBERS) {
+            log.warn("机构成员数量已达上限: institutionId={}, currentCount={}, maxCount={}", 
+                institution.getId(), memberCount, MAX_INSTITUTION_MEMBERS);
+            throw new BusinessException("该机构成员数量已达上限(" + MAX_INSTITUTION_MEMBERS + "人)，无法注册新成员");
         }
         
         // 检查用户名是否存在
@@ -98,8 +108,9 @@ public class InstitutionAuthServiceImpl implements InstitutionAuthService {
         log.debug("正在保存用户信息...");
         try {
             User savedUser = userRepository.save(user);
-            log.info("机构用户注册成功: userId={}, username={}, institutionId={}", 
-                    savedUser.getId(), savedUser.getUsername(), savedUser.getInstitutionId());
+            log.info("机构用户注册成功: userId={}, username={}, institutionId={}, 当前机构成员数={}/{}", 
+                    savedUser.getId(), savedUser.getUsername(), savedUser.getInstitutionId(), 
+                    memberCount + 1, MAX_INSTITUTION_MEMBERS);
         } catch (Exception e) {
             log.error("保存用户信息失败: {}", e.getMessage(), e);
             throw new BusinessException("注册失败: " + e.getMessage());

@@ -6,7 +6,9 @@ import com.zhangziqi.online_course_mine.model.entity.Media;
 import com.zhangziqi.online_course_mine.model.enums.MediaStatus;
 import com.zhangziqi.online_course_mine.model.enums.MediaType;
 import com.zhangziqi.online_course_mine.model.enums.QuotaType;
+import com.zhangziqi.online_course_mine.model.vo.MediaActivityCalendarVO;
 import com.zhangziqi.online_course_mine.model.vo.MediaVO;
+import com.zhangziqi.online_course_mine.model.vo.StorageGrowthPointVO;
 import com.zhangziqi.online_course_mine.repository.InstitutionRepository;
 import com.zhangziqi.online_course_mine.repository.MediaRepository;
 import com.zhangziqi.online_course_mine.service.impl.MediaServiceImpl;
@@ -22,10 +24,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse;
+import org.mockito.ArgumentCaptor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -229,6 +238,92 @@ public class MediaServiceTest {
     }
 
     @Test
+    void testGetMediaListWithTypeFilter() {
+        // 准备测试数据
+        List<Media> mediaList = List.of(media);
+        Page<Media> mediaPage = new PageImpl<>(mediaList);
+
+        // Mock 方法调用
+        when(institutionRepository.findById(institutionId)).thenReturn(Optional.of(institution));
+        when(mediaRepository.findByInstitutionAndType(
+                eq(institution), 
+                eq(MediaType.VIDEO), 
+                any(Pageable.class))).thenReturn(mediaPage);
+
+        // 执行测试
+        Page<MediaVO> result = mediaService.getMediaList(institutionId, MediaType.VIDEO, null, Pageable.unpaged());
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getContent().size());
+        assertEquals(mediaId, result.getContent().get(0).getId());
+        assertEquals(MediaType.VIDEO.name(), result.getContent().get(0).getType());
+        
+        // 验证调用
+        verify(mediaRepository).findByInstitutionAndType(
+                eq(institution), eq(MediaType.VIDEO), any(Pageable.class));
+    }
+    
+    @Test
+    void testGetMediaListWithFilenameFilter() {
+        // 准备测试数据
+        List<Media> mediaList = List.of(media);
+        Page<Media> mediaPage = new PageImpl<>(mediaList);
+        String searchKeyword = "test";
+
+        // Mock 方法调用
+        when(institutionRepository.findById(institutionId)).thenReturn(Optional.of(institution));
+        when(mediaRepository.findByInstitutionAndOriginalFilenameContaining(
+                eq(institution), 
+                eq(searchKeyword), 
+                any(Pageable.class))).thenReturn(mediaPage);
+
+        // 执行测试
+        Page<MediaVO> result = mediaService.getMediaList(institutionId, null, searchKeyword, Pageable.unpaged());
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getContent().size());
+        assertEquals(mediaId, result.getContent().get(0).getId());
+        assertTrue(result.getContent().get(0).getOriginalFilename().contains(searchKeyword));
+        
+        // 验证调用
+        verify(mediaRepository).findByInstitutionAndOriginalFilenameContaining(
+                eq(institution), eq(searchKeyword), any(Pageable.class));
+    }
+    
+    @Test
+    void testGetMediaListWithTypeAndFilenameFilter() {
+        // 准备测试数据
+        List<Media> mediaList = List.of(media);
+        Page<Media> mediaPage = new PageImpl<>(mediaList);
+        String searchKeyword = "test";
+
+        // Mock 方法调用
+        when(institutionRepository.findById(institutionId)).thenReturn(Optional.of(institution));
+        when(mediaRepository.findByInstitutionAndTypeAndOriginalFilenameContaining(
+                eq(institution), 
+                eq(MediaType.VIDEO), 
+                eq(searchKeyword), 
+                any(Pageable.class))).thenReturn(mediaPage);
+
+        // 执行测试
+        Page<MediaVO> result = mediaService.getMediaList(
+                institutionId, MediaType.VIDEO, searchKeyword, Pageable.unpaged());
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getContent().size());
+        assertEquals(mediaId, result.getContent().get(0).getId());
+        assertEquals(MediaType.VIDEO.name(), result.getContent().get(0).getType());
+        assertTrue(result.getContent().get(0).getOriginalFilename().contains(searchKeyword));
+        
+        // 验证调用
+        verify(mediaRepository).findByInstitutionAndTypeAndOriginalFilenameContaining(
+                eq(institution), eq(MediaType.VIDEO), eq(searchKeyword), any(Pageable.class));
+    }
+
+    @Test
     void testCancelUpload() {
         // Mock 方法调用
         when(institutionRepository.findById(institutionId)).thenReturn(Optional.of(institution));
@@ -262,5 +357,348 @@ public class MediaServiceTest {
         verify(minioService).deleteFile(media.getStoragePath());
         verify(storageQuotaService).updateUsedQuota(eq(institutionId), any(QuotaType.class), eq(-media.getSize()));
         verify(mediaRepository).delete(media);
+    }
+
+    @Test
+    void testGetMediaActivityCalendar() {
+        // 准备测试数据
+        LocalDate startDate = LocalDate.now().minusDays(7);
+        LocalDate endDate = LocalDate.now();
+        
+        List<MediaActivityDTO> activities = Arrays.asList(
+            new MediaActivityDTO(startDate, 5L, 1024L * 1024L * 50L), // 50MB
+            new MediaActivityDTO(startDate.plusDays(1), 3L, 1024L * 1024L * 30L), // 30MB
+            new MediaActivityDTO(startDate.plusDays(3), 8L, 1024L * 1024L * 80L)  // 80MB
+        );
+        
+        // Mock 方法调用
+        when(institutionRepository.findById(institutionId)).thenReturn(Optional.of(institution));
+        when(mediaRepository.findMediaUploadActivitiesByInstitution(
+                eq(institutionId), 
+                eq(startDate.atStartOfDay()), 
+                eq(endDate.atTime(LocalTime.MAX))))
+            .thenReturn(activities);
+        
+        // 执行测试
+        MediaActivityCalendarVO result = mediaService.getMediaActivityCalendar(institutionId, startDate, endDate);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(activities, result.getCalendarData());
+        assertEquals(8L, result.getPeakCount()); // 最大活动数为8
+        assertEquals(startDate.plusDays(3), result.getMostActiveDate()); // 最活跃日期
+        assertEquals(16L, result.getTotalCount()); // 总活动数: 5+3+8=16
+        assertEquals(1024L * 1024L * 160L, result.getTotalSize()); // 总大小: 50+30+80=160MB
+        
+        // 验证调用
+        verify(mediaRepository).findMediaUploadActivitiesByInstitution(
+                eq(institutionId), 
+                any(LocalDateTime.class), 
+                any(LocalDateTime.class));
+    }
+    
+    @Test
+    void testGetAllMediaActivityCalendar() {
+        // 准备测试数据
+        LocalDate startDate = LocalDate.now().minusDays(7);
+        LocalDate endDate = LocalDate.now();
+        
+        List<MediaActivityDTO> activities = Arrays.asList(
+            new MediaActivityDTO(startDate, 10L, 1024L * 1024L * 100L), // 100MB
+            new MediaActivityDTO(startDate.plusDays(2), 15L, 1024L * 1024L * 150L), // 150MB
+            new MediaActivityDTO(startDate.plusDays(5), 5L, 1024L * 1024L * 50L)  // 50MB
+        );
+        
+        // Mock 方法调用
+        when(mediaRepository.findAllMediaUploadActivities(
+                eq(startDate.atStartOfDay()), 
+                eq(endDate.atTime(LocalTime.MAX))))
+            .thenReturn(activities);
+        
+        // 执行测试
+        MediaActivityCalendarVO result = mediaService.getAllMediaActivityCalendar(startDate, endDate);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(activities, result.getCalendarData());
+        assertEquals(15L, result.getPeakCount()); // 最大活动数为15
+        assertEquals(startDate.plusDays(2), result.getMostActiveDate()); // 最活跃日期
+        assertEquals(30L, result.getTotalCount()); // 总活动数: 10+15+5=30
+        assertEquals(1024L * 1024L * 300L, result.getTotalSize()); // 总大小: 100+150+50=300MB
+        
+        // 验证调用
+        verify(mediaRepository).findAllMediaUploadActivities(
+                any(LocalDateTime.class), 
+                any(LocalDateTime.class));
+    }
+    
+    @Test
+    void testGetMediaListByDate() {
+        // 准备测试数据
+        LocalDate date = LocalDate.now();
+        
+        List<Media> mediaList = Arrays.asList(
+            media,
+            createMediaForTesting(4L, "测试视频2", MediaType.VIDEO, 1024L * 1024L * 20L)
+        );
+        Page<Media> mediaPage = new PageImpl<>(mediaList);
+        
+        // Mock 方法调用
+        when(institutionRepository.findById(institutionId)).thenReturn(Optional.of(institution));
+        when(mediaRepository.findMediaByInstitutionAndDate(
+                eq(institutionId), eq(date), any(Pageable.class)))
+            .thenReturn(mediaPage);
+        
+        // 执行测试
+        Page<MediaVO> result = mediaService.getMediaListByDate(institutionId, date, Pageable.unpaged());
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(2, result.getContent().size());
+        assertEquals(mediaId, result.getContent().get(0).getId());
+        assertEquals(4L, result.getContent().get(1).getId());
+        
+        // 验证调用
+        verify(mediaRepository).findMediaByInstitutionAndDate(
+                eq(institutionId), eq(date), any(Pageable.class));
+    }
+    
+    @Test
+    void testGetAllMediaListByDate() {
+        // 准备测试数据
+        LocalDate date = LocalDate.now();
+        
+        Media media2 = createMediaForTesting(4L, "机构2视频", MediaType.VIDEO, 1024L * 1024L * 15L);
+        // 设置不同机构ID
+        Institution institution2 = new Institution();
+        institution2.setId(2L);
+        institution2.setName("机构2");
+        media2.setInstitution(institution2);
+        
+        List<Media> mediaList = Arrays.asList(media, media2);
+        Page<Media> mediaPage = new PageImpl<>(mediaList);
+        
+        // Mock 方法调用
+        when(mediaRepository.findAllMediaByDate(eq(date), any(Pageable.class)))
+            .thenReturn(mediaPage);
+        
+        // 执行测试
+        Page<MediaVO> result = mediaService.getAllMediaListByDate(date, Pageable.unpaged());
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(2, result.getContent().size());
+        assertEquals(mediaId, result.getContent().get(0).getId());
+        assertEquals(4L, result.getContent().get(1).getId());
+        // 验证来自不同机构
+        assertEquals(institutionId, result.getContent().get(0).getInstitutionId());
+        assertEquals(2L, result.getContent().get(1).getInstitutionId());
+        
+        // 验证调用
+        verify(mediaRepository).findAllMediaByDate(eq(date), any(Pageable.class));
+    }
+    
+    @Test
+    void testGetAllMediaList() {
+        // 准备测试数据
+        Media media2 = createMediaForTesting(4L, "机构2视频", MediaType.VIDEO, 1024L * 1024L * 15L);
+        // 设置不同机构ID
+        Institution institution2 = new Institution();
+        institution2.setId(2L);
+        institution2.setName("机构2");
+        media2.setInstitution(institution2);
+        
+        List<Media> mediaList = Arrays.asList(media, media2);
+        Page<Media> mediaPage = new PageImpl<>(mediaList);
+        
+        // Mock 方法调用
+        when(mediaRepository.findAll(any(Specification.class), any(Pageable.class)))
+            .thenReturn(mediaPage);
+        
+        // 执行测试 - Pass null for type and filename
+        Page<MediaVO> result = mediaService.getAllMediaList(null, null, Pageable.unpaged());
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(2, result.getContent().size());
+        assertEquals(mediaId, result.getContent().get(0).getId());
+        assertEquals(4L, result.getContent().get(1).getId());
+        // 验证来自不同机构
+        assertEquals(institutionId, result.getContent().get(0).getInstitutionId());
+        assertEquals(2L, result.getContent().get(1).getInstitutionId());
+        
+        // 验证调用 - Verify findAll with Specification
+        verify(mediaRepository).findAll(any(Specification.class), any(Pageable.class));
+    }
+    
+    /**
+     * 由于在MediaServiceImpl中使用了this::mapToMediaVO，
+     * 这个测试用于确保这种用法在代码中正常工作，通过调用getAllMediaList。
+     */
+    @Test
+    void testConvertToMediaVO() {
+        // 准备测试数据，我们只需测试可能使用convertToMediaVO的其中一个方法
+        // 这里测试getAllMediaList，该方法调用了this::convertToMediaVO
+        
+        Media media2 = createMediaForTesting(4L, "另一个视频", MediaType.VIDEO, 1024L * 1024L * 15L);
+        List<Media> mediaList = List.of(media2);
+        Page<Media> mediaPage = new PageImpl<>(mediaList);
+        
+        // Mock方法调用
+        when(mediaRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(mediaPage);
+        
+        // 执行测试 - Pass null for type and filename
+        Page<MediaVO> result = mediaService.getAllMediaList(null, null, Pageable.unpaged());
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getContent().size());
+        assertEquals(4L, result.getContent().get(0).getId());
+        assertEquals("另一个视频", result.getContent().get(0).getTitle());
+    }
+    
+    /**
+     * 创建测试媒体对象
+     */
+    private Media createMediaForTesting(Long id, String title, MediaType type, Long size) {
+        Media testMedia = new Media();
+        testMedia.setId(id);
+        testMedia.setTitle(title);
+        testMedia.setDescription("测试描述");
+        testMedia.setType(type);
+        testMedia.setSize(size);
+        testMedia.setOriginalFilename(title + "." + (type == MediaType.VIDEO ? "mp4" : "pdf"));
+        testMedia.setStoragePath(type.name().toLowerCase() + "/" + institutionId + "/" + UUID.randomUUID() + "/" + title);
+        testMedia.setStatus(MediaStatus.COMPLETED);
+        testMedia.setInstitution(institution);
+        testMedia.setUploaderId(uploaderId);
+        testMedia.setUploadTime(LocalDateTime.now());
+        testMedia.setLastAccessTime(LocalDateTime.now());
+        return testMedia;
+    }
+
+    @Test
+    void testGetStorageGrowthTrend() {
+        // Given
+        LocalDate startDate = LocalDate.of(2024, 1, 1);
+        LocalDate endDate = LocalDate.of(2024, 1, 3);
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.plusDays(1).atStartOfDay();
+
+        MediaActivityDTO day1 = new MediaActivityDTO(startDate, 5L, 1024L * 1024 * 50); // 50MB
+        MediaActivityDTO day3 = new MediaActivityDTO(endDate, 10L, 1024L * 1024 * 100); // 100MB
+        List<MediaActivityDTO> activities = Arrays.asList(day1, day3);
+
+        when(mediaRepository.findAllMediaUploadActivities(startDateTime, endDateTime))
+                .thenReturn(activities);
+
+        // When
+        List<StorageGrowthPointVO> result = mediaService.getStorageGrowthTrend(
+                startDate, endDate, ChronoUnit.DAYS);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(2, result.size());
+
+        // Verify point 1
+        assertEquals(startDate, result.get(0).getDate());
+        assertEquals(1024L * 1024 * 50, result.get(0).getSizeAdded());
+
+        // Verify point 2
+        assertEquals(endDate, result.get(1).getDate());
+        assertEquals(1024L * 1024 * 100, result.get(1).getSizeAdded());
+
+        verify(mediaRepository).findAllMediaUploadActivities(startDateTime, endDateTime);
+    }
+
+    @Test
+    void testGetStorageGrowthTrend_NoData() {
+        // Given
+        LocalDate startDate = LocalDate.of(2024, 1, 1);
+        LocalDate endDate = LocalDate.of(2024, 1, 3);
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.plusDays(1).atStartOfDay();
+
+        when(mediaRepository.findAllMediaUploadActivities(startDateTime, endDateTime))
+                .thenReturn(Collections.emptyList());
+
+        // When
+        List<StorageGrowthPointVO> result = mediaService.getStorageGrowthTrend(
+                startDate, endDate, ChronoUnit.DAYS);
+
+        // Then
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+        verify(mediaRepository).findAllMediaUploadActivities(startDateTime, endDateTime);
+    }
+    
+    @Test
+    void testGetStorageGrowthTrend_UnsupportedGranularity() {
+        // Given
+        LocalDate startDate = LocalDate.of(2024, 1, 1);
+        LocalDate endDate = LocalDate.of(2024, 1, 3);
+
+        // When & Then 
+        // Currently logs a warning, doesn't throw exception. If it threw, use assertThrows:
+        // assertThrows(UnsupportedOperationException.class, () -> {
+        //     mediaService.getStorageGrowthTrend(startDate, endDate, ChronoUnit.WEEKS);
+        // });
+        // Just call it to ensure no unexpected errors and check log (manual check)
+        List<StorageGrowthPointVO> result = mediaService.getStorageGrowthTrend(startDate, endDate, ChronoUnit.WEEKS);
+        assertNotNull(result); // Should still return empty list or similar based on current impl
+        // We expect a warning log message here (manually verify or use log capture lib)
+    }
+
+    @Test
+    void testGetAllMediaList_Admin_NoFilters() {
+        // Given
+        Pageable pageable = Pageable.ofSize(10);
+        List<Media> mediaList = List.of(media);
+        Page<Media> mediaPage = new PageImpl<>(mediaList, pageable, 1);
+        
+        // Use lenient() if other tests mock findAll without Specification
+        when(mediaRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(mediaPage);
+
+        // When
+        Page<MediaVO> result = mediaService.getAllMediaList(null, null, pageable);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(mediaId, result.getContent().get(0).getId());
+
+        // Verify repository called with Specification
+        ArgumentCaptor<Specification<Media>> specCaptor = ArgumentCaptor.forClass(Specification.class);
+        verify(mediaRepository).findAll(specCaptor.capture(), eq(pageable));
+        // In a unit test, reliably asserting the spec content is hard.
+        // We primarily check that the correct method overload was called.
+    }
+
+    @Test
+    void testGetAllMediaList_Admin_WithFilters() {
+        // Given
+        Pageable pageable = Pageable.ofSize(10);
+        MediaType filterType = MediaType.VIDEO;
+        String filterFilename = "test";
+        List<Media> mediaList = List.of(media);
+        Page<Media> mediaPage = new PageImpl<>(mediaList, pageable, 1);
+
+        // Use lenient() if other tests mock findAll without Specification
+        when(mediaRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(mediaPage);
+
+        // When
+        Page<MediaVO> result = mediaService.getAllMediaList(filterType, filterFilename, pageable);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(mediaId, result.getContent().get(0).getId());
+
+        // Verify repository called with Specification
+        ArgumentCaptor<Specification<Media>> specCaptor = ArgumentCaptor.forClass(Specification.class);
+        verify(mediaRepository).findAll(specCaptor.capture(), eq(pageable));
+        // Asserting the actual Specification content is complex in unit tests.
+        // We trust the service layer correctly builds the spec based on inputs.
+        // Integration tests would cover the Specification logic more directly.
     }
 } 

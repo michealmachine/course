@@ -2,6 +2,8 @@ package com.zhangziqi.online_course_mine.service;
 
 import com.zhangziqi.online_course_mine.model.enums.QuotaType;
 import com.zhangziqi.online_course_mine.model.vo.QuotaInfoVO;
+import com.zhangziqi.online_course_mine.model.vo.QuotaStatsVO;
+import com.zhangziqi.online_course_mine.model.vo.InstitutionQuotaStatsVO;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -65,4 +67,21 @@ public interface StorageQuotaService {
      * @param additionalQuota 增加的配额大小(字节)
      */
     void increaseQuota(Long institutionId, QuotaType type, Long additionalQuota);
+    
+    /**
+     * 获取机构的配额统计信息
+     * 包含各类型配额的使用情况和分布
+     *
+     * @param institutionId 机构ID
+     * @return 配额统计信息
+     */
+    QuotaStatsVO getQuotaStats(Long institutionId);
+    
+    /**
+     * 获取所有机构的配额统计信息
+     * 用于管理员查看所有机构的配额使用情况
+     *
+     * @return 所有机构的配额统计信息
+     */
+    InstitutionQuotaStatsVO getAllInstitutionsQuotaStats();
 } 

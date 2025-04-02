@@ -3,6 +3,8 @@ package com.zhangziqi.online_course_mine.controller;
 import com.zhangziqi.online_course_mine.model.dto.media.MediaUploadInitDTO;
 import com.zhangziqi.online_course_mine.model.dto.media.UploadInitiationVO;
 import com.zhangziqi.online_course_mine.model.dto.media.CompleteUploadDTO;
+import com.zhangziqi.online_course_mine.model.enums.MediaType;
+import com.zhangziqi.online_course_mine.model.vo.MediaActivityCalendarVO;
 import com.zhangziqi.online_course_mine.model.vo.MediaVO;
 import com.zhangziqi.online_course_mine.model.vo.QuotaInfoVO;
 import com.zhangziqi.online_course_mine.model.vo.Result;
@@ -18,10 +20,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -150,14 +154,30 @@ public class MediaController {
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
-    @Operation(summary = "获取媒体列表", description = "分页获取机构的媒体文件列表")
+    @Operation(summary = "获取媒体列表", description = "分页获取机构的媒体文件列表，支持按类型和文件名筛选")
     public Result<Page<MediaVO>> getMediaList(
+            @Parameter(description = "媒体类型") @RequestParam(required = false) MediaType type,
+            @Parameter(description = "文件名关键词") @RequestParam(required = false) String filename,
             @PageableDefault(size = 10) Pageable pageable) {
+        
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
+        Long userId = SecurityUtil.getCurrentUserId();
         
-        Page<MediaVO> mediaList = mediaService.getMediaList(institutionId, pageable);
+        log.info("获取媒体列表 - 机构ID: {}, 用户ID: {}, 类型: {}, 文件名关键词: {}", 
+                institutionId, userId, type, filename);
         
-        return Result.success(mediaList);
+        try {
+            // 调用增强的service方法，支持筛选
+            Page<MediaVO> mediaList = mediaService.getMediaList(institutionId, type, filename, pageable);
+            
+            log.info("成功获取媒体列表 - 机构ID: {}, 总记录数: {}", 
+                    institutionId, mediaList.getTotalElements());
+            
+            return Result.success(mediaList);
+        } catch (Exception e) {
+            log.error("获取媒体列表失败 - 机构ID: {}, 错误: {}", institutionId, e.getMessage(), e);
+            throw e;
+        }
     }
     
     /**
@@ -191,5 +211,46 @@ public class MediaController {
         mediaService.deleteMedia(mediaId, institutionId);
         
         return Result.success();
+    }
+    
+    /**
+     * 获取媒体活动日历数据（可视化用）
+     */
+    @GetMapping("/activities/calendar")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
+    @Operation(summary = "获取媒体活动日历数据", description = "获取机构媒体活动的日历热图数据")
+    public Result<MediaActivityCalendarVO> getMediaActivityCalendar(
+            @Parameter(description = "开始日期") 
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @Parameter(description = "结束日期") 
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+        
+        log.info("获取媒体活动日历数据, 机构ID: {}, 开始日期: {}, 结束日期: {}", institutionId, startDate, endDate);
+        
+        MediaActivityCalendarVO calendarData = mediaService.getMediaActivityCalendar(institutionId, startDate, endDate);
+        
+        return Result.success(calendarData);
+    }
+
+    /**
+     * 根据日期获取媒体列表
+     */
+    @GetMapping("/by-date")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
+    @Operation(summary = "根据日期获取媒体列表", description = "获取特定日期上传的媒体文件列表")
+    public Result<Page<MediaVO>> getMediaListByDate(
+            @Parameter(description = "日期") 
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @PageableDefault(size = 10) Pageable pageable) {
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+        
+        log.info("根据日期获取媒体列表, 机构ID: {}, 日期: {}", institutionId, date);
+        
+        Page<MediaVO> mediaList = mediaService.getMediaListByDate(institutionId, date, pageable);
+        
+        return Result.success(mediaList);
     }
 } 

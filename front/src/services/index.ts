@@ -15,6 +15,10 @@ import userCourseService from './user-course-service';
 import wrongQuestionService from './wrong-question-service';
 import learningService from './learning-service';
 import courseReviewService from './course-review-service';
+import institutionMemberService from './institution-member';
+import { storageService } from './storage-service';
+import adminQuotaService from './admin-quota-service';
+import { mediaActivityService, adminMediaActivityService } from './media-activity-service';
 
 export {
   courseService,
@@ -33,5 +37,10 @@ export {
   userCourseService,
   wrongQuestionService,
   learningService,
-  courseReviewService
+  courseReviewService,
+  institutionMemberService,
+  storageService,
+  adminQuotaService,
+  mediaActivityService,
+  adminMediaActivityService
 }; 

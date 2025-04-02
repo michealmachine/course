@@ -107,8 +107,10 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
         setEditTitle(mediaData.title);
         setEditDescription(mediaData.description || '');
         
-        // 如果是视频或图片，尝试获取访问URL
-        if (mediaData.type === MEDIA_TYPES.VIDEO || mediaData.type === MEDIA_TYPES.IMAGE) {
+        // 如果是视频、音频或文档，尝试获取访问URL
+        if (mediaData.type === MEDIA_TYPES.VIDEO || 
+            mediaData.type === MEDIA_TYPES.AUDIO ||
+            mediaData.type === MEDIA_TYPES.DOCUMENT) {
           fetchMediaAccessUrl(mediaData.id);
         }
       } else {
@@ -142,6 +144,7 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
           console.log('更新后的media对象:', updated);
           return updated;
         });
+        return response.data.accessUrl;
       } else {
         console.error('获取媒体访问URL失败：没有返回有效的URL', response);
         toast.error('无法加载媒体预览：获取访问URL失败');
@@ -150,6 +153,7 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
       console.error('获取媒体访问URL失败:', error);
       toast.error('无法加载媒体预览：API错误');
     }
+    return null;
   };
   
   // 获取文件格式

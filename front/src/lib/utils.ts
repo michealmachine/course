@@ -51,3 +51,33 @@ export function formatDuration(seconds: number): string {
   }
   return `${minutes}分钟`;
 }
+
+/**
+ * 格式化字节数为可读字符串
+ * @param bytes 字节数
+ * @param decimals 小数位数
+ * @returns 格式化后的字符串，如 "1.5 MB"
+ */
+export function formatBytes(bytes: number, decimals: number = 2): string {
+  if (bytes === 0) return '0 Bytes';
+  
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+  
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+/**
+ * 格式化百分比
+ * @param value 百分比值（0-100或0-1）
+ * @param decimals 小数位数
+ * @returns 格式化后的字符串，如 "45.5%"
+ */
+export function formatPercentage(value: number, decimals: number = 2): string {
+  // 判断是否为0-1范围内的小数
+  const normalizedValue = value > 1 ? value : value * 100;
+  return normalizedValue.toFixed(decimals) + '%';
+}

@@ -1,5 +1,6 @@
 package com.zhangziqi.online_course_mine.service.impl;
 
+import com.zhangziqi.online_course_mine.config.CacheConfig;
 import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.exception.ResourceNotFoundException;
 import com.zhangziqi.online_course_mine.model.dto.media.*;
@@ -8,7 +9,9 @@ import com.zhangziqi.online_course_mine.model.entity.Media;
 import com.zhangziqi.online_course_mine.model.enums.MediaStatus;
 import com.zhangziqi.online_course_mine.model.enums.MediaType;
 import com.zhangziqi.online_course_mine.model.enums.QuotaType;
+import com.zhangziqi.online_course_mine.model.vo.MediaActivityCalendarVO;
 import com.zhangziqi.online_course_mine.model.vo.MediaVO;
+import com.zhangziqi.online_course_mine.model.vo.StorageGrowthPointVO;
 import com.zhangziqi.online_course_mine.repository.InstitutionRepository;
 import com.zhangziqi.online_course_mine.repository.MediaRepository;
 import com.zhangziqi.online_course_mine.service.MediaService;
@@ -16,14 +19,21 @@ import com.zhangziqi.online_course_mine.service.StorageQuotaService;
 import com.zhangziqi.online_course_mine.service.MinioService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -319,6 +329,43 @@ public class MediaServiceImpl implements MediaService {
         return mediaPage.map(media -> mapToMediaVO(media, null));
     }
     
+    @Transactional(readOnly = true)
+    @Override
+    public Page<MediaVO> getMediaList(Long institutionId, MediaType type, String filename, Pageable pageable) {
+        log.info("根据条件获取机构媒体列表 - 机构ID: {}, 媒体类型: {}, 文件名关键词: {}", 
+                institutionId, type, filename);
+        
+        // 验证机构是否存在
+        Institution institution = institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new ResourceNotFoundException("机构不存在，ID: " + institutionId));
+        
+        // 根据提供的参数选择对应的查询方法
+        Page<Media> mediaPage;
+        
+        if (type != null && filename != null && !filename.isEmpty()) {
+            // 同时按类型和文件名筛选
+            mediaPage = mediaRepository.findByInstitutionAndTypeAndOriginalFilenameContaining(
+                    institution, type, filename, pageable);
+            log.info("按机构、类型和文件名查询 - 结果数: {}", mediaPage.getTotalElements());
+        } else if (type != null) {
+            // 仅按类型筛选
+            mediaPage = mediaRepository.findByInstitutionAndType(institution, type, pageable);
+            log.info("按机构和类型查询 - 结果数: {}", mediaPage.getTotalElements());
+        } else if (filename != null && !filename.isEmpty()) {
+            // 仅按文件名筛选
+            mediaPage = mediaRepository.findByInstitutionAndOriginalFilenameContaining(
+                    institution, filename, pageable);
+            log.info("按机构和文件名查询 - 结果数: {}", mediaPage.getTotalElements());
+        } else {
+            // 不筛选，获取所有
+            mediaPage = mediaRepository.findByInstitution(institution, pageable);
+            log.info("仅按机构查询 - 结果数: {}", mediaPage.getTotalElements());
+        }
+        
+        // 转换为VO
+        return mediaPage.map(media -> mapToMediaVO(media, null));
+    }
+    
     @Override
     @Transactional
     public void deleteMedia(Long mediaId, Long institutionId) {
@@ -484,5 +531,198 @@ public class MediaServiceImpl implements MediaService {
         
         // 返回包含URL的VO
         return mapToMediaVO(media, url);
+    }
+    
+    /**
+     * 获取指定机构的媒体活动日历数据
+     */
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.MEDIA_ACTIVITY_CACHE, key = "'institution_' + #institutionId + '_' + #startDate + '_' + #endDate")
+    public MediaActivityCalendarVO getMediaActivityCalendar(Long institutionId, LocalDate startDate, LocalDate endDate) {
+        log.info("获取机构媒体活动日历数据 - 机构ID: {}, 开始日期: {}, 结束日期: {}", institutionId, startDate, endDate);
+        
+        // 验证机构是否存在
+        Institution institution = institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new ResourceNotFoundException("机构不存在，ID: " + institutionId));
+        
+        // 转换日期范围为 LocalDateTime
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+        
+        // 查询日期范围内的媒体上传活动
+        List<MediaActivityDTO> activities = mediaRepository.findMediaUploadActivitiesByInstitution(
+                institutionId, startDateTime, endDateTime);
+        
+        log.info("查询到 {} 条媒体活动记录", activities.size());
+        
+        // 构建日历数据
+        return buildCalendarData(activities, startDate, endDate);
+    }
+    
+    /**
+     * 获取所有机构的媒体活动日历数据
+     */
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.MEDIA_ACTIVITY_CACHE, key = "'all_institutions_' + #startDate + '_' + #endDate")
+    public MediaActivityCalendarVO getAllMediaActivityCalendar(LocalDate startDate, LocalDate endDate) {
+        log.info("获取所有机构媒体活动日历数据 - 开始日期: {}, 结束日期: {}", startDate, endDate);
+        
+        // 转换日期范围为 LocalDateTime
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+        
+        // 查询日期范围内的媒体上传活动
+        List<MediaActivityDTO> activities = mediaRepository.findAllMediaUploadActivities(
+                startDateTime, endDateTime);
+        
+        log.info("查询到 {} 条媒体活动记录", activities.size());
+        
+        // 构建日历数据
+        return buildCalendarData(activities, startDate, endDate);
+    }
+    
+    /**
+     * 构建日历数据
+     */
+    private MediaActivityCalendarVO buildCalendarData(List<MediaActivityDTO> activities, LocalDate startDate, LocalDate endDate) {
+        // 如果没有活动数据，返回空的日历数据
+        if (activities == null || activities.isEmpty()) {
+            log.info("没有媒体活动数据，返回空日历");
+            return MediaActivityCalendarVO.builder()
+                    .calendarData(new ArrayList<>())
+                    .peakCount(0L)
+                    .totalCount(0L)
+                    .totalSize(0L)
+                    .build();
+        }
+        
+        // 找出峰值活动和最活跃日期
+        MediaActivityDTO peakActivity = activities.stream()
+                .max(Comparator.comparing(MediaActivityDTO::getCount))
+                .orElse(null);
+        
+        // 计算总活动数和总文件大小
+        long totalCount = activities.stream().mapToLong(MediaActivityDTO::getCount).sum();
+        long totalSize = activities.stream().mapToLong(MediaActivityDTO::getTotalSize).sum();
+        
+        log.info("峰值活动: {} 个文件，日期: {}", 
+                peakActivity != null ? peakActivity.getCount() : 0,
+                peakActivity != null ? peakActivity.getDate() : "无");
+        log.info("总活动数: {} 个文件，总大小: {} 字节", totalCount, totalSize);
+        
+        // 构建返回结果
+        return MediaActivityCalendarVO.builder()
+                .calendarData(activities)
+                .peakCount(peakActivity != null ? peakActivity.getCount() : 0L)
+                .mostActiveDate(peakActivity != null ? peakActivity.getDate() : null)
+                .totalCount(totalCount)
+                .totalSize(totalSize)
+                .build();
+    }
+    
+    /**
+     * 根据日期获取指定机构的媒体列表
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Page<MediaVO> getMediaListByDate(Long institutionId, LocalDate date, Pageable pageable) {
+        log.info("根据日期获取机构媒体列表 - 机构ID: {}, 日期: {}", institutionId, date);
+        
+        // 验证机构是否存在
+        Institution institution = institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new ResourceNotFoundException("机构不存在，ID: " + institutionId));
+        
+        // 查询指定日期上传的媒体
+        Page<Media> mediaPage = mediaRepository.findMediaByInstitutionAndDate(institutionId, date, pageable);
+        
+        log.info("查询到 {} 条媒体记录", mediaPage.getTotalElements());
+        
+        // 转换为 VO
+        return mediaPage.map(media -> mapToMediaVO(media, null));
+    }
+    
+    /**
+     * 根据日期获取所有机构的媒体列表
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Page<MediaVO> getAllMediaListByDate(LocalDate date, Pageable pageable) {
+        log.info("根据日期获取所有机构媒体列表 - 日期: {}", date);
+        
+        // 查询指定日期上传的所有媒体
+        Page<Media> mediaPage = mediaRepository.findAllMediaByDate(date, pageable);
+        
+        log.info("查询到 {} 条媒体记录", mediaPage.getTotalElements());
+        
+        // 转换为 VO
+        return mediaPage.map(media -> mapToMediaVO(media, null));
+    }
+    
+    /**
+     * 获取所有机构的媒体列表
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Page<MediaVO> getAllMediaList(MediaType type, String filename, Pageable pageable) {
+        log.info("管理员查询所有机构媒体列表 - 类型: {}, 文件名: {}, 分页: {}", type, filename, pageable);
+
+        // 构建动态查询条件
+        Specification<Media> spec = Specification.where(null); // Start with empty spec
+
+        if (type != null) {
+            spec = spec.and((root, query, cb) -> 
+                cb.equal(root.get("type"), type)
+            );
+        }
+
+        if (StringUtils.hasText(filename)) {
+            spec = spec.and((root, query, cb) -> 
+                cb.like(cb.lower(root.get("originalFilename")), "%" + filename.toLowerCase() + "%")
+            );
+        }
+
+        // 执行查询
+        Page<Media> mediaPage = mediaRepository.findAll(spec, pageable);
+        
+        log.info("查询到符合条件的媒体记录 {} 条", mediaPage.getTotalElements());
+
+        // 映射为 VO
+        return mediaPage.map(media -> mapToMediaVO(media, null)); // Assuming mapToMediaVO exists
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StorageGrowthPointVO> getStorageGrowthTrend(
+            LocalDate startDate, LocalDate endDate, ChronoUnit granularity) {
+
+        log.info("获取存储增长趋势数据, 开始日期: {}, 结束日期: {}, 粒度: {}", 
+                 startDate, endDate, granularity);
+
+        // 将 LocalDate 转换为 LocalDateTime 以匹配 Repository 方法
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.plusDays(1).atStartOfDay(); // 结束日期需要包含当天
+
+        // TODO: 实现不同粒度的支持 (WEEKLY, MONTHLY) - 目前仅支持 DAILY
+        if (granularity != ChronoUnit.DAYS) {
+            log.warn("目前 getStorageGrowthTrend 仅支持 DAILY 粒度");
+            // 或者抛出异常 throw new UnsupportedOperationException("Granularity not supported yet");
+        }
+
+        // 调用 Repository 获取每日上传活动数据
+        List<MediaActivityDTO> dailyActivities = mediaRepository.findAllMediaUploadActivities(
+                startDateTime, endDateTime);
+
+        // 将 MediaActivityDTO 映射为 StorageGrowthPointVO
+        List<StorageGrowthPointVO> trendData = dailyActivities.stream()
+                .map(dto -> StorageGrowthPointVO.builder()
+                        .date(dto.getDate())
+                        .sizeAdded(dto.getTotalSize()) // 使用当天上传的总大小
+                        .build())
+                .collect(Collectors.toList());
+
+        log.info("成功获取存储增长趋势数据点 {} 个", trendData.size());
+        return trendData;
     }
 } 

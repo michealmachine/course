@@ -1,20 +1,27 @@
 package com.zhangziqi.online_course_mine.service.impl;
 
+import com.zhangziqi.online_course_mine.config.CacheConfig;
 import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.exception.ResourceNotFoundException;
 import com.zhangziqi.online_course_mine.model.entity.Institution;
 import com.zhangziqi.online_course_mine.model.entity.StorageQuota;
 import com.zhangziqi.online_course_mine.model.enums.QuotaType;
+import com.zhangziqi.online_course_mine.model.vo.QuotaDistributionVO;
 import com.zhangziqi.online_course_mine.model.vo.QuotaInfoVO;
+import com.zhangziqi.online_course_mine.model.vo.QuotaStatsVO;
+import com.zhangziqi.online_course_mine.model.vo.InstitutionQuotaStatsVO;
 import com.zhangziqi.online_course_mine.repository.InstitutionRepository;
 import com.zhangziqi.online_course_mine.repository.StorageQuotaRepository;
 import com.zhangziqi.online_course_mine.service.StorageQuotaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -41,6 +48,7 @@ public class StorageQuotaServiceImpl implements StorageQuotaService {
     
     @Override
     @Transactional
+    @CacheEvict(value = CacheConfig.QUOTA_STATS_CACHE, key = "#institutionId")
     public void updateUsedQuota(Long institutionId, QuotaType type, Long sizeDelta) {
         // 验证机构存在
         Institution institution = institutionRepository.findById(institutionId)
@@ -208,12 +216,20 @@ public class StorageQuotaServiceImpl implements StorageQuotaService {
      * @return 配额VO
      */
     private QuotaInfoVO mapToQuotaInfoVO(StorageQuota quota) {
+        // 计算可用配额和使用百分比
+        Long availableQuota = Math.max(0, quota.getTotalQuota() - quota.getUsedQuota());
+        Double usagePercentage = quota.getTotalQuota() > 0 
+            ? ((double) quota.getUsedQuota() / quota.getTotalQuota()) * 100.0 
+            : 0.0;
+        
         return QuotaInfoVO.builder()
                 .type(quota.getType().name())
                 .typeName(getQuotaTypeName(quota.getType()))
                 .totalQuota(quota.getTotalQuota())
                 .usedQuota(quota.getUsedQuota())
                 .lastUpdatedTime(quota.getUpdatedAt())
+                .availableQuota(availableQuota)
+                .usagePercentage(usagePercentage)
                 .build();
     }
     
@@ -238,6 +254,7 @@ public class StorageQuotaServiceImpl implements StorageQuotaService {
     
     @Override
     @Transactional
+    @CacheEvict(value = CacheConfig.QUOTA_STATS_CACHE, key = "#institutionId")
     public void setQuota(Long institutionId, QuotaType type, Long totalQuota, LocalDateTime expiresAt) {
         Institution institution = institutionRepository.findById(institutionId)
                 .orElseThrow(() -> new ResourceNotFoundException("机构不存在，ID: " + institutionId));
@@ -265,6 +282,7 @@ public class StorageQuotaServiceImpl implements StorageQuotaService {
      */
     @Override
     @Transactional
+    @CacheEvict(value = CacheConfig.QUOTA_STATS_CACHE, key = "#institutionId")
     public void increaseQuota(Long institutionId, QuotaType type, Long additionalQuota) {
         log.info("增加机构 {} 的 {} 配额: {} 字节", institutionId, type, additionalQuota);
         
@@ -304,5 +322,206 @@ public class StorageQuotaServiceImpl implements StorageQuotaService {
         
         log.info("配额增加成功，机构 {} 的 {} 配额当前为: {} 字节", 
                 institutionId, type, quota.getTotalQuota());
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.QUOTA_STATS_CACHE, key = "#institutionId")
+    public QuotaStatsVO getQuotaStats(Long institutionId) {
+        log.info("获取机构 {} 的配额统计信息", institutionId);
+        
+        // 获取所有配额信息
+        List<QuotaInfoVO> allQuotas = getAllQuotas(institutionId);
+        
+        // 找出总配额信息
+        QuotaInfoVO totalQuota = allQuotas.stream()
+                .filter(q -> q.getType().equals(QuotaType.TOTAL.name()))
+                .findFirst()
+                .orElse(null);
+        
+        // 过滤出非总配额的类型配额
+        List<QuotaInfoVO> typeQuotas = allQuotas.stream()
+                .filter(q -> !q.getType().equals(QuotaType.TOTAL.name()))
+                .collect(Collectors.toList());
+        
+        // 计算配额分布
+        List<QuotaDistributionVO> distribution = calculateQuotaDistribution(typeQuotas);
+        
+        // 构建并返回统计VO
+        QuotaStatsVO statsVO = QuotaStatsVO.builder()
+                .totalQuota(totalQuota)
+                .typeQuotas(typeQuotas)
+                .distribution(distribution)
+                .build();
+                
+        log.info("生成配额统计信息成功");
+        return statsVO;
+    }
+    
+    /**
+     * 计算配额类型分布
+     *
+     * @param typeQuotas 各类型配额信息
+     * @return 配额分布数据
+     */
+    private List<QuotaDistributionVO> calculateQuotaDistribution(List<QuotaInfoVO> typeQuotas) {
+        // 计算总的已用配额
+        long totalUsed = typeQuotas.stream()
+                .mapToLong(QuotaInfoVO::getUsedQuota)
+                .sum();
+        
+        // 如果总使用量为0，返回空分布以避免除零错误
+        if (totalUsed == 0) {
+            return typeQuotas.stream()
+                    .map(q -> QuotaDistributionVO.builder()
+                            .type(q.getType())
+                            .name(q.getTypeName())
+                            .usedQuota(0L)
+                            .percentage(0.0)
+                            .build())
+                    .collect(Collectors.toList());
+        }
+        
+        // 计算各类型占比
+        return typeQuotas.stream()
+                .map(q -> {
+                    double percentage = (double) q.getUsedQuota() / totalUsed * 100.0;
+                    return QuotaDistributionVO.builder()
+                            .type(q.getType())
+                            .name(q.getTypeName())
+                            .usedQuota(q.getUsedQuota())
+                            .percentage(percentage)
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.QUOTA_STATS_CACHE, key = "'all-institutions'")
+    public InstitutionQuotaStatsVO getAllInstitutionsQuotaStats() {
+        log.info("获取所有机构的配额统计信息");
+        
+        // 获取所有正常状态的机构
+        List<Institution> institutions = institutionRepository.findByStatus(1); // 1-正常状态
+        log.info("找到 {} 个正常状态的机构", institutions.size());
+        
+        if (institutions.isEmpty()) {
+            log.warn("未找到任何机构");
+            return InstitutionQuotaStatsVO.builder()
+                    .totalUsage(InstitutionQuotaStatsVO.TotalQuotaUsageVO.builder()
+                            .totalQuota(0L)
+                            .usedQuota(0L)
+                            .availableQuota(0L)
+                            .usagePercentage(0.0)
+                            .institutionCount(0)
+                            .build())
+                    .institutions(new ArrayList<>())
+                    .distribution(new ArrayList<>())
+                    .build();
+        }
+        
+        // 收集所有机构的配额信息
+        List<InstitutionQuotaStatsVO.InstitutionQuotaVO> institutionQuotas = new ArrayList<>();
+        long totalQuotaSum = 0L;
+        long usedQuotaSum = 0L;
+        
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        
+        for (Institution institution : institutions) {
+            try {
+                // 获取该机构的配额信息
+                QuotaInfoVO quotaInfo = getQuotaInfo(institution.getId());
+                
+                // 创建机构配额VO
+                InstitutionQuotaStatsVO.InstitutionQuotaVO institutionQuota = 
+                        InstitutionQuotaStatsVO.InstitutionQuotaVO.builder()
+                                .institutionId(institution.getId())
+                                .institutionName(institution.getName())
+                                .totalQuota(quotaInfo.getTotalQuota())
+                                .usedQuota(quotaInfo.getUsedQuota())
+                                .availableQuota(quotaInfo.getAvailableQuota())
+                                .usagePercentage(quotaInfo.getUsagePercentage())
+                                .lastUpdatedTime(quotaInfo.getLastUpdatedTime() != null ? 
+                                        quotaInfo.getLastUpdatedTime().format(formatter) : null)
+                                .build();
+                
+                institutionQuotas.add(institutionQuota);
+                
+                // 累加总配额和已用配额
+                totalQuotaSum += quotaInfo.getTotalQuota();
+                usedQuotaSum += quotaInfo.getUsedQuota();
+                
+            } catch (Exception e) {
+                log.warn("获取机构 {} 的配额信息失败: {}", institution.getId(), e.getMessage());
+                // 跳过错误的机构，继续处理下一个
+            }
+        }
+        
+        // 计算总体配额使用情况
+        double usagePercentage = totalQuotaSum == 0 ? 0 : (double) usedQuotaSum / totalQuotaSum * 100.0;
+        
+        InstitutionQuotaStatsVO.TotalQuotaUsageVO totalUsage = 
+                InstitutionQuotaStatsVO.TotalQuotaUsageVO.builder()
+                        .totalQuota(totalQuotaSum)
+                        .usedQuota(usedQuotaSum)
+                        .availableQuota(totalQuotaSum - usedQuotaSum)
+                        .usagePercentage(usagePercentage)
+                        .institutionCount(institutionQuotas.size())
+                        .build();
+        
+        // 计算机构配额分布
+        List<InstitutionQuotaStatsVO.InstitutionQuotaDistributionVO> distribution = 
+                calculateInstitutionQuotaDistribution(institutionQuotas);
+        
+        // 构建并返回统计VO
+        InstitutionQuotaStatsVO statsVO = InstitutionQuotaStatsVO.builder()
+                .totalUsage(totalUsage)
+                .institutions(institutionQuotas)
+                .distribution(distribution)
+                .build();
+                
+        log.info("生成所有机构的配额统计信息成功");
+        return statsVO;
+    }
+    
+    /**
+     * 计算机构配额分布
+     *
+     * @param institutionQuotas 各机构配额信息
+     * @return 机构配额分布数据
+     */
+    private List<InstitutionQuotaStatsVO.InstitutionQuotaDistributionVO> calculateInstitutionQuotaDistribution(
+            List<InstitutionQuotaStatsVO.InstitutionQuotaVO> institutionQuotas) {
+        
+        // 计算总的已用配额
+        long totalUsed = institutionQuotas.stream()
+                .mapToLong(InstitutionQuotaStatsVO.InstitutionQuotaVO::getUsedQuota)
+                .sum();
+        
+        // 如果总使用量为0，返回空分布以避免除零错误
+        if (totalUsed == 0) {
+            return institutionQuotas.stream()
+                    .map(q -> InstitutionQuotaStatsVO.InstitutionQuotaDistributionVO.builder()
+                            .institutionId(q.getInstitutionId())
+                            .institutionName(q.getInstitutionName())
+                            .usedQuota(0L)
+                            .percentage(0.0)
+                            .build())
+                    .collect(Collectors.toList());
+        }
+        
+        // 计算各机构占比
+        return institutionQuotas.stream()
+                .map(q -> {
+                    double percentage = (double) q.getUsedQuota() / totalUsed * 100.0;
+                    return InstitutionQuotaStatsVO.InstitutionQuotaDistributionVO.builder()
+                            .institutionId(q.getInstitutionId())
+                            .institutionName(q.getInstitutionName())
+                            .usedQuota(q.getUsedQuota())
+                            .percentage(percentage)
+                            .build();
+                })
+                .collect(Collectors.toList());
     }
 } 

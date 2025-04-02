@@ -7,12 +7,15 @@ import {
   Database,
   HardDrive,
   FileText,
-  PieChart, 
-  BarChart,
+  PieChart as PieChartIcon, 
+  BarChart as BarChartIcon,
+  BarChart2,
   RefreshCw,
   Save,
   Plus,
   Filter,
+  Layers,
+  Activity,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -49,13 +52,40 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
+// 导入 recharts 组件
+import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  BarChart, 
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from 'recharts';
+
+// 导入 shadcn 图表组件
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from "@/components/ui/chart";
+import { type ChartConfig } from "@/components/ui/chart";
+
 import { storageService } from '@/services/storage-service';
 import quotaApplicationService from '@/services/quota-application';
 import { 
   QuotaApplicationVO, 
   QuotaApplicationStatus, 
   QuotaType,
-  QuotaUsage
+  QuotaUsage,
+  QuotaStatsVO,
+  QuotaDistributionVO
 } from '@/types/quota';
 import type { QuotaInfoVO } from '@/types/api';
 
@@ -90,6 +120,37 @@ const convertQuotaInfo = (apiQuota: QuotaInfoVO): StorageQuota => ({
   updatedAt: apiQuota.lastUpdatedTime
 });
 
+// 饼图的颜色配置
+const CHART_COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#a4de6c', '#d0ed57'];
+
+// 添加图表配置
+const getChartConfig = (quotaStats: QuotaStatsVO): ChartConfig => {
+  // 为饼图准备配置
+  const chartConfig: ChartConfig = {};
+  
+  // 为每种配额类型添加颜色配置 - 使用shadcn图表颜色变量
+  if (quotaStats?.distribution) {
+    // 定义类型的直接颜色值，不使用CSS变量
+    const pieColors = [
+      "#4f46e5", // 靛蓝色
+      "#10b981", // 翠绿色
+      "#f59e0b", // 琥珀色
+      "#8b5cf6", // 紫色
+      "#ef4444"  // 红色
+    ];
+    
+    quotaStats.distribution.forEach((item, index) => {
+      const key = `type_${index}`;
+      chartConfig[key] = {
+        label: item.name,
+        color: pieColors[index % pieColors.length],
+      };
+    });
+  }
+  
+  return chartConfig;
+};
+
 export default function StoragePage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
@@ -111,6 +172,10 @@ export default function StoragePage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(5);
   
+  // 新增: 配额统计状态
+  const [quotaStats, setQuotaStats] = useState<QuotaStatsVO | null>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
+  
   // 加载配额数据
   useEffect(() => {
     fetchQuotas();
@@ -120,6 +185,8 @@ export default function StoragePage() {
   useEffect(() => {
     if (activeTab === "applications") {
       fetchApplications();
+    } else if (activeTab === "stats") {
+      fetchQuotaStats();
     }
   }, [activeTab, currentPage]);
   
@@ -137,6 +204,25 @@ export default function StoragePage() {
       console.error('获取存储配额失败:', error);
       toast.error('获取存储配额信息失败');
       setIsLoading(false);
+    }
+  };
+  
+  // 获取配额统计信息
+  const fetchQuotaStats = async () => {
+    setIsLoadingStats(true);
+    try {
+      // 使用SecurityUtil获取当前用户的机构ID
+      // 这里使用1作为测试，实际应该从用户信息中获取
+      const institutionId = 1;
+      const response = await storageService.getQuotaStats(institutionId);
+      if (response.data) {
+        setQuotaStats(response.data);
+      }
+      setIsLoadingStats(false);
+    } catch (error) {
+      console.error('获取配额统计失败:', error);
+      toast.error('获取配额统计信息失败');
+      setIsLoadingStats(false);
     }
   };
   
@@ -215,7 +301,6 @@ export default function StoragePage() {
       case QuotaApplicationStatus.PENDING: return '待审核';
       case QuotaApplicationStatus.APPROVED: return '已通过';
       case QuotaApplicationStatus.REJECTED: return '已拒绝';
-      case QuotaApplicationStatus.CANCELED: return '已取消';
       default: return '未知';
     }
   };
@@ -273,22 +358,12 @@ export default function StoragePage() {
     }
   };
   
-  // 取消申请
-  const handleCancelApplication = async (id: number) => {
-    try {
-      await quotaApplicationService.cancelApplication(id);
-      toast.success('申请已取消');
-      fetchApplications();
-    } catch (error) {
-      console.error(`取消申请失败, ID: ${id}:`, error);
-      toast.error('取消申请失败');
-    }
-  };
-  
   // 同步刷新按钮的功能
   const handleRefresh = () => {
     if (activeTab === 'applications') {
       fetchApplications();
+    } else if (activeTab === 'stats') {
+      fetchQuotaStats();
     } else {
       fetchQuotas();
     }
@@ -306,9 +381,9 @@ export default function StoragePage() {
             variant="outline"
             size="sm"
             onClick={handleRefresh}
-            disabled={isLoading || isLoadingApplications}
+            disabled={isLoading || isLoadingApplications || isLoadingStats}
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${(isLoading || isLoadingApplications) ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 mr-2 ${(isLoading || isLoadingApplications || isLoadingStats) ? 'animate-spin' : ''}`} />
             刷新
           </Button>
           <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
@@ -394,6 +469,7 @@ export default function StoragePage() {
         <TabsList>
           <TabsTrigger value="overview">概览</TabsTrigger>
           <TabsTrigger value="details">详细信息</TabsTrigger>
+          <TabsTrigger value="stats">统计分析</TabsTrigger>
           <TabsTrigger value="history">使用历史</TabsTrigger>
           <TabsTrigger value="applications">申请记录</TabsTrigger>
         </TabsList>
@@ -545,6 +621,223 @@ export default function StoragePage() {
           </Card>
         </TabsContent>
         
+        <TabsContent value="stats" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>配额统计分析</CardTitle>
+              <CardDescription>
+                查看存储空间的使用统计分析
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingStats ? (
+                <div className="space-y-4">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* 统计分析内容 */}
+                  {quotaStats && (
+                    <>
+                      {/* 总体配额统计卡片和配额分布图并排显示 */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* 总体配额统计卡片 */}
+                        <Card className="border border-border/50 shadow-sm hover:shadow-md transition-shadow duration-300">
+                          <CardHeader className="pb-2">
+                            <div className="flex justify-between items-center">
+                              <CardTitle className="text-xl">总体配额情况</CardTitle>
+                              <Database className="h-6 w-6 text-primary" />
+                            </div>
+                            <CardDescription>
+                              上次更新时间: {quotaStats.totalQuota.lastUpdatedTime}
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent className="pt-0 pb-6">
+                            <div className="grid grid-cols-3 gap-4 mt-4">
+                              <div className="space-y-2 p-4 bg-background rounded-lg border border-border/40">
+                                <p className="text-muted-foreground text-sm">总配额</p>
+                                <p className="text-2xl font-bold text-primary">
+                                  {formatFileSize(quotaStats.totalQuota.totalQuota)}
+                                </p>
+                              </div>
+                              <div className="space-y-2 p-4 bg-background rounded-lg border border-border/40">
+                                <p className="text-muted-foreground text-sm">已用配额</p>
+                                <p className="text-2xl font-bold text-amber-600 dark:text-amber-500">
+                                  {formatFileSize(quotaStats.totalQuota.usedQuota)}
+                                </p>
+                              </div>
+                              <div className="space-y-2 p-4 bg-background rounded-lg border border-border/40">
+                                <p className="text-muted-foreground text-sm">可用配额</p>
+                                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-500">
+                                  {formatFileSize(quotaStats.totalQuota.availableQuota)}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            <div className="mt-6 space-y-2">
+                              <div className="flex justify-between">
+                                <span className="text-sm font-medium">使用进度</span>
+                                <span className="text-sm">{quotaStats.totalQuota.usagePercentage.toFixed(2)}%</span>
+                              </div>
+                              <Progress 
+                                value={quotaStats.totalQuota.usagePercentage} 
+                                className={`h-3 rounded-full ${getUsageColor(quotaStats.totalQuota.usagePercentage)}`}
+                              />
+                            </div>
+                          </CardContent>
+                        </Card>
+                      
+                        {/* 配额分布饼图 */}
+                        <Card className="border border-border/50 shadow-sm hover:shadow-md transition-shadow duration-300">
+                          <CardHeader className="pb-2">
+                            <div className="flex justify-between items-center">
+                              <CardTitle className="text-xl">配额类型分布</CardTitle>
+                              <PieChartIcon className="h-6 w-6 text-primary" />
+                            </div>
+                            <CardDescription>
+                              各类型存储配额占比分析
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent className="h-[320px] pt-0">
+                            {quotaStats.distribution.length > 0 ? (
+                              <ChartContainer
+                                config={getChartConfig(quotaStats)}
+                                className="h-full w-full min-h-[300px]"
+                              >
+                                <PieChart accessibilityLayer margin={{ top: 10, right: 10, bottom: 40, left: 10 }}>
+                                  <Pie
+                                    data={quotaStats.distribution}
+                                    cx="50%"
+                                    cy="45%"
+                                    labelLine={true}
+                                    label={({ name, percent }: { name: string; percent: number }) => 
+                                      `${name}: ${(percent * 100).toFixed(0)}%`
+                                    }
+                                    outerRadius={100}
+                                    innerRadius={60}
+                                    paddingAngle={4}
+                                    dataKey="usedQuota"
+                                    nameKey="name"
+                                  >
+                                    {quotaStats.distribution.map((entry, index) => {
+                                      // 定义颜色数组
+                                      const pieColors = [
+                                        "#4f46e5", // 靛蓝色
+                                        "#10b981", // 翠绿色
+                                        "#f59e0b", // 琥珀色
+                                        "#8b5cf6", // 紫色
+                                        "#ef4444"  // 红色
+                                      ];
+                                      return (
+                                        <Cell 
+                                          key={`cell-${index}`}
+                                          fill={pieColors[index % pieColors.length]}
+                                          stroke="#ffffff"
+                                          strokeWidth={2}
+                                        />
+                                      );
+                                    })}
+                                  </Pie>
+                                  <ChartTooltip 
+                                    content={
+                                      <ChartTooltipContent 
+                                        formatter={(value: any) => formatFileSize(Number(value))}
+                                      />
+                                    }
+                                  />
+                                  <ChartLegend 
+                                    verticalAlign="bottom" 
+                                    align="center"
+                                    layout="horizontal"
+                                    content={<ChartLegendContent />} 
+                                  />
+                                </PieChart>
+                              </ChartContainer>
+                            ) : (
+                              <div className="flex h-full items-center justify-center text-muted-foreground">
+                                <p>暂无配额分布数据</p>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </div>
+                      
+                      {/* 配额类型详情表格 */}
+                      <Card className="border border-border/50 shadow-sm">
+                        <CardHeader className="pb-2">
+                          <div className="flex justify-between items-center">
+                            <CardTitle className="text-xl">配额类型详情</CardTitle>
+                            <HardDrive className="h-6 w-6 text-primary" />
+                          </div>
+                          <CardDescription>
+                            各类型配额使用详细数据
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <div className="rounded-md border">
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="bg-muted/50">
+                                  <TableHead className="font-medium">配额类型</TableHead>
+                                  <TableHead className="font-medium">总配额</TableHead>
+                                  <TableHead className="font-medium">已用配额</TableHead>
+                                  <TableHead className="font-medium">可用配额</TableHead>
+                                  <TableHead className="font-medium">使用率</TableHead>
+                                  <TableHead className="font-medium">最后更新</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {quotaStats.typeQuotas.map((quota, index) => {
+                                  // 使用与饼图相同的颜色方案
+                                  const pieColors = [
+                                    "#4f46e5", // 靛蓝色
+                                    "#10b981", // 翠绿色
+                                    "#f59e0b", // 琥珀色
+                                    "#8b5cf6", // 紫色
+                                    "#ef4444"  // 红色
+                                  ];
+                                  return (
+                                    <TableRow key={index} className="hover:bg-muted/30">
+                                      <TableCell className="font-medium">
+                                        <div className="flex items-center space-x-2">
+                                          <div 
+                                            className="w-3 h-3 rounded-full" 
+                                            style={{ backgroundColor: pieColors[index % pieColors.length] }}
+                                          />
+                                          <span>{quota.typeName}</span>
+                                        </div>
+                                      </TableCell>
+                                      <TableCell>{formatFileSize(quota.totalQuota)}</TableCell>
+                                      <TableCell>{formatFileSize(quota.usedQuota)}</TableCell>
+                                      <TableCell>{formatFileSize(quota.availableQuota)}</TableCell>
+                                      <TableCell>
+                                        <div className="flex items-center gap-2">
+                                          <span>{quota.usagePercentage.toFixed(1)}%</span>
+                                          <Progress
+                                            value={quota.usagePercentage}
+                                            className={`h-2 w-20 ${getUsageColor(quota.usagePercentage)}`}
+                                          />
+                                        </div>
+                                      </TableCell>
+                                      <TableCell className="text-muted-foreground text-sm">{quota.lastUpdatedTime}</TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
         <TabsContent value="history" className="mt-6">
           <Card>
             <CardHeader>
@@ -619,11 +912,12 @@ export default function StoragePage() {
                           <TableCell>
                             {app.status === QuotaApplicationStatus.PENDING && (
                               <Button 
-                                variant="outline" 
+                                variant="destructive"
                                 size="sm"
-                                onClick={() => handleCancelApplication(app.id)}
+                                disabled
+                                className="ml-2"
                               >
-                                取消
+                                取消申请
                               </Button>
                             )}
                           </TableCell>

@@ -126,8 +126,8 @@ const menuItems: MenuItem[] = [
     roles: [UserRole.ADMIN],
   },
   {
-    title: '配额申请管理',
-    href: '/dashboard/quota-applications',
+    title: '配额管理',
+    href: '/dashboard/admin-quota',
     icon: <HardDrive className="w-5 h-5" />,
     roles: [UserRole.ADMIN],
   },

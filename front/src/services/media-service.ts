@@ -1,4 +1,9 @@
-import { http } from '@/lib/http';
+'use client';
+
+import { request } from './api';
+import { ApiResponse } from '@/types/api';
+import { AxiosResponse } from 'axios';
+import { StorageGrowthPointVO } from '@/types/stats';
 
 // 媒体类型
 export enum MediaType {
@@ -39,6 +44,7 @@ export interface MediaQueryParams {
     size?: number;
     sort?: string[];
     type?: MediaType;
+    filename?: string;
 }
 
 // 媒体信息
@@ -153,6 +159,20 @@ export interface MediaService {
    * @param mediaId 媒体ID
    */
   deleteMedia(mediaId: number): Promise<Result<void>>;
+
+  /**
+   * 获取管理员视角的媒体列表 (支持过滤)
+   * @param params 查询参数 (包括 type, filename, page, size)
+   */
+  getAdminMediaList(params: MediaQueryParams): Promise<Result<Page<MediaVO>>>;
+
+  /**
+   * 获取系统存储增长趋势
+   * @param startDate 开始日期 (YYYY-MM-DD)
+   * @param endDate 结束日期 (YYYY-MM-DD)
+   * @param granularity 时间粒度 (目前仅支持 'DAYS')
+   */
+  getStorageGrowthTrend(startDate: string, endDate: string, granularity?: string): Promise<Result<StorageGrowthPointVO[]>>;
 }
 
 class MediaServiceImpl implements MediaService {
@@ -168,33 +188,56 @@ class MediaServiceImpl implements MediaService {
     }
     
     console.log('发送到API的查询参数:', queryParams);
-    return http.get('/api/media', { params: queryParams });
+    const response: AxiosResponse<ApiResponse<Page<MediaVO>>> = await request.get('/media', { params: queryParams });
+    return response.data as Result<Page<MediaVO>>;
   }
 
   async getMediaInfo(mediaId: number): Promise<Result<MediaVO>> {
-    return http.get(`/api/media/${mediaId}`);
+    const response: AxiosResponse<ApiResponse<MediaVO>> = await request.get(`/media/${mediaId}`);
+    return response.data as Result<MediaVO>;
   }
 
   async initiateUpload(initDTO: MediaUploadInitDTO): Promise<Result<UploadInitiationVO>> {
-    return http.post('/api/media/initiate-upload', initDTO);
+    const response: AxiosResponse<ApiResponse<UploadInitiationVO>> = await request.post('/media/initiate-upload', initDTO);
+    return response.data as Result<UploadInitiationVO>;
   }
 
   async completeUpload(mediaId: number, dto: CompleteUploadDTO): Promise<Result<MediaVO>> {
-    return http.post(`/api/media/${mediaId}/complete`, dto);
+    const response: AxiosResponse<ApiResponse<MediaVO>> = await request.post(`/media/${mediaId}/complete`, dto);
+    return response.data as Result<MediaVO>;
   }
 
   async cancelUpload(mediaId: number): Promise<Result<void>> {
-    return http.delete(`/api/media/${mediaId}/cancel`);
+    const response: AxiosResponse<ApiResponse<void>> = await request.delete(`/media/${mediaId}/cancel`);
+    return response.data as Result<void>;
   }
 
   async getMediaAccessUrl(mediaId: number, expirationMinutes?: number): Promise<Result<MediaAccessUrlVO>> {
-    return http.get(`/api/media/${mediaId}/access`, {
+    const response: AxiosResponse<ApiResponse<MediaAccessUrlVO>> = await request.get(`/media/${mediaId}/access`, {
       params: expirationMinutes ? { expirationMinutes } : undefined
     });
+    return response.data as Result<MediaAccessUrlVO>;
   }
 
   async deleteMedia(mediaId: number): Promise<Result<void>> {
-    return http.delete(`/api/media/${mediaId}`);
+    const response: AxiosResponse<ApiResponse<void>> = await request.delete(`/media/${mediaId}`);
+    return response.data as Result<void>;
+  }
+
+  async getAdminMediaList(params: MediaQueryParams): Promise<Result<Page<MediaVO>>> {
+    console.log('MediaService.getAdminMediaList 请求参数:', params);
+    // 管理员接口路径为 /admin/media
+    const response: AxiosResponse<ApiResponse<Page<MediaVO>>> = await request.get('/admin/media', { params });
+    return response.data as Result<Page<MediaVO>>;
+  }
+
+  async getStorageGrowthTrend(startDate: string, endDate: string, granularity: string = 'DAYS'): Promise<Result<StorageGrowthPointVO[]>> {
+    console.log('MediaService.getStorageGrowthTrend 请求参数:', { startDate, endDate, granularity });
+    // 存储增长趋势接口路径
+    const response: AxiosResponse<ApiResponse<StorageGrowthPointVO[]>> = await request.get('/admin/media/stats/storage-growth', {
+      params: { startDate, endDate, granularity }
+    });
+    return response.data as Result<StorageGrowthPointVO[]>;
   }
 }
 
