@@ -167,4 +167,97 @@ public interface MediaRepository extends JpaRepository<Media, Long>, JpaSpecific
     Page<Media> findAllMediaByDate(
             @Param("date") LocalDate date,
             Pageable pageable);
+    
+    /**
+     * 根据上传时间范围查询所有媒体
+     * 
+     * @param startTime 开始时间
+     * @param endTime 结束时间
+     * @param pageable 分页参数
+     * @return 媒体分页
+     */
+    Page<Media> findByUploadTimeBetween(LocalDateTime startTime, LocalDateTime endTime, Pageable pageable);
+    
+    /**
+     * 根据上传时间范围和媒体类型查询所有媒体
+     * 
+     * @param startTime 开始时间
+     * @param endTime 结束时间
+     * @param type 媒体类型
+     * @param pageable 分页参数
+     * @return 媒体分页
+     */
+    Page<Media> findByUploadTimeBetweenAndType(
+            LocalDateTime startTime, 
+            LocalDateTime endTime, 
+            MediaType type, 
+            Pageable pageable);
+    
+    /**
+     * 根据媒体大小范围查询所有媒体
+     * 
+     * @param minSize 最小大小（字节）
+     * @param maxSize 最大大小（字节）
+     * @param pageable 分页参数
+     * @return 媒体分页
+     */
+    Page<Media> findBySizeBetween(Long minSize, Long maxSize, Pageable pageable);
+    
+    /**
+     * 获取媒体类型统计
+     * 
+     * @return 各类型的媒体数量
+     */
+    @Query("SELECT m.type, COUNT(m) FROM Media m GROUP BY m.type")
+    List<Object[]> countByMediaType();
+    
+    /**
+     * 获取特定机构的媒体类型统计
+     * 
+     * @param institutionId 机构ID
+     * @return 该机构各类型的媒体数量
+     */
+    @Query("SELECT m.type, COUNT(m) FROM Media m WHERE m.institution.id = :institutionId GROUP BY m.type")
+    List<Object[]> countByMediaTypeForInstitution(@Param("institutionId") Long institutionId);
+    
+    /**
+     * 根据机构名称查询媒体
+     * 
+     * @param institutionName 机构名称
+     * @param pageable 分页参数
+     * @return 媒体分页
+     */
+    @Query("SELECT m FROM Media m JOIN m.institution i WHERE LOWER(i.name) LIKE LOWER(CONCAT('%', :institutionName, '%'))")
+    Page<Media> findByInstitutionNameContaining(@Param("institutionName") String institutionName, Pageable pageable);
+    
+    /**
+     * 根据机构名称和文件类型查询媒体
+     * 
+     * @param institutionName 机构名称
+     * @param type 媒体类型
+     * @param pageable 分页参数
+     * @return 媒体分页
+     */
+    @Query("SELECT m FROM Media m JOIN m.institution i WHERE LOWER(i.name) LIKE LOWER(CONCAT('%', :institutionName, '%')) AND m.type = :type")
+    Page<Media> findByInstitutionNameContainingAndType(
+            @Param("institutionName") String institutionName, 
+            @Param("type") MediaType type, 
+            Pageable pageable);
+    
+    /**
+     * 根据文件大小和上传日期范围查询媒体
+     * 
+     * @param minSize 最小大小（字节）
+     * @param maxSize 最大大小（字节）
+     * @param startTime 开始时间
+     * @param endTime 结束时间
+     * @param pageable 分页参数
+     * @return 媒体分页
+     */
+    Page<Media> findBySizeBetweenAndUploadTimeBetween(
+            Long minSize, 
+            Long maxSize, 
+            LocalDateTime startTime, 
+            LocalDateTime endTime, 
+            Pageable pageable);
 } 

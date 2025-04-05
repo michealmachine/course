@@ -33,8 +33,9 @@ import {
 
 import { Section, ChapterAccessType } from '@/types/course';
 import { sectionService, mediaService, questionGroupService } from '@/services';
-import { MediaVO } from '@/services/media-service';
+import type { MediaVO } from '@/types/media';
 import { QuestionGroup } from '@/types/question';
+import { MediaSelection } from '../media/media-selection';
 
 // 访问类型选项
 const accessTypes = [
@@ -490,54 +491,11 @@ export function SectionEditDrawer({
                 
                 {/* 媒体资源选择 */}
                 <TabsContent value="media" className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Input
-                      placeholder="搜索媒体资源..."
-                      value={mediaSearchTerm}
-                      onChange={e => setMediaSearchTerm(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button 
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => loadMediaResources(0, mediaSearchTerm, mediaType)}
-                    >
-                      搜索
-                    </Button>
-                  </div>
-                  
-                  {isLoadingMedia ? (
-                    <div className="flex justify-center items-center py-6">
-                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                      <span className="ml-2">加载媒体资源中...</span>
-                    </div>
-                  ) : mediaList.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[320px] overflow-y-auto p-1">
-                      {mediaList.map(media => (
-                        <div
-                          key={media.id}
-                          className={`rounded-md p-3 cursor-pointer transition-colors ${
-                            selectedMedia?.id === media.id 
-                              ? 'bg-primary/10 border-primary border' 
-                              : 'border hover:bg-accent/50'
-                          }`}
-                          onClick={() => handleSelectMedia(media)}
-                        >
-                          <div className="flex flex-col">
-                            <div className="font-medium truncate">{media.title}</div>
-                            <div className="text-xs text-muted-foreground mt-1 flex justify-between">
-                              <span>{media.type?.split('/')[0] || '未知类型'}</span>
-                              {media.size ? <span>{(media.size / 1024 / 1024).toFixed(1)} MB</span> : null}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-10 text-muted-foreground">
-                      <p>未找到媒体资源</p>
-                    </div>
-                  )}
+                  <MediaSelection 
+                    onSelectMedia={handleSelectMedia}
+                    selectedMediaId={selectedMedia?.id}
+                    preloadAccessUrl={true}
+                  />
                 </TabsContent>
                 
                 {/* 题目组选择 */}

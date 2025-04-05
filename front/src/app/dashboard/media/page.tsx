@@ -49,7 +49,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { mediaService, MediaType, MediaStatus, MediaQueryParams } from '@/services/media-service';
+import { mediaService, MediaStatus, MediaQueryParams } from '@/services/media-service';
 import { mediaActivityService } from '@/services/media-activity-service';
 import { MediaActivityDTO, MediaActivityCalendarVO } from '@/types/media-activity';
 import { Badge } from '@/components/ui/badge';
@@ -60,14 +60,15 @@ import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
+import { MediaType } from '@/types/media';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 // 媒体类型
 const MEDIA_TYPES = {
   VIDEO: 'VIDEO',
   AUDIO: 'AUDIO',
   IMAGE: 'IMAGE',
-  DOCUMENT: 'DOCUMENT',
-  OTHER: 'OTHER'
+  DOCUMENT: 'DOCUMENT'
 };
 
 // 媒体状态
@@ -90,7 +91,7 @@ interface MediaItem {
   id: number;
   title: string;
   description?: string;
-  type: string; // 'VIDEO', 'AUDIO', 'IMAGE', 'DOCUMENT', 'OTHER'
+  type: string; // 'VIDEO', 'AUDIO', 'IMAGE', 'DOCUMENT'
   size: number;
   originalFilename: string;
   status: string;
@@ -136,7 +137,7 @@ const formatFileSize = (bytes: number): string => {
 };
 
 // 获取媒体类型名称
-const getMediaTypeName = (type: MediaType): string => {
+const getMediaTypeName = (type: MediaType | string): string => {
   switch (type) {
     case MediaType.VIDEO:
       return '视频';
@@ -147,7 +148,7 @@ const getMediaTypeName = (type: MediaType): string => {
     case MediaType.DOCUMENT:
       return '文档';
     default:
-      return '其他';
+      return '未知';
   }
 };
 
@@ -189,7 +190,7 @@ const ActivityHeatmap = ({
   startDate?: Date;
   endDate?: Date;
   selectedDate?: Date;
-  onDateSelect: (date: Date) => void;
+  onDateSelect: (date: Date | undefined) => void;
 }) => {
   if (!calendarData || !calendarData.calendarData || calendarData.calendarData.length === 0) {
     return (
@@ -285,6 +286,19 @@ const ActivityHeatmap = ({
           <p>最活跃日期: {format(parseISO(calendarData.mostActiveDate), 'yyyy年MM月dd日')}</p>
           <p>总上传数量: {calendarData.totalCount} 个文件</p>
           <p>总大小: {formatFileSize(calendarData.totalSize)}</p>
+        </div>
+      )}
+
+      {selectedDate && (
+        <div className="mt-4">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full"
+            onClick={() => onDateSelect(undefined)}
+          >
+            清除日期选择
+          </Button>
         </div>
       )}
     </div>
@@ -388,8 +402,7 @@ export default function MediaPage() {
     [MediaType.VIDEO]: 0,
     [MediaType.AUDIO]: 0,
     [MediaType.IMAGE]: 0,
-    [MediaType.DOCUMENT]: 0,
-    [MediaType.OTHER]: 0
+    [MediaType.DOCUMENT]: 0
   });
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -491,16 +504,13 @@ export default function MediaPage() {
           [MediaType.VIDEO]: 0,
           [MediaType.AUDIO]: 0,
           [MediaType.IMAGE]: 0,
-          [MediaType.DOCUMENT]: 0,
-          [MediaType.OTHER]: 0
+          [MediaType.DOCUMENT]: 0
         };
         
         items.forEach(item => {
           const type = item.type as MediaType;
           if (stats[type] !== undefined) {
             stats[type]++;
-          } else if (stats[MediaType.OTHER] !== undefined) {
-            stats[MediaType.OTHER]++;
           }
         });
         
@@ -508,9 +518,7 @@ export default function MediaPage() {
         
         // 为媒体类型预加载访问URL
         items.forEach(item => {
-          if ((item.type === MediaType.VIDEO || 
-               item.type === MediaType.AUDIO ||
-               item.type === MediaType.DOCUMENT) && !item.accessUrl) {
+          if (!item.accessUrl) {
             preloadMediaAccessUrl(item.id);
           }
         });
@@ -525,8 +533,7 @@ export default function MediaPage() {
           [MediaType.VIDEO]: 0,
           [MediaType.AUDIO]: 0,
           [MediaType.IMAGE]: 0,
-          [MediaType.DOCUMENT]: 0,
-          [MediaType.OTHER]: 0
+          [MediaType.DOCUMENT]: 0
         });
       }
     } catch (error) {
@@ -589,6 +596,15 @@ export default function MediaPage() {
       
       setMediaList(data.content);
       setTotalItems(data.totalElements);
+      
+      // 添加：预加载媒体访问URL
+      if (data.content && data.content.length > 0) {
+        data.content.forEach(item => {
+          if (!item.accessUrl) {
+            preloadMediaAccessUrl(item.id);
+          }
+        });
+      }
     } catch (error) {
       console.error('加载指定日期媒体列表失败:', error);
       toast.error('加载指定日期媒体列表失败');
@@ -598,9 +614,14 @@ export default function MediaPage() {
   };
 
   // 日期选择处理
-  const handleDateSelect = (date: Date) => {
+  const handleDateSelect = (date: Date | undefined) => {
     setSelectedDate(date);
-    loadMediaByDate(date);
+    if (date) {
+      loadMediaByDate(date);
+    } else {
+      // 清除选择后重新加载默认数据
+      fetchMediaList();
+    }
   };
 
   // 初始加载
@@ -1036,19 +1057,18 @@ export default function MediaPage() {
         <TabsList className="mb-4">
           <TabsTrigger value="all" className="flex items-center gap-2">
             <FileText className="h-4 w-4" /> 全部
-            <Badge variant="secondary" className="ml-1">{typeStats['all']}</Badge>
           </TabsTrigger>
           <TabsTrigger value={MediaType.VIDEO} className="flex items-center gap-2">
             <Video className="h-4 w-4" /> 视频
-            <Badge variant="secondary" className="ml-1">{typeStats[MediaType.VIDEO]}</Badge>
           </TabsTrigger>
           <TabsTrigger value={MediaType.AUDIO} className="flex items-center gap-2">
             <Music className="h-4 w-4" /> 音频
-            <Badge variant="secondary" className="ml-1">{typeStats[MediaType.AUDIO]}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value={MediaType.IMAGE} className="flex items-center gap-2">
+            <Image className="h-4 w-4" /> 图片
           </TabsTrigger>
           <TabsTrigger value={MediaType.DOCUMENT} className="flex items-center gap-2">
             <FileText className="h-4 w-4" /> 文档
-            <Badge variant="secondary" className="ml-1">{typeStats[MediaType.DOCUMENT]}</Badge>
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -1115,7 +1135,7 @@ export default function MediaPage() {
                   </CardDescription>
                 </div>
                 {selectedDate && (
-                  <Button variant="outline" size="sm" onClick={() => setSelectedDate(undefined)}>
+                  <Button variant="outline" size="sm" onClick={() => handleDateSelect(undefined)}>
                     清除日期筛选
                   </Button>
                 )}
@@ -1180,18 +1200,12 @@ export default function MediaPage() {
                                     item.type === MediaType.VIDEO && "bg-blue-100 dark:bg-blue-950/50",
                                     item.type === MediaType.AUDIO && "bg-green-100 dark:bg-green-950/50",
                                     item.type === MediaType.IMAGE && "bg-purple-100 dark:bg-purple-950/50",
-                                    item.type === MediaType.DOCUMENT && "bg-orange-100 dark:bg-orange-950/50",
-                                    item.type === MediaType.OTHER && "bg-gray-100 dark:bg-gray-900/50"
+                                    item.type === MediaType.DOCUMENT && "bg-orange-100 dark:bg-orange-950/50"
                                   )}>
                                     {item.type === MediaType.VIDEO && <FileVideo className="h-5 w-5 text-blue-600 dark:text-blue-400" />}
                                     {item.type === MediaType.AUDIO && <FileAudio className="h-5 w-5 text-green-600 dark:text-green-400" />}
                                     {item.type === MediaType.IMAGE && <FileImage className="h-5 w-5 text-purple-600 dark:text-purple-400" />}
                                     {item.type === MediaType.DOCUMENT && <FileText className="h-5 w-5 text-orange-600 dark:text-orange-400" />}
-                                    {(item.type !== MediaType.VIDEO && 
-                                      item.type !== MediaType.AUDIO && 
-                                      item.type !== MediaType.IMAGE && 
-                                      item.type !== MediaType.DOCUMENT) && 
-                                      <File className="h-5 w-5 text-gray-600 dark:text-gray-400" />}
                                   </div>
                                 </HoverCardTrigger>
                                 <HoverCardContent className="w-80 p-0">
@@ -1364,18 +1378,12 @@ export default function MediaPage() {
                                       item.type === MediaType.VIDEO && "bg-blue-50 dark:bg-blue-950/20",
                                       item.type === MediaType.AUDIO && "bg-green-50 dark:bg-green-950/20",
                                       item.type === MediaType.IMAGE && "bg-purple-50 dark:bg-purple-950/20",
-                                      item.type === MediaType.DOCUMENT && "bg-orange-50 dark:bg-orange-950/20",
-                                      item.type === MediaType.OTHER && "bg-gray-50 dark:bg-gray-900/20"
+                                      item.type === MediaType.DOCUMENT && "bg-orange-50 dark:bg-orange-950/20"
                                     )}>
                                       {item.type === MediaType.VIDEO && <FileVideo className="h-16 w-16 text-blue-600 dark:text-blue-400" />}
                                       {item.type === MediaType.AUDIO && <FileAudio className="h-16 w-16 text-green-600 dark:text-green-400" />}
                                       {item.type === MediaType.IMAGE && <FileImage className="h-16 w-16 text-purple-600 dark:text-purple-400" />}
                                       {item.type === MediaType.DOCUMENT && <FileText className="h-16 w-16 text-orange-600 dark:text-orange-400" />}
-                                      {(item.type !== MediaType.VIDEO && 
-                                        item.type !== MediaType.AUDIO && 
-                                        item.type !== MediaType.IMAGE && 
-                                        item.type !== MediaType.DOCUMENT) && 
-                                        <File className="h-16 w-16 text-gray-600 dark:text-gray-400" />}
                                     </div>
                                   )}
                                   <div className="p-3">
@@ -1422,8 +1430,7 @@ export default function MediaPage() {
                               item.type === MediaType.VIDEO && "bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/20 dark:text-blue-400",
                               item.type === MediaType.AUDIO && "bg-green-50 text-green-700 hover:bg-green-100 dark:bg-green-950/20 dark:text-green-400",
                               item.type === MediaType.IMAGE && "bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-950/20 dark:text-purple-400",
-                              item.type === MediaType.DOCUMENT && "bg-orange-50 text-orange-700 hover:bg-orange-100 dark:bg-orange-950/20 dark:text-orange-400",
-                              item.type === MediaType.OTHER && "bg-gray-50 text-gray-700 hover:bg-gray-100 dark:bg-gray-900/20 dark:text-gray-400"
+                              item.type === MediaType.DOCUMENT && "bg-orange-50 text-orange-700 hover:bg-orange-100 dark:bg-orange-950/20 dark:text-orange-400"
                             )}>
                               {getMediaTypeName(item.type as MediaType)}
                             </Badge>

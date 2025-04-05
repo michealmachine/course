@@ -6,17 +6,22 @@ import com.zhangziqi.online_course_mine.exception.ResourceNotFoundException;
 import com.zhangziqi.online_course_mine.model.dto.media.*;
 import com.zhangziqi.online_course_mine.model.entity.Institution;
 import com.zhangziqi.online_course_mine.model.entity.Media;
+import com.zhangziqi.online_course_mine.model.entity.User;
 import com.zhangziqi.online_course_mine.model.enums.MediaStatus;
 import com.zhangziqi.online_course_mine.model.enums.MediaType;
 import com.zhangziqi.online_course_mine.model.enums.QuotaType;
+import com.zhangziqi.online_course_mine.model.vo.AdminMediaVO;
 import com.zhangziqi.online_course_mine.model.vo.MediaActivityCalendarVO;
+import com.zhangziqi.online_course_mine.model.vo.MediaTypeDistributionVO;
 import com.zhangziqi.online_course_mine.model.vo.MediaVO;
 import com.zhangziqi.online_course_mine.model.vo.StorageGrowthPointVO;
 import com.zhangziqi.online_course_mine.repository.InstitutionRepository;
 import com.zhangziqi.online_course_mine.repository.MediaRepository;
+import com.zhangziqi.online_course_mine.repository.UserRepository;
 import com.zhangziqi.online_course_mine.service.MediaService;
 import com.zhangziqi.online_course_mine.service.StorageQuotaService;
 import com.zhangziqi.online_course_mine.service.MinioService;
+import com.zhangziqi.online_course_mine.utils.FormatUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
@@ -34,9 +39,13 @@ import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import static com.zhangziqi.online_course_mine.model.enums.ContentType.IMAGE;
 
 /**
  * 媒体服务实现类
@@ -48,6 +57,7 @@ public class MediaServiceImpl implements MediaService {
     
     private final MediaRepository mediaRepository;
     private final InstitutionRepository institutionRepository;
+    private final UserRepository userRepository;
     private final StorageQuotaService storageQuotaService;
     private final S3MultipartUploadManager s3UploadManager;
     private final UploadStatusService uploadStatusService;
@@ -724,5 +734,245 @@ public class MediaServiceImpl implements MediaService {
 
         log.info("成功获取存储增长趋势数据点 {} 个", trendData.size());
         return trendData;
+    }
+
+    /**
+     * 将Media转换为AdminMediaVO（包含额外的机构名称和上传者名称信息）
+     */
+    private AdminMediaVO mapToAdminMediaVO(Media media, String accessUrl) {
+        // 先获取基础的MediaVO信息
+        MediaVO baseVO = mapToMediaVO(media, accessUrl);
+        
+        // 获取机构名称
+        String institutionName = "";
+        if (media.getInstitution() != null) {
+            institutionName = media.getInstitution().getName();
+        }
+        
+        // 尝试获取上传者名称
+        String uploaderUsername = "";
+        if (media.getUploaderId() != null) {
+            // 从用户仓库查询用户名
+            try {
+                User uploader = userRepository.findById(media.getUploaderId()).orElse(null);
+                if (uploader != null) {
+                    uploaderUsername = uploader.getUsername();
+                }
+            } catch (Exception e) {
+                log.warn("获取上传者名称时出错: {}", e.getMessage());
+                // 不抛出异常，使用空名称
+            }
+        }
+        
+        // 格式化文件大小
+        String formattedSize = FormatUtil.formatFileSize(media.getSize());
+        
+        // 构建扩展VO
+        return AdminMediaVO.builder()
+                // 继承基础VO的所有属性
+                .id(baseVO.getId())
+                .title(baseVO.getTitle())
+                .description(baseVO.getDescription())
+                .type(baseVO.getType())
+                .size(baseVO.getSize())
+                .originalFilename(baseVO.getOriginalFilename())
+                .status(baseVO.getStatus())
+                .institutionId(baseVO.getInstitutionId())
+                .uploaderId(baseVO.getUploaderId())
+                .uploadTime(baseVO.getUploadTime())
+                .lastAccessTime(baseVO.getLastAccessTime())
+                .accessUrl(baseVO.getAccessUrl())
+                // 添加扩展属性
+                .institutionName(institutionName)
+                .uploaderUsername(uploaderUsername)
+                .formattedSize(formattedSize)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<AdminMediaVO> getAdminMediaList(
+            MediaType type, 
+            String filename,
+            String institutionName,
+            LocalDateTime uploadStartTime,
+            LocalDateTime uploadEndTime,
+            Long minSize,
+            Long maxSize,
+            Pageable pageable) {
+        
+        log.info("管理员高级查询媒体列表 - 类型: {}, 文件名: {}, 机构名称: {}, 上传时间: {} 至 {}, 大小: {} 至 {}",
+                type, filename, institutionName, uploadStartTime, uploadEndTime, minSize, maxSize);
+        
+        // 构建动态查询条件
+        Specification<Media> spec = Specification.where(null);
+        
+        // 按媒体类型筛选
+        if (type != null) {
+            spec = spec.and((root, query, cb) -> 
+                cb.equal(root.get("type"), type)
+            );
+        }
+        
+        // 按文件名筛选
+        if (StringUtils.hasText(filename)) {
+            spec = spec.and((root, query, cb) -> 
+                cb.like(cb.lower(root.get("originalFilename")), "%" + filename.toLowerCase() + "%")
+            );
+        }
+        
+        // 按机构名称筛选
+        if (StringUtils.hasText(institutionName)) {
+            spec = spec.and((root, query, cb) -> 
+                cb.like(cb.lower(root.get("institution").get("name")), "%" + institutionName.toLowerCase() + "%")
+            );
+        }
+        
+        // 按上传时间筛选
+        if (uploadStartTime != null && uploadEndTime != null) {
+            spec = spec.and((root, query, cb) -> 
+                cb.between(root.get("uploadTime"), uploadStartTime, uploadEndTime)
+            );
+        } else if (uploadStartTime != null) {
+            spec = spec.and((root, query, cb) -> 
+                cb.greaterThanOrEqualTo(root.get("uploadTime"), uploadStartTime)
+            );
+        } else if (uploadEndTime != null) {
+            spec = spec.and((root, query, cb) -> 
+                cb.lessThanOrEqualTo(root.get("uploadTime"), uploadEndTime)
+            );
+        }
+        
+        // 按文件大小筛选
+        if (minSize != null && maxSize != null) {
+            spec = spec.and((root, query, cb) -> 
+                cb.between(root.get("size"), minSize, maxSize)
+            );
+        } else if (minSize != null) {
+            spec = spec.and((root, query, cb) -> 
+                cb.greaterThanOrEqualTo(root.get("size"), minSize)
+            );
+        } else if (maxSize != null) {
+            spec = spec.and((root, query, cb) -> 
+                cb.lessThanOrEqualTo(root.get("size"), maxSize)
+            );
+        }
+        
+        // 执行查询
+        Page<Media> mediaPage = mediaRepository.findAll(spec, pageable);
+        
+        log.info("查询到符合条件的媒体记录 {} 条", mediaPage.getTotalElements());
+        
+        // 映射为扩展VO
+        return mediaPage.map(media -> mapToAdminMediaVO(media, null));
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public Page<AdminMediaVO> getAdminMediaListByDate(LocalDate date, Pageable pageable) {
+        log.info("管理员根据日期获取媒体列表 - 日期: {}", date);
+        
+        // 查询指定日期上传的所有媒体
+        Page<Media> mediaPage = mediaRepository.findAllMediaByDate(date, pageable);
+        
+        log.info("查询到 {} 条媒体记录", mediaPage.getTotalElements());
+        
+        // 转换为扩展VO
+        return mediaPage.map(media -> mapToAdminMediaVO(media, null));
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.MEDIA_STATS_CACHE, key = "'type_distribution_' + (T(java.util.Objects).isNull(#institutionId) ? 'all' : #institutionId)")
+    public MediaTypeDistributionVO getMediaTypeDistribution(Long institutionId) {
+        log.info("获取媒体类型分布统计 - 机构ID: {}", institutionId);
+        
+        List<Object[]> typeCountList;
+        
+        // 根据是否指定机构ID选择不同的查询方法
+        if (institutionId != null) {
+            Institution institution = institutionRepository.findById(institutionId)
+                    .orElseThrow(() -> new ResourceNotFoundException("机构不存在，ID: " + institutionId));
+            typeCountList = mediaRepository.countByMediaTypeForInstitution(institutionId);
+        } else {
+            typeCountList = mediaRepository.countByMediaType();
+        }
+        
+        // 解析查询结果
+        Map<MediaType, Long> typeCountMap = new HashMap<>();
+        long totalCount = 0;
+        
+        for (Object[] result : typeCountList) {
+            MediaType type = (MediaType) result[0];
+            Long count = ((Number) result[1]).longValue();
+            typeCountMap.put(type, count);
+            totalCount += count;
+        }
+        
+        // 构建分布详情列表
+        List<MediaTypeDistributionVO.TypeDistribution> distribution = new ArrayList<>();
+        
+        // 确保所有媒体类型都有记录
+        for (MediaType type : MediaType.values()) {
+            long count = typeCountMap.getOrDefault(type, 0L);
+            double percentage = totalCount > 0 ? (double) count / totalCount : 0;
+            
+            distribution.add(
+                MediaTypeDistributionVO.TypeDistribution.builder()
+                    .type(type)
+                    .typeName(getMediaTypeName(type))
+                    .count(count)
+                    .percentage(percentage)
+                    .build()
+            );
+        }
+        
+        // 按数量降序排序
+        distribution.sort(Comparator.comparing(MediaTypeDistributionVO.TypeDistribution::getCount).reversed());
+        
+        return MediaTypeDistributionVO.builder()
+                .totalCount(totalCount)
+                .typeCount(typeCountMap)
+                .distribution(distribution)
+                .build();
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.MEDIA_STATS_CACHE, key = "'institution_storage_usage'")
+    public Map<String, Long> getInstitutionStorageUsage() {
+        log.info("获取各机构的媒体存储占用统计");
+        
+        // 获取所有机构
+        List<Institution> institutions = institutionRepository.findAll();
+        Map<String, Long> usageMap = new HashMap<>();
+        
+        // 查询每个机构的存储使用量
+        for (Institution institution : institutions) {
+            Long usage = mediaRepository.sumSizeByInstitution(institution);
+            // 为null时设为0
+            usageMap.put(institution.getName(), usage != null ? usage : 0L);
+        }
+        
+        log.info("成功获取 {} 个机构的存储使用情况", usageMap.size());
+        return usageMap;
+    }
+    
+    /**
+     * 获取媒体类型的中文名称
+     */
+    private String getMediaTypeName(MediaType type) {
+        switch (type) {
+            case VIDEO:
+                return "视频";
+            case AUDIO:
+                return "音频";
+            case IMAGE:
+                return "图片";
+            case DOCUMENT:
+                return "文档";
+            default:
+                return "未知";
+        }
     }
 } 

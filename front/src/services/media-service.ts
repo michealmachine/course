@@ -4,15 +4,7 @@ import { request } from './api';
 import { ApiResponse } from '@/types/api';
 import { AxiosResponse } from 'axios';
 import { StorageGrowthPointVO } from '@/types/stats';
-
-// 媒体类型
-export enum MediaType {
-  VIDEO = 'VIDEO',
-  AUDIO = 'AUDIO',
-  IMAGE = 'IMAGE',
-  DOCUMENT = 'DOCUMENT',
-  OTHER = 'OTHER'
-}
+import { MediaType, MediaVO, AdminMediaVO } from '@/types/media';
 
 // 媒体状态
 export enum MediaStatus {
@@ -47,20 +39,13 @@ export interface MediaQueryParams {
     filename?: string;
 }
 
-// 媒体信息
-export interface MediaVO {
-    id: number;
-    title: string;
-    description?: string;
-    type: string;
-    size: number;
-    originalFilename: string;
-    status: string;
-    institutionId: number;
-    uploaderId: number;
-    uploadTime: string;
-    lastAccessTime: string;
-    accessUrl?: string;
+// 添加高级查询参数
+export interface AdvancedMediaQueryParams extends MediaQueryParams {
+  institutionName?: string;
+  uploadStartTime?: string;
+  uploadEndTime?: string;
+  minSize?: number;
+  maxSize?: number;
 }
 
 // 媒体访问URL响应
@@ -167,6 +152,12 @@ export interface MediaService {
   getAdminMediaList(params: MediaQueryParams): Promise<Result<Page<MediaVO>>>;
 
   /**
+   * 获取管理员视角的媒体列表 (支持高级筛选)
+   * @param params 高级查询参数
+   */
+  getAdvancedMediaList(params: AdvancedMediaQueryParams): Promise<Result<Page<AdminMediaVO>>>;
+
+  /**
    * 获取系统存储增长趋势
    * @param startDate 开始日期 (YYYY-MM-DD)
    * @param endDate 结束日期 (YYYY-MM-DD)
@@ -229,6 +220,13 @@ class MediaServiceImpl implements MediaService {
     // 管理员接口路径为 /admin/media
     const response: AxiosResponse<ApiResponse<Page<MediaVO>>> = await request.get('/admin/media', { params });
     return response.data as Result<Page<MediaVO>>;
+  }
+
+  async getAdvancedMediaList(params: AdvancedMediaQueryParams): Promise<Result<Page<AdminMediaVO>>> {
+    console.log('MediaService.getAdvancedMediaList 请求参数:', params);
+    // 高级筛选接口路径为 /admin/media/advanced
+    const response: AxiosResponse<ApiResponse<Page<AdminMediaVO>>> = await request.get('/admin/media/advanced', { params });
+    return response.data as Result<Page<AdminMediaVO>>;
   }
 
   async getStorageGrowthTrend(startDate: string, endDate: string, granularity: string = 'DAYS'): Promise<Result<StorageGrowthPointVO[]>> {

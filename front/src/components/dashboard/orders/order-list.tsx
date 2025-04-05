@@ -375,14 +375,14 @@ export function OrderList({ isAdmin, isInstitution }: OrderListProps) {
             <div className="space-y-2">
               <label className="text-sm font-medium">订单状态</label>
               <Select 
-                value={searchParams.status?.toString() || ''} 
-                onValueChange={(value) => setSearchParams((prev) => ({ ...prev, status: value ? parseInt(value) : undefined }))}
+                value={searchParams.status?.toString() || 'ALL'} 
+                onValueChange={(value) => setSearchParams((prev) => ({ ...prev, status: value === 'ALL' ? undefined : parseInt(value) }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="所有状态" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">所有状态</SelectItem>
+                  <SelectItem value="ALL">所有状态</SelectItem>
                   <SelectItem value={OrderStatus.PENDING.toString()}>待支付</SelectItem>
                   <SelectItem value={OrderStatus.PAID.toString()}>已支付</SelectItem>
                   <SelectItem value={OrderStatus.CLOSED.toString()}>已关闭</SelectItem>

@@ -15,6 +15,11 @@ public enum MediaType {
     AUDIO,
     
     /**
+     * 图片
+     */
+    IMAGE,
+    
+    /**
      * 文档
      */
     DOCUMENT

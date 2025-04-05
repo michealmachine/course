@@ -107,23 +107,38 @@ public class MediaController {
      */
     @GetMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasAuthority('ROLE_INSTITUTION')")
+    @PreAuthorize("hasAnyAuthority('ROLE_INSTITUTION', 'ROLE_ADMIN')")
     @Operation(summary = "获取媒体信息", description = "获取指定媒体的详细信息")
     public Result<MediaVO> getMediaInfo(
             @Parameter(description = "媒体ID") @PathVariable("id") Long mediaId) {
-        Long institutionId = SecurityUtil.getCurrentInstitutionId();
         Long userId = SecurityUtil.getCurrentUserId();
         
-        log.info("获取媒体信息, mediaId: {}, institutionId: {}, userId: {}, 请求路径: {}", 
-                mediaId, institutionId, userId, "/api/media/" + mediaId);
+        // 区分管理员和机构用户
+        Long institutionId = null;
+        boolean isAdmin = SecurityUtil.hasRole("ADMIN");
+        
+        if (!isAdmin) {
+            institutionId = SecurityUtil.getCurrentInstitutionId();
+            log.info("机构用户获取媒体信息, mediaId: {}, institutionId: {}, userId: {}", 
+                    mediaId, institutionId, userId);
+        } else {
+            log.info("管理员获取媒体信息, mediaId: {}, userId: {}", mediaId, userId);
+        }
         
         try {
-            MediaVO media = mediaService.getMediaInfo(mediaId, institutionId);
+            MediaVO media;
+            if (isAdmin) {
+                // 管理员可以查看任意媒体，无需机构ID验证
+                media = mediaService.getMediaByIdForPreview(mediaId);
+            } else {
+                // 机构用户只能查看自己机构的媒体
+                media = mediaService.getMediaInfo(mediaId, institutionId);
+            }
+            
             log.info("成功获取媒体信息: {}", media);
             return Result.success(media);
         } catch (Exception e) {
-            log.error("获取媒体信息失败, mediaId: {}, institutionId: {}, error: {}", 
-                    mediaId, institutionId, e.getMessage());
+            log.error("获取媒体信息失败, mediaId: {}, error: {}", mediaId, e.getMessage());
             throw e;
         }
     }

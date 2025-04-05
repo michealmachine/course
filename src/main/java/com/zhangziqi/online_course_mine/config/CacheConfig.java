@@ -32,6 +32,7 @@ public class CacheConfig {
     public static final String ROLE_CACHE = "roles";
     public static final String QUOTA_STATS_CACHE = "quotaStats_v2"; // 添加版本号，避免使用旧缓存
     public static final String MEDIA_ACTIVITY_CACHE = "mediaActivity"; // 媒体活动缓存
+    public static final String MEDIA_STATS_CACHE = "mediaStats"; // 媒体统计缓存
 
     // 缓存时间常量（分钟）
     private static final long DEFAULT_EXPIRE_MINUTES = 30;
@@ -40,15 +41,13 @@ public class CacheConfig {
     private static final long ROLE_EXPIRE_MINUTES = 120; // 角色缓存2小时
     private static final long QUOTA_STATS_EXPIRE_MINUTES = 15; // 配额统计缓存15分钟
     private static final long MEDIA_ACTIVITY_EXPIRE_MINUTES = 30; // 媒体活动缓存30分钟
+    private static final long MEDIA_STATS_EXPIRE_MINUTES = 15; // 媒体统计缓存15分钟
     
     /**
      * 配置Redis缓存管理器
      */
     @Bean
     public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
-        // 使用Jackson2JsonRedisSerializer作为序列化器
-        Jackson2JsonRedisSerializer<Object> serializer = new Jackson2JsonRedisSerializer<>(Object.class);
-        
         // 配置ObjectMapper，确保序列化时保留类型信息
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule()); // 支持Java 8时间类型
@@ -57,7 +56,12 @@ public class CacheConfig {
             LaissezFaireSubTypeValidator.instance,
             ObjectMapper.DefaultTyping.NON_FINAL
         );
-        serializer.setObjectMapper(objectMapper);
+        
+        // 使用新的API方式创建Jackson2JsonRedisSerializer
+        Jackson2JsonRedisSerializer<Object> serializer = new Jackson2JsonRedisSerializer<>(
+            objectMapper,
+            Object.class
+        );
 
         // 默认缓存配置
         RedisCacheConfiguration defaultCacheConfig = RedisCacheConfiguration.defaultCacheConfig()
@@ -88,6 +92,10 @@ public class CacheConfig {
         // 媒体活动缓存配置
         cacheConfigurations.put(MEDIA_ACTIVITY_CACHE, 
             defaultCacheConfig.entryTtl(Duration.ofMinutes(MEDIA_ACTIVITY_EXPIRE_MINUTES)));
+
+        // 媒体统计缓存配置
+        cacheConfigurations.put(MEDIA_STATS_CACHE, 
+            defaultCacheConfig.entryTtl(Duration.ofMinutes(MEDIA_STATS_EXPIRE_MINUTES)));
 
         // 构建缓存管理器
         return RedisCacheManager.builder(connectionFactory)

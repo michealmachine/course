@@ -3,14 +3,18 @@ package com.zhangziqi.online_course_mine.service;
 import com.zhangziqi.online_course_mine.model.dto.media.*;
 import com.zhangziqi.online_course_mine.model.entity.Institution;
 import com.zhangziqi.online_course_mine.model.entity.Media;
+import com.zhangziqi.online_course_mine.model.entity.User;
 import com.zhangziqi.online_course_mine.model.enums.MediaStatus;
 import com.zhangziqi.online_course_mine.model.enums.MediaType;
 import com.zhangziqi.online_course_mine.model.enums.QuotaType;
 import com.zhangziqi.online_course_mine.model.vo.MediaActivityCalendarVO;
 import com.zhangziqi.online_course_mine.model.vo.MediaVO;
 import com.zhangziqi.online_course_mine.model.vo.StorageGrowthPointVO;
+import com.zhangziqi.online_course_mine.model.vo.AdminMediaVO;
+import com.zhangziqi.online_course_mine.model.vo.MediaTypeDistributionVO;
 import com.zhangziqi.online_course_mine.repository.InstitutionRepository;
 import com.zhangziqi.online_course_mine.repository.MediaRepository;
+import com.zhangziqi.online_course_mine.repository.UserRepository;
 import com.zhangziqi.online_course_mine.service.impl.MediaServiceImpl;
 import com.zhangziqi.online_course_mine.service.impl.S3MultipartUploadManager;
 import com.zhangziqi.online_course_mine.service.impl.UploadStatusService;
@@ -38,6 +42,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -51,6 +56,9 @@ public class MediaServiceTest {
 
     @Mock
     private InstitutionRepository institutionRepository;
+
+    @Mock
+    private UserRepository userRepository;
 
     @Mock
     private StorageQuotaService storageQuotaService;
@@ -700,5 +708,149 @@ public class MediaServiceTest {
         // Asserting the actual Specification content is complex in unit tests.
         // We trust the service layer correctly builds the spec based on inputs.
         // Integration tests would cover the Specification logic more directly.
+    }
+
+    @Test
+    void testGetAdminMediaList() {
+        // 准备测试数据
+        List<Media> mediaList = List.of(media);
+        Page<Media> mediaPage = new PageImpl<>(mediaList);
+        
+        User uploader = new User();
+        uploader.setId(uploaderId);
+        uploader.setUsername("testUser");
+        
+        // Mock方法调用
+        when(mediaRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(mediaPage);
+        when(userRepository.findById(uploaderId)).thenReturn(Optional.of(uploader));
+        
+        // 执行测试
+        Page<AdminMediaVO> result = mediaService.getAdminMediaList(
+                MediaType.VIDEO, "test", "测试机构", 
+                LocalDateTime.now().minusDays(7), LocalDateTime.now(),
+                1024L, 1024 * 1024 * 100L, Pageable.unpaged());
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getContent().size());
+        assertEquals(mediaId, result.getContent().get(0).getId());
+        assertEquals("testUser", result.getContent().get(0).getUploaderUsername());
+        assertEquals("测试机构", result.getContent().get(0).getInstitutionName());
+        assertNotNull(result.getContent().get(0).getFormattedSize());
+        
+        // 验证调用
+        verify(mediaRepository).findAll(any(Specification.class), any(Pageable.class));
+        verify(userRepository).findById(uploaderId);
+    }
+    
+    @Test
+    void testGetAdminMediaListByDate() {
+        // 准备测试数据
+        List<Media> mediaList = List.of(media);
+        Page<Media> mediaPage = new PageImpl<>(mediaList);
+        
+        User uploader = new User();
+        uploader.setId(uploaderId);
+        uploader.setUsername("testUser");
+        
+        // Mock方法调用
+        when(mediaRepository.findAllMediaByDate(any(LocalDate.class), any(Pageable.class))).thenReturn(mediaPage);
+        when(userRepository.findById(uploaderId)).thenReturn(Optional.of(uploader));
+        
+        // 执行测试
+        Page<AdminMediaVO> result = mediaService.getAdminMediaListByDate(LocalDate.now(), Pageable.unpaged());
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getContent().size());
+        assertEquals(mediaId, result.getContent().get(0).getId());
+        assertEquals("testUser", result.getContent().get(0).getUploaderUsername());
+        
+        // 验证调用
+        verify(mediaRepository).findAllMediaByDate(any(LocalDate.class), any(Pageable.class));
+        verify(userRepository).findById(uploaderId);
+    }
+    
+    @Test
+    void testGetMediaTypeDistribution() {
+        // 准备测试数据
+        List<Object[]> typeCountList = new ArrayList<>();
+        typeCountList.add(new Object[] { MediaType.VIDEO, 5L });
+        typeCountList.add(new Object[] { MediaType.DOCUMENT, 3L });
+        
+        // Mock方法调用
+        when(mediaRepository.countByMediaType()).thenReturn(typeCountList);
+        
+        // 执行测试
+        MediaTypeDistributionVO result = mediaService.getMediaTypeDistribution(null);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(8, result.getTotalCount());
+        assertEquals(2, result.getTypeCount().size());
+        assertTrue(result.getTypeCount().containsKey(MediaType.VIDEO));
+        assertTrue(result.getTypeCount().containsKey(MediaType.DOCUMENT));
+        assertEquals(5L, result.getTypeCount().get(MediaType.VIDEO));
+        assertEquals(3L, result.getTypeCount().get(MediaType.DOCUMENT));
+        
+        // 验证调用
+        verify(mediaRepository).countByMediaType();
+    }
+    
+    @Test
+    void testGetMediaTypeDistributionForInstitution() {
+        // 准备测试数据
+        List<Object[]> typeCountList = new ArrayList<>();
+        typeCountList.add(new Object[] { MediaType.VIDEO, 5L });
+        
+        // Mock方法调用
+        when(institutionRepository.findById(institutionId)).thenReturn(Optional.of(institution));
+        when(mediaRepository.countByMediaTypeForInstitution(institutionId)).thenReturn(typeCountList);
+        
+        // 执行测试
+        MediaTypeDistributionVO result = mediaService.getMediaTypeDistribution(institutionId);
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(5, result.getTotalCount());
+        assertEquals(1, result.getTypeCount().size());
+        assertTrue(result.getTypeCount().containsKey(MediaType.VIDEO));
+        assertEquals(5L, result.getTypeCount().get(MediaType.VIDEO));
+        
+        // 验证调用
+        verify(institutionRepository).findById(institutionId);
+        verify(mediaRepository).countByMediaTypeForInstitution(institutionId);
+    }
+    
+    @Test
+    void testGetInstitutionStorageUsage() {
+        // 准备测试数据
+        List<Institution> institutions = new ArrayList<>();
+        institutions.add(institution);
+        
+        Institution institution2 = new Institution();
+        institution2.setId(2L);
+        institution2.setName("测试机构2");
+        institutions.add(institution2);
+        
+        // Mock方法调用
+        when(institutionRepository.findAll()).thenReturn(institutions);
+        when(mediaRepository.sumSizeByInstitution(institution)).thenReturn(1024 * 1024 * 10L);
+        when(mediaRepository.sumSizeByInstitution(institution2)).thenReturn(1024 * 1024 * 5L);
+        
+        // 执行测试
+        Map<String, Long> result = mediaService.getInstitutionStorageUsage();
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(2, result.size());
+        assertTrue(result.containsKey("测试机构"));
+        assertTrue(result.containsKey("测试机构2"));
+        assertEquals(1024 * 1024 * 10L, result.get("测试机构"));
+        assertEquals(1024 * 1024 * 5L, result.get("测试机构2"));
+        
+        // 验证调用
+        verify(institutionRepository).findAll();
+        verify(mediaRepository, times(2)).sumSizeByInstitution(any(Institution.class));
     }
 } 

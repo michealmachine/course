@@ -2,7 +2,9 @@ package com.zhangziqi.online_course_mine.service;
 
 import com.zhangziqi.online_course_mine.model.dto.media.*;
 import com.zhangziqi.online_course_mine.model.enums.MediaType;
+import com.zhangziqi.online_course_mine.model.vo.AdminMediaVO;
 import com.zhangziqi.online_course_mine.model.vo.MediaActivityCalendarVO;
+import com.zhangziqi.online_course_mine.model.vo.MediaTypeDistributionVO;
 import com.zhangziqi.online_course_mine.model.vo.MediaVO;
 import com.zhangziqi.online_course_mine.model.vo.StorageGrowthPointVO;
 import org.springframework.data.domain.Page;
@@ -10,8 +12,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 媒体服务接口
@@ -166,4 +170,51 @@ public interface MediaService {
      */
     List<StorageGrowthPointVO> getStorageGrowthTrend(
             LocalDate startDate, LocalDate endDate, ChronoUnit granularity);
+
+    /**
+     * 获取所有机构的媒体列表（管理员使用，支持高级筛选）
+     *
+     * @param type 媒体类型（可选）
+     * @param filename 文件名关键词（可选）
+     * @param institutionName 机构名称关键词（可选）
+     * @param uploadStartTime 上传开始时间（可选）
+     * @param uploadEndTime 上传结束时间（可选）
+     * @param minSize 最小文件大小（可选，字节）
+     * @param maxSize 最大文件大小（可选，字节）
+     * @param pageable 分页参数
+     * @return 媒体列表（包含扩展信息）
+     */
+    Page<AdminMediaVO> getAdminMediaList(
+            MediaType type, 
+            String filename,
+            String institutionName,
+            LocalDateTime uploadStartTime,
+            LocalDateTime uploadEndTime,
+            Long minSize,
+            Long maxSize,
+            Pageable pageable);
+    
+    /**
+     * 根据日期获取所有机构的媒体列表（管理员使用，返回扩展VO）
+     *
+     * @param date 日期
+     * @param pageable 分页参数
+     * @return 媒体列表（包含扩展信息）
+     */
+    Page<AdminMediaVO> getAdminMediaListByDate(LocalDate date, Pageable pageable);
+    
+    /**
+     * 获取媒体类型分布统计
+     *
+     * @param institutionId 机构ID（可选，如果提供则只统计该机构的媒体）
+     * @return 各类型媒体的数量统计
+     */
+    MediaTypeDistributionVO getMediaTypeDistribution(Long institutionId);
+    
+    /**
+     * 获取各机构的媒体存储占用统计
+     *
+     * @return 各机构的存储占用情况
+     */
+    Map<String, Long> getInstitutionStorageUsage();
 } 
