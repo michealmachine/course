@@ -281,6 +281,7 @@ const ActivityHeatmap = ({
         ))}
       </div>
       
+      {/* 如果有最活跃日期，显示信息但不自动选择 */}
       {calendarData.mostActiveDate && (
         <div className="mt-4 text-sm text-muted-foreground">
           <p>最活跃日期: {format(parseISO(calendarData.mostActiveDate), 'yyyy年MM月dd日')}</p>
@@ -289,6 +290,7 @@ const ActivityHeatmap = ({
         </div>
       )}
 
+      {/* 如果已经选择了日期，提供清除选择的按钮 */}
       {selectedDate && (
         <div className="mt-4">
           <Button 
@@ -563,12 +565,10 @@ export default function MediaPage() {
       
       setCalendarData(data);
       
-      // 如果没有选择日期但有最活跃日期，则选择最活跃日期
-      if (!selectedDate && data.mostActiveDate) {
-        const activeDate = parseISO(data.mostActiveDate);
-        setSelectedDate(activeDate);
-        loadMediaByDate(activeDate);
-      }
+      // 移除自动选择最活跃日期的逻辑
+      // 如果手动清除了选择，则不应该自动选择回来
+      // 只有在用户明确点击热力图上的日期时才选择日期
+      
     } catch (error) {
       console.error('加载媒体活动数据失败:', error);
       toast.error('加载媒体活动数据失败');
@@ -615,18 +615,24 @@ export default function MediaPage() {
 
   // 日期选择处理
   const handleDateSelect = (date: Date | undefined) => {
+    // 更新选中的日期状态
     setSelectedDate(date);
+    
     if (date) {
+      // 如果选择了日期，则加载该日期的媒体列表
       loadMediaByDate(date);
     } else {
-      // 清除选择后重新加载默认数据
+      // 如果清除了日期选择，则重新加载默认的媒体列表（不按日期筛选）
       fetchMediaList();
     }
   };
 
   // 初始加载
   useEffect(() => {
+    // 首先获取一般的媒体列表，不按日期筛选
     fetchMediaList();
+    
+    // 然后再获取热力图数据，但不自动选择日期
     fetchActivityData();
   }, [pagination, activeTab]);
 
@@ -1125,17 +1131,20 @@ export default function MediaPage() {
                 <div>
                   <CardTitle>
                     {selectedDate 
-                      ? `${format(selectedDate, 'yyyy年MM月dd日')}的媒体文件` 
+                      ? `${format(selectedDate, 'yyyy年MM月dd日')}的上传文件` 
                       : activeTab === 'all' 
                         ? '全部媒体文件' 
                         : `${getMediaTypeName(activeTab as MediaType)}文件`}
                   </CardTitle>
                   <CardDescription>
-                    {totalItems > 0 ? `共 ${totalItems} 个文件` : '暂无文件'}
+                    {selectedDate 
+                      ? `当日上传: ${totalItems > 0 ? `共 ${totalItems} 个文件` : '暂无文件'}`
+                      : `${totalItems > 0 ? `共 ${totalItems} 个文件` : '暂无文件'}`}
                   </CardDescription>
                 </div>
                 {selectedDate && (
                   <Button variant="outline" size="sm" onClick={() => handleDateSelect(undefined)}>
+                    <X className="h-4 w-4 mr-1" />
                     清除日期筛选
                   </Button>
                 )}

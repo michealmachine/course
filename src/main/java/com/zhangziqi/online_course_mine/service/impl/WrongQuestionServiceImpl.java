@@ -10,11 +10,13 @@ import com.zhangziqi.online_course_mine.model.entity.Course;
 import com.zhangziqi.online_course_mine.model.entity.Section;
 import com.zhangziqi.online_course_mine.model.entity.User;
 import com.zhangziqi.online_course_mine.model.entity.UserWrongQuestion;
+import com.zhangziqi.online_course_mine.model.enums.UserCourseStatus;
 import com.zhangziqi.online_course_mine.model.enums.UserWrongQuestionStatus;
 import com.zhangziqi.online_course_mine.model.vo.UserWrongQuestionVO;
 import com.zhangziqi.online_course_mine.repository.ChapterRepository;
 import com.zhangziqi.online_course_mine.repository.CourseRepository;
 import com.zhangziqi.online_course_mine.repository.SectionRepository;
+import com.zhangziqi.online_course_mine.repository.UserCourseRepository;
 import com.zhangziqi.online_course_mine.repository.UserRepository;
 import com.zhangziqi.online_course_mine.repository.UserWrongQuestionRepository;
 import com.zhangziqi.online_course_mine.service.WrongQuestionService;
@@ -47,6 +49,7 @@ public class WrongQuestionServiceImpl implements WrongQuestionService {
     private final CourseRepository courseRepository;
     private final ChapterRepository chapterRepository;
     private final SectionRepository sectionRepository;
+    private final UserCourseRepository userCourseRepository;
     private final ObjectMapper objectMapper;
     
     @Override
@@ -63,6 +66,11 @@ public class WrongQuestionServiceImpl implements WrongQuestionService {
         // 查找课程
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("课程不存在"));
+        
+        // 验证用户是否已购买课程，并且课程状态为正常（未退款、未过期）
+        if (!userCourseRepository.existsByUser_IdAndCourse_IdAndStatus(userId, courseId, UserCourseStatus.NORMAL.getValue())) {
+            throw new BusinessException(403, "请先购买课程再进行学习，或检查课程是否已过期或退款");
+        }
         
         // 查找小节
         Section section = null;
@@ -85,9 +93,13 @@ public class WrongQuestionServiceImpl implements WrongQuestionService {
         if (existingRecord.isPresent()) {
             // 更新现有记录
             wrongQuestion = existingRecord.get();
-            // 错误计数增加
-            Integer wrongCount = wrongQuestion.getStatus() != null ? wrongQuestion.getStatus() + 1 : 1;
-            wrongQuestion.setStatus(UserWrongQuestionStatus.UNRESOLVED.getValue()); // 再次错误，标记为未解决
+            
+            // 错误计数增加 - 使用专门的错误计数字段
+            Integer errorCount = wrongQuestion.getErrorCount() != null ? wrongQuestion.getErrorCount() + 1 : 1;
+            wrongQuestion.setErrorCount(errorCount);
+            
+            // 再次错误，标记为未解决
+            wrongQuestion.setStatus(UserWrongQuestionStatus.UNRESOLVED.getValue());
         } else {
             // 创建新记录
             wrongQuestion = UserWrongQuestion.builder()
@@ -98,7 +110,13 @@ public class WrongQuestionServiceImpl implements WrongQuestionService {
                     .questionType(dto.getQuestionType())
                     .questionTitle(dto.getQuestionTitle())
                     .status(UserWrongQuestionStatus.UNRESOLVED.getValue())
+                    .errorCount(1) // 设置初始错误计数为1
                     .build();
+        }
+        
+        // 设置关联的学习记录ID（如果有）
+        if (dto.getLearningRecordId() != null) {
+            wrongQuestion.setLearningRecordId(dto.getLearningRecordId());
         }
         
         // 序列化用户答案
@@ -115,7 +133,7 @@ public class WrongQuestionServiceImpl implements WrongQuestionService {
         // 保存错题记录
         UserWrongQuestion savedWrongQuestion = wrongQuestionRepository.save(wrongQuestion);
         
-        log.info("成功保存错题记录, ID: {}", savedWrongQuestion.getId());
+        log.info("成功保存错题记录, ID: {}, 错误次数: {}", savedWrongQuestion.getId(), savedWrongQuestion.getErrorCount());
         return savedWrongQuestion;
     }
 
@@ -125,7 +143,8 @@ public class WrongQuestionServiceImpl implements WrongQuestionService {
         log.info("分页获取用户错题, 用户ID: {}, 页码: {}, 每页数量: {}", 
                 userId, pageable.getPageNumber(), pageable.getPageSize());
         
-        Page<UserWrongQuestion> wrongQuestionsPage = wrongQuestionRepository.findByUser_Id(userId, pageable);
+        // 使用过滤方法，只获取正常状态课程的错题
+        Page<UserWrongQuestion> wrongQuestionsPage = wrongQuestionRepository.findByUserIdFilteredByNormalCourses(userId, pageable);
         
         return wrongQuestionsPage.map(this::convertToVO);
     }
@@ -135,7 +154,8 @@ public class WrongQuestionServiceImpl implements WrongQuestionService {
     public List<UserWrongQuestionVO> getUserWrongQuestions(Long userId) {
         log.info("获取用户所有错题, 用户ID: {}", userId);
         
-        List<UserWrongQuestion> wrongQuestions = wrongQuestionRepository.findByUser_Id(userId);
+        // 使用过滤方法，只获取正常状态课程的错题
+        List<UserWrongQuestion> wrongQuestions = wrongQuestionRepository.findByUserIdFilteredByNormalCourses(userId);
         
         return convertToVOList(wrongQuestions);
     }
@@ -146,8 +166,9 @@ public class WrongQuestionServiceImpl implements WrongQuestionService {
         log.info("分页获取用户课程错题, 用户ID: {}, 课程ID: {}, 页码: {}, 每页数量: {}", 
                 userId, courseId, pageable.getPageNumber(), pageable.getPageSize());
         
+        // 使用过滤方法，只获取正常状态课程的错题
         Page<UserWrongQuestion> wrongQuestionsPage = 
-                wrongQuestionRepository.findByUser_IdAndCourse_Id(userId, courseId, pageable);
+                wrongQuestionRepository.findByUserIdAndCourseIdFilteredByNormalCourses(userId, courseId, pageable);
         
         return wrongQuestionsPage.map(this::convertToVO);
     }
@@ -157,7 +178,9 @@ public class WrongQuestionServiceImpl implements WrongQuestionService {
     public List<UserWrongQuestionVO> getUserCourseWrongQuestions(Long userId, Long courseId) {
         log.info("获取用户课程所有错题, 用户ID: {}, 课程ID: {}", userId, courseId);
         
-        List<UserWrongQuestion> wrongQuestions = wrongQuestionRepository.findByUser_IdAndCourse_Id(userId, courseId);
+        // 使用过滤方法，只获取正常状态课程的错题
+        List<UserWrongQuestion> wrongQuestions = 
+                wrongQuestionRepository.findByUserIdAndCourseIdFilteredByNormalCourses(userId, courseId);
         
         return convertToVOList(wrongQuestions);
     }
@@ -168,8 +191,8 @@ public class WrongQuestionServiceImpl implements WrongQuestionService {
         log.info("分页获取用户未解决错题, 用户ID: {}, 页码: {}, 每页数量: {}", 
                 userId, pageable.getPageNumber(), pageable.getPageSize());
         
-        // 获取状态为未解决的错题
-        Page<UserWrongQuestion> wrongQuestionsPage = wrongQuestionRepository.findByUser_IdAndStatus(
+        // 使用过滤方法，只获取正常状态课程的未解决错题
+        Page<UserWrongQuestion> wrongQuestionsPage = wrongQuestionRepository.findByUserIdAndStatusFilteredByNormalCourses(
                 userId, UserWrongQuestionStatus.UNRESOLVED.getValue(), pageable);
         
         return wrongQuestionsPage.map(this::convertToVO);
@@ -180,8 +203,8 @@ public class WrongQuestionServiceImpl implements WrongQuestionService {
     public List<UserWrongQuestionVO> getUserUnresolvedWrongQuestions(Long userId) {
         log.info("获取用户所有未解决错题, 用户ID: {}", userId);
         
-        // 获取状态为未解决的错题
-        List<UserWrongQuestion> wrongQuestions = wrongQuestionRepository.findByUser_IdAndStatus(
+        // 使用过滤方法，只获取正常状态课程的未解决错题
+        List<UserWrongQuestion> wrongQuestions = wrongQuestionRepository.findByUserIdAndStatusFilteredByNormalCourses(
                 userId, UserWrongQuestionStatus.UNRESOLVED.getValue());
         
         return convertToVOList(wrongQuestions);
@@ -247,13 +270,20 @@ public class WrongQuestionServiceImpl implements WrongQuestionService {
     @Override
     @Transactional(readOnly = true)
     public long countUserWrongQuestions(Long userId) {
-        return wrongQuestionRepository.countByUser_Id(userId);
+        log.info("统计用户错题数量, 用户ID: {}", userId);
+        
+        // 使用过滤方法，只统计正常状态课程的错题
+        return wrongQuestionRepository.countByUserIdFilteredByNormalCourses(userId);
     }
     
     @Override
     @Transactional(readOnly = true)
     public long countUserUnresolvedWrongQuestions(Long userId) {
-        return wrongQuestionRepository.countByUser_IdAndStatus(userId, UserWrongQuestionStatus.UNRESOLVED.getValue());
+        log.info("统计用户未解决错题数量, 用户ID: {}", userId);
+        
+        // 使用过滤方法，只统计正常状态课程的未解决错题
+        return wrongQuestionRepository.countByUserIdAndStatusFilteredByNormalCourses(
+                userId, UserWrongQuestionStatus.UNRESOLVED.getValue());
     }
     
     /**
@@ -290,6 +320,8 @@ public class WrongQuestionServiceImpl implements WrongQuestionService {
                 .userAnswers(userAnswers)
                 .correctAnswers(correctAnswers)
                 .status(entity.getStatus())
+                .errorCount(entity.getErrorCount()) // 添加错误计数
+                .learningRecordId(entity.getLearningRecordId()) // 添加学习记录ID
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();

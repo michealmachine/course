@@ -48,6 +48,7 @@ import { formatTime, formatDuration } from '@/utils/format';
 import { CourseMediaPlayer } from '@/components/learning/course-media-player';
 import { CourseDocumentViewer } from '@/components/learning/course-document-viewer';
 import { CourseQuestionGroup } from '@/components/learning/course-question-group';
+import { CourseStatistics } from '@/components/learning/course-statistics';
 
 // 从learning-service.ts导入
 import { LearningCourseStructureVO } from '@/services/learning-service';
@@ -79,12 +80,15 @@ export default function LearnCoursePage() {
   const [currentSection, setCurrentSection] = useState<SectionWithResource | null>(null);
   const [sectionContent, setSectionContent] = useState<SectionResourceVO | null>(null);
   const [contentLoading, setContentLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('content');
+  const [activeTab, setActiveTab] = useState<'content' | 'statistics'>('content');
   
   // 学习时长记录
   const [learningDuration, setLearningDuration] = useState(0);
   const durationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastDurationUpdateRef = useRef<number>(0);
+  const learningDurationRef = useRef<number>(0); // 使用ref存储时长，避免频繁更新
+  // 当前学习活动类型
+  const [currentActivityType, setCurrentActivityType] = useState<string | null>(null);
   
   // 获取课程结构
   useEffect(() => {
@@ -146,15 +150,19 @@ export default function LearnCoursePage() {
     
     fetchCourseStructure();
     
-    // 开始计时
+    // 直接启动学习计时器，不等待其他条件
     startLearningTimer();
     
-    // 清理函数
+    // 组件卸载时清理
     return () => {
+      // 组件卸载时记录最终学习时长
+      if (learningDurationRef.current > 0) {
+        console.log(`组件卸载，记录最终学习时长: ${learningDurationRef.current}秒`);
+        recordFinalLearningDuration(learningDurationRef.current);
+      }
       stopLearningTimer();
-      recordFinalLearningDuration();
     };
-  }, [courseId]);
+  }, []);
   
   // 监听当前小节变化，加载小节内容
   useEffect(() => {
@@ -169,14 +177,27 @@ export default function LearnCoursePage() {
       clearInterval(durationTimerRef.current);
     }
     
-    // 每秒增加学习时长
+    console.log(`学习计时器启动，准备记录学习活动，当前活动类型: ${currentActivityType || 'VIDEO_WATCH'}`);
+    
+    // 每秒增加学习时长，但减少状态更新频率
     durationTimerRef.current = setInterval(() => {
-      setLearningDuration(prev => prev + 1);
+      // 增加持续时间但不立即更新状态
+      learningDurationRef.current += 1;
       
-      // 每5分钟更新一次学习时长
-      if (learningDuration - lastDurationUpdateRef.current >= 300) {
-        recordLearningDuration();
-        lastDurationUpdateRef.current = learningDuration;
+      // 每10秒才更新一次UI上的时长显示，减少渲染
+      if (learningDurationRef.current % 10 === 0) {
+        setLearningDuration(learningDurationRef.current);
+        console.log(`当前学习时长: ${learningDurationRef.current}秒, 活动类型: ${currentActivityType || 'VIDEO_WATCH'}`);
+      }
+      
+      // 每30秒更新一次学习时长（改为30秒更频繁地记录）
+      if (learningDurationRef.current - lastDurationUpdateRef.current >= 30) {
+        // 使用setTimeout避免阻塞UI
+        setTimeout(() => {
+          console.log(`即将记录学习活动，时长: ${learningDurationRef.current - lastDurationUpdateRef.current}秒, 活动类型: ${currentActivityType || 'VIDEO_WATCH'}`);
+          recordLearningActivity(learningDurationRef.current - lastDurationUpdateRef.current);
+          lastDurationUpdateRef.current = learningDurationRef.current;
+        }, 100);
       }
     }, 1000);
   };
@@ -189,35 +210,141 @@ export default function LearnCoursePage() {
   };
   
   // 记录最终学习时长
-  const recordFinalLearningDuration = async () => {
-    if (learningDuration <= 0 || !courseId || !currentSectionId) return;
+  const recordFinalLearningDuration = async (duration = learningDuration) => {
+    if (duration <= 0 || !courseId || !currentSectionId) return;
     
     try {
-      await learningService.recordLearningDuration({
-        courseId,
-        sectionId: currentSectionId,
-        duration: learningDuration
-      });
-      console.log(`记录学习时长: ${learningDuration}秒`);
+      console.log(`记录最终学习时长: ${duration}秒, 活动类型: ${currentActivityType || 'VIDEO_WATCH'}`);
+      
+      // 使用setTimeout避免阻塞UI和导致闪动
+      setTimeout(async () => {
+        try {
+          // 使用新的API记录学习活动
+          await learningService.recordCompletedActivity({
+            courseId,
+            chapterId: currentChapterId || undefined,
+            sectionId: currentSectionId,
+            activityType: currentActivityType || 'VIDEO_WATCH',  // 默认使用视频观看类型
+            durationSeconds: Math.max(duration, 1), // 确保时长至少为1秒
+            contextData: JSON.stringify({
+              source: 'final_record',
+              progress: currentProgress
+            })
+          });
+          console.log('最终学习时长记录成功');
+        } catch (err) {
+          console.error('记录最终学习时长失败:', err);
+        }
+      }, 100);
+      
+      // 重置学习时长
+      setLearningDuration(0);
     } catch (err) {
-      console.error('记录学习时长失败:', err);
+      console.error('记录最终学习时长失败:', err);
     }
   };
   
-  // 定期记录学习时长
-  const recordLearningDuration = async () => {
-    if (learningDuration <= 0 || !courseId || !currentSectionId) return;
-    
-    try {
-      await learningService.recordLearningDuration({
-        courseId,
-        sectionId: currentSectionId,
-        duration: learningDuration
-      });
-      console.log(`定期记录学习时长: ${learningDuration}秒`);
-    } catch (err) {
-      console.error('记录学习时长失败:', err);
+  // 定期记录学习活动
+  const recordLearningActivity = async (duration = learningDuration) => {
+    // 移除courseId和currentSectionId检查，以确保在任何情况下都尝试记录时长
+    if (duration <= 0) {
+      console.log(`学习时长 ${duration}秒 不能为0或负数，不记录`);
+      return;
     }
+    
+    // 降低节流阈值为1秒，确保几乎所有的学习时长都能被记录
+    if (duration < 1) {
+      console.log(`学习时长 ${duration}秒 小于1秒，不记录`);
+      return;
+    }
+    
+    // 如果没有courseId或currentSectionId，记录警告但仍然尝试继续
+    if (!courseId || !currentSectionId) {
+      console.warn(`缺少课程ID(${courseId})或小节ID(${currentSectionId})，但仍尝试记录学习时长`);
+    }
+    
+    console.log(`定期记录学习时长: ${duration}秒, 活动类型: ${currentActivityType || 'VIDEO_WATCH'}, 课程ID: ${courseId}, 小节ID: ${currentSectionId}`);
+    
+    // 使用setTimeout避免阻塞UI和导致闪动
+    setTimeout(async () => {
+      try {
+        // 使用新的API记录学习活动
+        await learningService.recordCompletedActivity({
+          courseId: Number(courseId),
+          chapterId: currentChapterId ? Number(currentChapterId) : undefined,
+          sectionId: Number(currentSectionId),
+          activityType: currentActivityType || 'VIDEO_WATCH',  // 默认使用视频观看类型
+          durationSeconds: Math.max(duration, 1), // 确保时长至少为1秒
+          contextData: JSON.stringify({
+            source: 'periodic_update',
+            progress: currentProgress
+          })
+        });
+        console.log('定期学习活动记录成功');
+      } catch (err) {
+        console.error('记录学习活动失败:', err);
+      }
+    }, 100);
+    
+    // 不重置学习时长，只在lastDurationUpdateRef中记录最后更新时间点
+    // 注意：这里不再重置setLearningDuration(0)
+  };
+  
+  // 记录小节开始活动
+  const recordSectionStart = (resourceType: string | null) => {
+    // 避免频繁调用API
+    if (!courseId || !currentSectionId) return;
+    
+    console.log(`准备记录小节开始: 章节ID=${currentChapterId}, 小节ID=${currentSectionId}, 资源类型=${resourceType}`);
+    
+    // 使用setTimeout避免阻塞UI
+    setTimeout(async () => {
+      try {
+        await learningService.recordCompletedActivity({
+          courseId,
+          chapterId: currentChapterId || undefined,
+          sectionId: currentSectionId,
+          activityType: 'SECTION_START',
+          durationSeconds: 1,  // 确保为1秒，避免后端验证失败
+          contextData: JSON.stringify({
+            resourceType,
+            timestamp: Date.now()
+          })
+        });
+        console.log(`记录小节开始成功: 章节ID=${currentChapterId}, 小节ID=${currentSectionId}`);
+      } catch (err) {
+        console.error('记录小节开始失败:', err);
+      }
+    }, 200);
+  };
+  
+  // 记录小节完成
+  const recordSectionComplete = () => {
+    // 避免频繁调用API
+    if (!courseId || !currentChapterId || !currentSectionId) return;
+    
+    console.log(`准备记录小节完成: 章节ID=${currentChapterId}, 小节ID=${currentSectionId}`);
+    
+    // 使用setTimeout避免阻塞UI
+    setTimeout(async () => {
+      try {
+        await learningService.recordCompletedActivity({
+          courseId,
+          chapterId: currentChapterId,
+          sectionId: currentSectionId,
+          activityType: 'SECTION_END',
+          durationSeconds: 1,  // 确保为1秒，避免后端验证失败
+          contextData: JSON.stringify({
+            completed: true,
+            progress: 100,
+            timestamp: Date.now()
+          })
+        });
+        console.log(`记录小节完成成功: 章节ID=${currentChapterId}, 小节ID=${currentSectionId}`);
+      } catch (err) {
+        console.error('记录小节完成失败:', err);
+      }
+    }, 200);
   };
   
   // 加载当前小节内容
@@ -259,6 +386,18 @@ export default function LearnCoursePage() {
         resourceType,
         effectiveResourceType
       });
+      
+      // 设置当前学习活动类型
+      if (effectiveResourceType === 'MEDIA') {
+        setCurrentActivityType('VIDEO_WATCH');
+      } else if (effectiveResourceType === 'QUESTION_GROUP') {
+        setCurrentActivityType('DOCUMENT_READ'); // 将题组视为文档阅读，测验尝试会在提交答案时记录
+      } else {
+        setCurrentActivityType('DOCUMENT_READ'); // 默认为文档阅读
+      }
+      
+      // 记录小节开始活动 - 使用提取的函数
+      recordSectionStart(effectiveResourceType);
       
       // 根据资源类型加载不同内容
       if (effectiveResourceType === 'MEDIA') {
@@ -422,8 +561,15 @@ export default function LearnCoursePage() {
         sectionProgress: progress
       };
       
-      await learningService.updateLearningPosition(positionData);
+      const result = await learningService.updateLearningPosition(positionData);
       console.log(`更新学习进度: ${progress}%`);
+      
+      // 如果进度为100%，记录小节完成
+      if (progress === 100 && currentActivityType) {
+        recordSectionComplete();
+      }
+      
+      return result;
     } catch (err) {
       console.error('更新学习进度失败:', err);
     }
@@ -651,6 +797,36 @@ export default function LearnCoursePage() {
     );
   };
   
+  // 处理Tab切换
+  const handleTabChange = (tab: string) => {
+    // 只处理我们关心的两个tab值
+    if (tab !== 'content' && tab !== 'statistics') return;
+    
+    // 如果从学习内容切换到统计Tab
+    if (activeTab === 'content' && tab === 'statistics') {
+      console.log('切换到统计Tab，暂停学习计时器');
+      // 停止计时器
+      stopLearningTimer();
+      // 记录当前累计的学习时长
+      if (learningDurationRef.current > 0) {
+        console.log(`切换Tab，记录累计学习时长: ${learningDurationRef.current}秒`);
+        recordFinalLearningDuration(learningDurationRef.current);
+        // 重置学习时长
+        learningDurationRef.current = 0;
+        setLearningDuration(0);
+      }
+    } 
+    // 如果从统计Tab切换回学习内容
+    else if (activeTab === 'statistics' && tab === 'content') {
+      console.log('切换回学习内容Tab，重新启动学习计时器');
+      // 重新启动计时器
+      startLearningTimer();
+    }
+    
+    // 更新当前活动的Tab
+    setActiveTab(tab as 'content' | 'statistics');
+  };
+  
   // 渲染内容区域
   const renderContent = () => {
     if (contentLoading) {
@@ -747,6 +923,44 @@ export default function LearnCoursePage() {
       );
     }
   };
+  
+  // 添加页面卸载事件处理
+  useEffect(() => {
+    // 页面卸载前处理
+    const handleBeforeUnload = () => {
+      if (learningDurationRef.current > 0) {
+        console.log(`页面即将卸载，记录最终学习时长: ${learningDurationRef.current}秒`);
+        // 这里不能使用 async 函数，因为 beforeunload 事件不会等待 Promise 完成
+        // 所以我们使用同步 XMLHttpRequest 来确保数据被发送
+        try {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', '/api/learning/records/completed', false); // 同步请求
+          xhr.setRequestHeader('Content-Type', 'application/json');
+          xhr.send(JSON.stringify({
+            courseId: Number(courseId),
+            chapterId: currentChapterId ? Number(currentChapterId) : undefined,
+            sectionId: Number(currentSectionId),
+            activityType: currentActivityType || 'VIDEO_WATCH',
+            durationSeconds: Math.max(learningDurationRef.current, 1),
+            contextData: JSON.stringify({
+              source: 'page_unload',
+              progress: currentProgress
+            })
+          }));
+        } catch (err) {
+          console.error('页面卸载时记录学习时长失败:', err);
+        }
+      }
+    };
+    
+    // 添加页面卸载事件监听
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      // 移除事件监听
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [courseId, currentChapterId, currentSectionId, currentActivityType, currentProgress]);
   
   if (loading) {
     return (
@@ -858,7 +1072,7 @@ export default function LearnCoursePage() {
         
         {/* 右侧内容区域 */}
         <div className="lg:col-span-9 space-y-4">
-          <Tabs defaultValue="content" value={activeTab} onValueChange={setActiveTab}>
+          <Tabs defaultValue="content" value={activeTab} onValueChange={handleTabChange}>
             <TabsList>
               <TabsTrigger value="content">学习内容</TabsTrigger>
               <TabsTrigger value="statistics">学习统计</TabsTrigger>
@@ -921,17 +1135,7 @@ export default function LearnCoursePage() {
             </TabsContent>
             
             <TabsContent value="statistics">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                    <BarChart2 className="h-16 w-16 text-primary mb-2" />
-                    <h3 className="text-xl font-semibold">学习统计功能即将上线</h3>
-                    <p className="text-center text-muted-foreground max-w-md">
-                      我们正在努力开发学习统计功能，帮助您更好地了解学习情况。敬请期待！
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+              <CourseStatistics courseId={courseId} />
             </TabsContent>
           </Tabs>
         </div>

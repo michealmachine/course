@@ -73,6 +73,17 @@ public class UserWrongQuestionVO {
     private Integer status;
     
     /**
+     * 错误次数
+     * 记录用户答错该题的次数
+     */
+    private Integer errorCount;
+    
+    /**
+     * 相关学习记录ID
+     */
+    private Long learningRecordId;
+    
+    /**
      * 创建时间
      */
     private LocalDateTime createdAt;

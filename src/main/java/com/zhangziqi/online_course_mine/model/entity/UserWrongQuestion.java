@@ -81,6 +81,14 @@ public class UserWrongQuestion {
     private Integer status;
     
     /**
+     * 错误次数
+     * 记录用户答错该题的次数
+     */
+    @Builder.Default
+    @Column(name = "error_count")
+    private Integer errorCount = 1;
+    
+    /**
      * 创建时间
      */
     @CreationTimestamp
@@ -93,4 +101,11 @@ public class UserWrongQuestion {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+    
+    /**
+     * 相关学习记录ID
+     * 可选关联，记录错题时对应的学习记录
+     */
+    @Column(name = "learning_record_id")
+    private Long learningRecordId;
 } 

@@ -1,14 +1,22 @@
 package com.zhangziqi.online_course_mine.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.exception.ResourceNotFoundException;
 import com.zhangziqi.online_course_mine.model.dto.LearningProgressUpdateDTO;
+import com.zhangziqi.online_course_mine.model.dto.LearningRecordCompletedDTO;
+import com.zhangziqi.online_course_mine.model.dto.LearningRecordEndDTO;
+import com.zhangziqi.online_course_mine.model.dto.LearningRecordStartDTO;
 import com.zhangziqi.online_course_mine.model.dto.UserQuestionAnswerDTO;
 import com.zhangziqi.online_course_mine.model.entity.Course;
 import com.zhangziqi.online_course_mine.model.entity.Section;
 import com.zhangziqi.online_course_mine.model.entity.UserCourse;
 import com.zhangziqi.online_course_mine.model.enums.CourseStatus;
+import com.zhangziqi.online_course_mine.model.enums.LearningActivityType;
+import com.zhangziqi.online_course_mine.model.vo.ActivityTypeStatVO;
+import com.zhangziqi.online_course_mine.model.vo.DailyLearningStatVO;
 import com.zhangziqi.online_course_mine.model.vo.LearningCourseStructureVO;
+import com.zhangziqi.online_course_mine.model.vo.LearningRecordVO;
 import com.zhangziqi.online_course_mine.model.vo.LearningStatisticsVO;
 import com.zhangziqi.online_course_mine.model.vo.MediaVO;
 import com.zhangziqi.online_course_mine.model.vo.QuestionGroupVO;
@@ -21,6 +29,7 @@ import com.zhangziqi.online_course_mine.repository.SectionRepository;
 import com.zhangziqi.online_course_mine.repository.UserCourseRepository;
 import com.zhangziqi.online_course_mine.security.SecurityUtil;
 import com.zhangziqi.online_course_mine.service.CourseService;
+import com.zhangziqi.online_course_mine.service.LearningRecordService;
 import com.zhangziqi.online_course_mine.service.LearningStatisticsService;
 import com.zhangziqi.online_course_mine.service.MediaService;
 import com.zhangziqi.online_course_mine.service.QuestionGroupService;
@@ -36,12 +45,17 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * 学习控制器
@@ -64,6 +78,8 @@ public class LearningController {
     private final SectionRepository sectionRepository;
     private final LearningStatisticsService learningStatisticsService;
     private final WrongQuestionService wrongQuestionService;
+    private final LearningRecordService learningRecordService;
+    private final ObjectMapper objectMapper;
     
     /**
      * 获取课程学习结构
@@ -215,19 +231,32 @@ public class LearningController {
     }
     
     /**
-     * 记录学习时长
+     * 记录学习时长（旧方法，建议使用学习记录相关接口）
+     * @deprecated 使用学习记录相关接口替代
      */
+    @Deprecated
     @PutMapping("/courses/{courseId}/duration")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "记录学习时长", description = "记录当前用户的指定课程学习时长")
+    @Operation(summary = "记录学习时长", description = "记录当前用户的指定课程学习时长（已废弃，建议使用学习记录相关接口）")
     public Result<UserCourseVO> recordLearningDuration(
             @Parameter(description = "课程ID") @PathVariable Long courseId,
             @Parameter(description = "学习时长(秒)") @RequestParam Integer duration) {
         Long userId = SecurityUtil.getCurrentUserId();
         log.info("记录用户课程学习时长, 用户ID: {}, 课程ID: {}, 时长: {}秒", userId, courseId, duration);
         
+        // 创建一个完成的学习活动记录
+        LearningRecordCompletedDTO recordDTO = LearningRecordCompletedDTO.builder()
+                .courseId(courseId)
+                .activityType(LearningActivityType.VIDEO_WATCH.getCode())
+                .durationSeconds(duration)
+                .build();
+        
+        learningRecordService.recordCompletedActivity(userId, recordDTO);
+        
+        // 同时更新旧的学习时长记录
         UserCourseVO userCourseVO = userCourseService.recordLearningDuration(userId, courseId, duration);
+        
         return Result.success(userCourseVO);
     }
     
@@ -250,14 +279,43 @@ public class LearningController {
                 .orElseThrow(() -> new ResourceNotFoundException("小节不存在"));
         
         Long courseId = section.getChapter().getCourse().getId();
+        Long chapterId = section.getChapter().getId();
         
-        // 如果答错了，保存到错题本
+        // 记录测验尝试活动
+        LearningRecordCompletedDTO activityDto = LearningRecordCompletedDTO.builder()
+                .courseId(courseId)
+                .chapterId(chapterId)
+                .sectionId(sectionId)
+                .activityType(LearningActivityType.QUIZ_ATTEMPT.getCode())
+                .durationSeconds(dto.getDuration() != null ? (int)(dto.getDuration() / 1000) : 0)
+                .contextData(createQuizContextData(questionId, dto))
+                .build();
+        
+        LearningRecordVO learningRecord = learningRecordService.recordCompletedActivity(userId, activityDto);
+        
+        // 如果答错了，保存到错题本，并关联学习记录ID
         if (dto.getIsWrong() != null && dto.getIsWrong()) {
             log.info("用户答错题目, 用户ID: {}, 题目ID: {}, 用户答案: {}", userId, questionId, dto.getAnswers());
+            dto.setLearningRecordId(learningRecord.getId()); // 设置学习记录ID
             wrongQuestionService.saveWrongQuestion(userId, courseId, sectionId, questionId, dto);
         }
         
         return Result.success();
+    }
+    
+    /**
+     * 创建测验上下文数据
+     */
+    private String createQuizContextData(Long questionId, UserQuestionAnswerDTO dto) {
+        try {
+            Map<String, Object> contextData = new HashMap<>();
+            contextData.put("questionId", questionId);
+            contextData.put("isCorrect", !Boolean.TRUE.equals(dto.getIsWrong()));
+            return objectMapper.writeValueAsString(contextData);
+        } catch (Exception e) {
+            log.error("创建测验上下文数据失败", e);
+            return null;
+        }
     }
 
     /**
@@ -298,6 +356,178 @@ public class LearningController {
         
         learningStatisticsService.resetUserCourseProgress(userId, courseId);
         return Result.success();
+    }
+    
+    /**
+     * 开始学习活动
+     */
+    @PostMapping("/records/start")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "开始学习活动", description = "记录用户开始的学习活动")
+    public Result<LearningRecordVO> startLearningActivity(@RequestBody LearningRecordStartDTO dto) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        log.info("开始学习活动, 用户ID: {}, 课程ID: {}, 活动类型: {}", userId, dto.getCourseId(), dto.getActivityType());
+        
+        LearningRecordVO record = learningRecordService.startActivity(userId, dto);
+        return Result.success(record);
+    }
+    
+    /**
+     * 结束学习活动
+     */
+    @PutMapping("/records/{recordId}/end")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "结束学习活动", description = "记录用户结束的学习活动")
+    public Result<LearningRecordVO> endLearningActivity(
+            @PathVariable Long recordId,
+            @RequestBody(required = false) LearningRecordEndDTO dto) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        log.info("结束学习活动, 用户ID: {}, 记录ID: {}", userId, recordId);
+        
+        LearningRecordVO record = learningRecordService.endActivity(userId, recordId, 
+                dto != null ? dto : new LearningRecordEndDTO());
+        return Result.success(record);
+    }
+    
+    /**
+     * 记录已完成的学习活动
+     */
+    @PostMapping("/records/completed")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "记录已完成的学习活动", description = "一次性记录已完成的学习活动")
+    public Result<LearningRecordVO> recordCompletedActivity(@RequestBody LearningRecordCompletedDTO dto) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        log.info("记录已完成学习活动, 用户ID: {}, 课程ID: {}, 活动类型: {}", userId, dto.getCourseId(), dto.getActivityType());
+        
+        LearningRecordVO record = learningRecordService.recordCompletedActivity(userId, dto);
+        return Result.success(record);
+    }
+    
+    /**
+     * 查找用户当前进行中的活动
+     */
+    @GetMapping("/records/ongoing")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "查找用户当前进行中的活动", description = "查找用户当前进行中的学习活动")
+    public Result<LearningRecordVO> findOngoingActivity() {
+        Long userId = SecurityUtil.getCurrentUserId();
+        log.info("查找用户当前进行中的学习活动, 用户ID: {}", userId);
+        
+        Optional<LearningRecordVO> record = learningRecordService.findOngoingActivity(userId);
+        return record.map(Result::success).orElseGet(() -> Result.success(null));
+    }
+    
+    /**
+     * 获取用户学习记录
+     */
+    @GetMapping("/records")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "获取用户学习记录", description = "分页获取用户的学习记录")
+    public Result<Page<LearningRecordVO>> getUserLearningRecords(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        log.info("获取用户学习记录, 用户ID: {}, 页码: {}, 每页数量: {}", userId, page, size);
+        
+        Pageable pageable = PageRequest.of(page, size);
+        Page<LearningRecordVO> records = learningRecordService.getUserActivities(userId, pageable);
+        return Result.success(records);
+    }
+    
+    /**
+     * 获取用户课程学习记录
+     */
+    @GetMapping("/courses/{courseId}/records")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "获取用户课程学习记录", description = "分页获取用户特定课程的学习记录")
+    public Result<Page<LearningRecordVO>> getUserCourseLearningRecords(
+            @PathVariable Long courseId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        log.info("获取用户课程学习记录, 用户ID: {}, 课程ID: {}, 页码: {}, 每页数量: {}", 
+                userId, courseId, page, size);
+        
+        Pageable pageable = PageRequest.of(page, size);
+        Page<LearningRecordVO> records = learningRecordService.getUserCourseActivities(userId, courseId, pageable);
+        return Result.success(records);
+    }
+    
+    /**
+     * 获取每日学习统计
+     */
+    @GetMapping("/stats/heatmap")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "获取学习热图数据", description = "获取用户学习时间的热图数据")
+    public Result<List<DailyLearningStatVO>> getLearningHeatmap(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        
+        // 默认获取最近30天
+        if (startDate == null) {
+            startDate = LocalDate.now().minusDays(30);
+        }
+        if (endDate == null) {
+            endDate = LocalDate.now();
+        }
+        
+        log.info("获取用户学习热图数据, 用户ID: {}, 开始日期: {}, 结束日期: {}", userId, startDate, endDate);
+        
+        List<DailyLearningStatVO> data = learningRecordService.getDailyLearningStats(userId, startDate, endDate);
+        return Result.success(data);
+    }
+    
+    /**
+     * 获取活动类型统计
+     */
+    @GetMapping("/stats/activity-types")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "获取活动类型统计", description = "获取用户各类学习活动的时长统计")
+    public Result<List<ActivityTypeStatVO>> getActivityTypeStats() {
+        Long userId = SecurityUtil.getCurrentUserId();
+        log.info("获取用户活动类型统计, 用户ID: {}", userId);
+        
+        List<ActivityTypeStatVO> data = learningRecordService.getActivityTypeStats(userId);
+        return Result.success(data);
+    }
+    
+    /**
+     * 获取今日学习时长
+     */
+    @GetMapping("/stats/today-duration")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "获取今日学习时长", description = "获取用户今日的学习总时长")
+    public Result<Long> getTodayLearningDuration() {
+        Long userId = SecurityUtil.getCurrentUserId();
+        log.info("获取用户今日学习时长, 用户ID: {}", userId);
+        
+        Long duration = learningRecordService.getTodayLearningDuration(userId);
+        return Result.success(duration);
+    }
+    
+    /**
+     * 获取总学习时长
+     */
+    @GetMapping("/stats/total-duration")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "获取总学习时长", description = "获取用户的学习总时长")
+    public Result<Long> getTotalLearningDuration() {
+        Long userId = SecurityUtil.getCurrentUserId();
+        log.info("获取用户总学习时长, 用户ID: {}", userId);
+        
+        Long duration = learningRecordService.getTotalLearningDuration(userId);
+        return Result.success(duration);
     }
 
     /**

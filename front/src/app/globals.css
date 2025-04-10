@@ -123,4 +123,13 @@
   body {
     @apply bg-background text-foreground;
   }
+  
+  /* 为图表添加颜色变量映射 */
+  :root {
+    --color-daily: hsl(var(--chart-1));
+    --color-video: hsl(var(--chart-2));
+    --color-document: hsl(var(--chart-3));
+    --color-quiz: hsl(var(--chart-4));
+    --color-section: hsl(var(--chart-5));
+  }
 }

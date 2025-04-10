@@ -92,6 +92,8 @@ export interface QuestionGroupVO {
   name?: string;  // 后端返回的字段名是name
   description?: string;
   sectionId: number;
+  courseId?: number;     // 课程ID
+  chapterId?: number;    // 章节ID
   questions?: QuestionVO[];  // 前端使用的题目列表
   totalQuestions?: number;
   totalScore?: number;

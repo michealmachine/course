@@ -56,4 +56,10 @@ public class UserQuestionAnswerDTO {
      * 是否做错
      */
     private Boolean isWrong;
-} 
+    
+    /**
+     * 学习记录ID
+     * 关联的学习活动记录，用于链接错题和学习活动
+     */
+    private Long learningRecordId;
+}

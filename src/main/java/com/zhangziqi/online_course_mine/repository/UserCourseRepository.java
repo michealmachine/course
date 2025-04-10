@@ -135,4 +135,53 @@ public interface UserCourseRepository extends JpaRepository<UserCourse, Long> {
      * 检查用户是否购买了指定课程（指定状态）
      */
     boolean existsByUser_IdAndCourse_IdAndStatus(Long userId, Long courseId, Integer status);
+    
+    /**
+     * 分页查询用户的已购课程
+     */
+    @Query("SELECT uc FROM UserCourse uc WHERE uc.user.id = :userId AND uc.status = :status")
+    Page<UserCourse> findPurchasedCourses(@Param("userId") Long userId, @Param("status") Integer status, Pageable pageable);
+    
+    /**
+     * 查询用户已购课程列表
+     */
+    @Query("SELECT uc FROM UserCourse uc WHERE uc.user.id = :userId AND uc.status = :status")
+    List<UserCourse> findPurchasedCourses(@Param("userId") Long userId, @Param("status") Integer status);
+    
+    /**
+     * 统计课程学习人数
+     * 返回课程ID和学习人数
+     */
+    @Query("SELECT uc.course.id, COUNT(DISTINCT uc.user.id) FROM UserCourse uc " +
+           "WHERE uc.course.id = :courseId " +
+           "GROUP BY uc.course.id")
+    List<Object[]> countLearnersByCourseId(@Param("courseId") Long courseId);
+    
+    /**
+     * 统计特定进度的用户数量
+     * 例如查询完成人数（进度=100）
+     */
+    @Query("SELECT COUNT(uc) FROM UserCourse uc " +
+           "WHERE uc.course.id = :courseId AND uc.progress = :progress")
+    Long countByProgress(@Param("courseId") Long courseId, @Param("progress") Integer progress);
+    
+    /**
+     * 计算课程平均进度
+     */
+    @Query("SELECT AVG(uc.progress) FROM UserCourse uc WHERE uc.course.id = :courseId")
+    Double getAverageProgressByCourseId(@Param("courseId") Long courseId);
+    
+    /**
+     * 统计机构下所有课程的平均进度
+     */
+    @Query("SELECT AVG(uc.progress) FROM UserCourse uc WHERE uc.course.institution.id = :institutionId")
+    Double getAverageProgressByInstitutionId(@Param("institutionId") Long institutionId);
+    
+    /**
+     * 统计机构下所有课程的完成人数
+     * 完成定义为进度=100
+     */
+    @Query("SELECT COUNT(DISTINCT uc.user.id) FROM UserCourse uc " +
+           "WHERE uc.course.institution.id = :institutionId AND uc.progress = 100")
+    Long countCompletedLearnersByInstitutionId(@Param("institutionId") Long institutionId);
 } 

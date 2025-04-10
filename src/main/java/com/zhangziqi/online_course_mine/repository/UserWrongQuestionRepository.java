@@ -4,6 +4,8 @@ import com.zhangziqi.online_course_mine.model.entity.UserWrongQuestion;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -66,9 +68,89 @@ public interface UserWrongQuestionRepository extends JpaRepository<UserWrongQues
     Page<UserWrongQuestion> findByUser_IdAndCourse_IdAndStatus(Long userId, Long courseId, Integer status, Pageable pageable);
     
     /**
-     * 获取用户错题总数
+     * 根据用户ID查找错题，只包含用户状态为NORMAL的课程的错题
      */
-    long countByUser_Id(Long userId);
+    @Query("SELECT wq FROM UserWrongQuestion wq " +
+           "JOIN UserCourse uc ON wq.user.id = uc.user.id AND wq.course.id = uc.course.id " +
+           "WHERE wq.user.id = :userId " +
+           "AND uc.status = 0") // 0 = NORMAL，只包含正常状态的课程
+    List<UserWrongQuestion> findByUserIdFilteredByNormalCourses(@Param("userId") Long userId);
+    
+    /**
+     * 根据用户ID查找错题，只包含用户状态为NORMAL的课程的错题（分页）
+     */
+    @Query("SELECT wq FROM UserWrongQuestion wq " +
+           "JOIN UserCourse uc ON wq.user.id = uc.user.id AND wq.course.id = uc.course.id " +
+           "WHERE wq.user.id = :userId " +
+           "AND uc.status = 0 " + // 0 = NORMAL，只包含正常状态的课程
+           "ORDER BY wq.updatedAt DESC")
+    Page<UserWrongQuestion> findByUserIdFilteredByNormalCourses(@Param("userId") Long userId, Pageable pageable);
+    
+    /**
+     * 根据用户ID和课程ID查找错题，只包含用户状态为NORMAL的课程的错题
+     */
+    @Query("SELECT wq FROM UserWrongQuestion wq " +
+           "JOIN UserCourse uc ON wq.user.id = uc.user.id AND wq.course.id = uc.course.id " +
+           "WHERE wq.user.id = :userId " +
+           "AND wq.course.id = :courseId " +
+           "AND uc.status = 0") // 0 = NORMAL，只包含正常状态的课程
+    List<UserWrongQuestion> findByUserIdAndCourseIdFilteredByNormalCourses(
+            @Param("userId") Long userId, @Param("courseId") Long courseId);
+    
+    /**
+     * 根据用户ID和课程ID查找错题，只包含用户状态为NORMAL的课程的错题（分页）
+     */
+    @Query("SELECT wq FROM UserWrongQuestion wq " +
+           "JOIN UserCourse uc ON wq.user.id = uc.user.id AND wq.course.id = uc.course.id " +
+           "WHERE wq.user.id = :userId " +
+           "AND wq.course.id = :courseId " +
+           "AND uc.status = 0 " + // 0 = NORMAL，只包含正常状态的课程
+           "ORDER BY wq.updatedAt DESC")
+    Page<UserWrongQuestion> findByUserIdAndCourseIdFilteredByNormalCourses(
+            @Param("userId") Long userId, @Param("courseId") Long courseId, Pageable pageable);
+    
+    /**
+     * 根据用户ID和错题状态查找错题，只包含用户状态为NORMAL的课程的错题
+     */
+    @Query("SELECT wq FROM UserWrongQuestion wq " +
+           "JOIN UserCourse uc ON wq.user.id = uc.user.id AND wq.course.id = uc.course.id " +
+           "WHERE wq.user.id = :userId " +
+           "AND wq.status = :questionStatus " +
+           "AND uc.status = 0") // 0 = NORMAL，只包含正常状态的课程
+    List<UserWrongQuestion> findByUserIdAndStatusFilteredByNormalCourses(
+            @Param("userId") Long userId, @Param("questionStatus") Integer questionStatus);
+    
+    /**
+     * 根据用户ID和错题状态查找错题，只包含用户状态为NORMAL的课程的错题（分页）
+     */
+    @Query("SELECT wq FROM UserWrongQuestion wq " +
+           "JOIN UserCourse uc ON wq.user.id = uc.user.id AND wq.course.id = uc.course.id " +
+           "WHERE wq.user.id = :userId " +
+           "AND wq.status = :questionStatus " +
+           "AND uc.status = 0 " + // 0 = NORMAL，只包含正常状态的课程
+           "ORDER BY wq.updatedAt DESC")
+    Page<UserWrongQuestion> findByUserIdAndStatusFilteredByNormalCourses(
+            @Param("userId") Long userId, @Param("questionStatus") Integer questionStatus, Pageable pageable);
+    
+    /**
+     * 获取用户错题总数，只计算正常状态课程的错题
+     */
+    @Query("SELECT COUNT(wq) FROM UserWrongQuestion wq " +
+           "JOIN UserCourse uc ON wq.user.id = uc.user.id AND wq.course.id = uc.course.id " +
+           "WHERE wq.user.id = :userId " +
+           "AND uc.status = 0") // 0 = NORMAL，只计算正常状态课程的错题
+    long countByUserIdFilteredByNormalCourses(@Param("userId") Long userId);
+    
+    /**
+     * 获取用户指定状态的错题总数，只计算正常状态课程的错题
+     */
+    @Query("SELECT COUNT(wq) FROM UserWrongQuestion wq " +
+           "JOIN UserCourse uc ON wq.user.id = uc.user.id AND wq.course.id = uc.course.id " +
+           "WHERE wq.user.id = :userId " +
+           "AND wq.status = :questionStatus " +
+           "AND uc.status = 0") // 0 = NORMAL，只计算正常状态课程的错题
+    long countByUserIdAndStatusFilteredByNormalCourses(
+            @Param("userId") Long userId, @Param("questionStatus") Integer questionStatus);
     
     /**
      * 获取用户指定课程的错题总数
