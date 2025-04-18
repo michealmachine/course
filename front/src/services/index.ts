@@ -19,6 +19,8 @@ import institutionMemberService from './institution-member';
 import { storageService } from './storage-service';
 import adminQuotaService from './admin-quota-service';
 import { mediaActivityService, adminMediaActivityService } from './media-activity-service';
+import adminUserStatsService from './admin-user-stats-service';
+import institutionLearningStatsService from './institution-learning-stats-service';
 
 export {
   courseService,
@@ -42,5 +44,7 @@ export {
   storageService,
   adminQuotaService,
   mediaActivityService,
-  adminMediaActivityService
+  adminMediaActivityService,
+  adminUserStatsService,
+  institutionLearningStatsService
 }; 

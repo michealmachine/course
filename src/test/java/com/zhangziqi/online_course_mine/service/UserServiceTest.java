@@ -5,9 +5,10 @@ import com.zhangziqi.online_course_mine.model.dto.RegisterDTO;
 import com.zhangziqi.online_course_mine.model.entity.Role;
 import com.zhangziqi.online_course_mine.model.entity.User;
 import com.zhangziqi.online_course_mine.model.enums.RoleEnum;
-import com.zhangziqi.online_course_mine.model.vo.UserVO;
+import com.zhangziqi.online_course_mine.model.vo.*;
 import com.zhangziqi.online_course_mine.repository.RoleRepository;
 import com.zhangziqi.online_course_mine.repository.UserRepository;
+import com.zhangziqi.online_course_mine.security.jwt.TokenBlacklistService;
 import com.zhangziqi.online_course_mine.service.impl.UserServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -57,6 +60,9 @@ public class UserServiceTest {
 
     @Mock
     private MinioService minioService;
+    
+    @Mock
+    private TokenBlacklistService tokenBlacklistService;
 
     @InjectMocks
     private UserServiceImpl userService;
@@ -76,6 +82,7 @@ public class UserServiceTest {
 
         // 初始化角色
         userRole = new Role();
+        userRole.setId(1L);
         userRole.setName("普通用户");
         userRole.setCode(RoleEnum.USER.getCode());
 
@@ -570,5 +577,234 @@ public class UserServiceTest {
         assertTrue(exception.getMessage().contains("文件大小不能超过2MB"));
         verify(minioService, never()).uploadFile(anyString(), any(), anyString());
         verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void getUserStatsShouldReturnAllStatistics() {
+        // 创建Spy以便于验证方法调用
+        UserServiceImpl spyUserService = spy(userService);
+        
+        // 创建模拟数据
+        UserRoleDistributionVO roleDistribution = new UserRoleDistributionVO();
+        UserGrowthStatsVO growthStats = new UserGrowthStatsVO();
+        UserStatusStatsVO statusStats = new UserStatusStatsVO();
+        UserActivityStatsVO activityStats = new UserActivityStatsVO();
+        
+        // 配置spy的行为
+        doReturn(roleDistribution).when(spyUserService).getUserRoleDistribution();
+        doReturn(growthStats).when(spyUserService).getUserGrowthStats();
+        doReturn(statusStats).when(spyUserService).getUserStatusStats();
+        doReturn(activityStats).when(spyUserService).getUserActivityStats();
+        
+        // 执行测试
+        UserStatsVO result = spyUserService.getUserStats();
+        
+        // 验证结果
+        assertNotNull(result);
+        assertSame(roleDistribution, result.getRoleDistribution());
+        assertSame(growthStats, result.getGrowthStats());
+        assertSame(statusStats, result.getStatusStats());
+        assertSame(activityStats, result.getActivityStats());
+        
+        // 验证方法调用
+        verify(spyUserService).getUserRoleDistribution();
+        verify(spyUserService).getUserGrowthStats();
+        verify(spyUserService).getUserStatusStats();
+        verify(spyUserService).getUserActivityStats();
+    }
+    
+    @Test
+    void getUserRoleDistributionShouldCalculateCorrectPercentages() {
+        // 准备测试数据
+        Role adminRole = new Role();
+        adminRole.setId(2L);
+        adminRole.setName("管理员");
+        adminRole.setCode("ADMIN");
+        
+        List<Role> roles = Arrays.asList(userRole, adminRole);
+        
+        // 配置mock行为
+        when(userRepository.count()).thenReturn(100L);
+        when(roleRepository.findAll()).thenReturn(roles);
+        when(userRepository.countByRoleId(1L)).thenReturn(80L);
+        when(userRepository.countByRoleId(2L)).thenReturn(20L);
+        
+        // 执行测试
+        UserRoleDistributionVO result = userService.getUserRoleDistribution();
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(100L, result.getTotalUserCount());
+        assertEquals(2, result.getRoleDistributions().size());
+        
+        // 获取并验证普通用户角色分布
+        UserRoleDistributionVO.RoleDistribution userDist = result.getRoleDistributions().stream()
+                .filter(r -> r.getRoleId().equals(1L))
+                .findFirst()
+                .orElse(null);
+        assertNotNull(userDist);
+        assertEquals(1L, userDist.getRoleId());
+        assertEquals("普通用户", userDist.getRoleName());
+        assertEquals("ROLE_USER", userDist.getRoleCode());
+        assertEquals(80L, userDist.getUserCount());
+        assertEquals(80.0, userDist.getPercentage());
+        
+        // 获取并验证管理员角色分布
+        UserRoleDistributionVO.RoleDistribution adminDist = result.getRoleDistributions().stream()
+                .filter(r -> r.getRoleId().equals(2L))
+                .findFirst()
+                .orElse(null);
+        assertNotNull(adminDist);
+        assertEquals(2L, adminDist.getRoleId());
+        assertEquals("管理员", adminDist.getRoleName());
+        assertEquals("ADMIN", adminDist.getRoleCode());
+        assertEquals(20L, adminDist.getUserCount());
+        assertEquals(20.0, adminDist.getPercentage());
+        
+        // 验证方法调用
+        verify(userRepository).count();
+        verify(roleRepository).findAll();
+        verify(userRepository).countByRoleId(1L);
+        verify(userRepository).countByRoleId(2L);
+    }
+    
+    @Test
+    void getUserGrowthStatsShouldCalculateCorrectGrowthRates() {
+        // 准备测试数据
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime todayStart = now.toLocalDate().atStartOfDay();
+        LocalDateTime weekStart = now.toLocalDate().minusDays(now.getDayOfWeek().getValue() - 1).atStartOfDay();
+        LocalDateTime monthStart = now.toLocalDate().withDayOfMonth(1).atStartOfDay();
+        
+        LocalDateTime yesterdayStart = todayStart.minusDays(1);
+        LocalDateTime lastWeekStart = weekStart.minusWeeks(1);
+        LocalDateTime lastMonthStart = monthStart.minusMonths(1);
+        
+        LocalDateTime thirtyDaysAgo = now.minusDays(30);
+        
+        List<Object[]> registrationData = Arrays.asList(
+            new Object[]{"2023-10-01", 5L},
+            new Object[]{"2023-10-02", 8L}
+        );
+        
+        // 配置mock行为 - 使用any(LocalDateTime.class)来避免严格匹配问题
+        when(userRepository.count()).thenReturn(200L);
+        when(userRepository.countByCreatedAtBetween(any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(10L, 30L, 50L, 5L, 20L, 40L);
+        
+        when(userRepository.countUserRegistrationsByDateRange(any(LocalDateTime.class), any(LocalDateTime.class)))
+            .thenReturn(registrationData);
+        
+        // 执行测试
+        UserGrowthStatsVO result = userService.getUserGrowthStats();
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(200L, result.getTotalUserCount());
+        assertEquals(10L, result.getTodayNewUsers());
+        assertEquals(30L, result.getWeekNewUsers());
+        assertEquals(50L, result.getMonthNewUsers());
+        
+        // 增长率计算：(当前 - 上一期) / 上一期 * 100
+        assertEquals(100.0, result.getDailyGrowthRate()); // (10 - 5) / 5 * 100 = 100%
+        assertEquals(50.0, result.getWeeklyGrowthRate()); // (30 - 20) / 20 * 100 = 50%
+        assertEquals(25.0, result.getMonthlyGrowthRate()); // (50 - 40) / 40 * 100 = 25%
+        
+        // 验证每日注册数据
+        assertEquals(2, result.getDailyRegistrations().size());
+        assertEquals("2023-10-01", result.getDailyRegistrations().get(0).getDate());
+        assertEquals(5L, result.getDailyRegistrations().get(0).getCount());
+        assertEquals("2023-10-02", result.getDailyRegistrations().get(1).getDate());
+        assertEquals(8L, result.getDailyRegistrations().get(1).getCount());
+    }
+    
+    @Test
+    void getUserStatusStatsShouldCalculateCorrectStatusPercentages() {
+        // 配置mock行为
+        when(userRepository.count()).thenReturn(100L);
+        when(userRepository.countByStatus(1)).thenReturn(75L);
+        when(userRepository.countByStatus(0)).thenReturn(25L);
+        
+        // 执行测试
+        UserStatusStatsVO result = userService.getUserStatusStats();
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(100L, result.getTotalUserCount());
+        assertEquals(75L, result.getActiveUserCount());
+        assertEquals(25L, result.getDisabledUserCount());
+        assertEquals(75.0, result.getActiveUserPercentage());
+        assertEquals(25.0, result.getDisabledUserPercentage());
+        
+        // 验证方法调用
+        verify(userRepository).count();
+        verify(userRepository).countByStatus(1);
+        verify(userRepository).countByStatus(0);
+    }
+    
+    @Test
+    void getUserActivityStatsShouldCalculateCorrectActivityMetrics() {
+        // 准备测试数据
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime oneDayAgo = now.minusDays(1);
+        LocalDateTime oneWeekAgo = now.minusWeeks(1);
+        LocalDateTime oneMonthAgo = now.minusMonths(1);
+        
+        List<Object[]> activityData = Arrays.asList(
+            new Object[]{"2023-10-01", 15L},
+            new Object[]{"2023-10-02", 25L}
+        );
+        
+        List<Object[]> hourlyData = Arrays.asList(
+            new Object[]{9, 30L},
+            new Object[]{14, 45L}
+        );
+        
+        List<Object[]> weekdayData = Arrays.asList(
+            new Object[]{1, 20L}, // 周日
+            new Object[]{2, 35L}  // 周一
+        );
+        
+        // 配置mock行为 - 使用any(LocalDateTime.class)来避免严格匹配问题
+        when(userRepository.count()).thenReturn(200L);
+        when(userRepository.countByLastLoginAtAfter(any(LocalDateTime.class))).thenReturn(150L, 50L, 100L);
+        
+        when(userRepository.countUserActivityByDateRange(any(LocalDateTime.class), any(LocalDateTime.class)))
+            .thenReturn(activityData);
+        when(userRepository.countUserLoginByHourOfDay(any(LocalDateTime.class), any(LocalDateTime.class)))
+            .thenReturn(hourlyData);
+        when(userRepository.countUserLoginByDayOfWeek(any(LocalDateTime.class), any(LocalDateTime.class)))
+            .thenReturn(weekdayData);
+        
+        // 执行测试
+        UserActivityStatsVO result = userService.getUserActivityStats();
+        
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(200L, result.getTotalUserCount());
+        assertEquals(150L, result.getActiveUserCount());
+        assertEquals(50L, result.getInactiveUserCount()); // 200 - 150 = 50
+        assertEquals(50L, result.getTodayActiveUsers());
+        assertEquals(100L, result.getWeekActiveUsers());
+        assertEquals(150L, result.getMonthActiveUsers());
+        assertEquals(75.0, result.getActiveUserPercentage()); // 150 / 200 * 100 = 75%
+        
+        // 验证每日活跃数据
+        assertEquals(2, result.getDailyActiveUsers().size());
+        assertEquals("2023-10-01", result.getDailyActiveUsers().get(0).getDate());
+        assertEquals(15L, result.getDailyActiveUsers().get(0).getCount());
+        assertEquals("2023-10-02", result.getDailyActiveUsers().get(1).getDate());
+        assertEquals(25L, result.getDailyActiveUsers().get(1).getCount());
+        
+        // 验证小时分布
+        Map<Integer, Long> hourlyDistribution = result.getHourlyActiveDistribution();
+        assertEquals(2, hourlyDistribution.size());
+        assertEquals(30L, hourlyDistribution.get(9));
+        assertEquals(45L, hourlyDistribution.get(14));
+        
+        // 验证星期分布
+        Map<Integer, Long> weekdayDistribution = result.getWeekdayActiveDistribution();
+        assertEquals(2, weekdayDistribution.size());
+        assertEquals(20L, weekdayDistribution.get(1));
+        assertEquals(35L, weekdayDistribution.get(2));
     }
 } 

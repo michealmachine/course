@@ -83,4 +83,71 @@ public interface InstitutionLearningStatisticsService {
      * @return 学习人数
      */
     Long getInstitutionLearnerCount(Long institutionId);
+    
+    /**
+     * 获取课程学习统计概览
+     * 
+     * @param institutionId 机构ID
+     * @param courseId 课程ID
+     * @return 课程学习统计数据
+     */
+    InstitutionLearningStatisticsVO.CourseStatisticsVO getCourseLearningStatistics(Long institutionId, Long courseId);
+    
+    /**
+     * 获取课程每日学习统计
+     * 
+     * @param institutionId 机构ID
+     * @param courseId 课程ID
+     * @param startDate 开始日期
+     * @param endDate 结束日期
+     * @return 每日学习统计列表
+     */
+    List<DailyLearningStatVO> getCourseDailyLearningStats(Long institutionId, Long courseId, LocalDate startDate, LocalDate endDate);
+    
+    /**
+     * 获取课程活动类型统计
+     * 
+     * @param institutionId 机构ID
+     * @param courseId 课程ID
+     * @return 活动类型统计列表
+     */
+    List<ActivityTypeStatVO> getCourseActivityTypeStats(Long institutionId, Long courseId);
+    
+    /**
+     * 获取课程学生学习统计
+     * 
+     * @param institutionId 机构ID
+     * @param courseId 课程ID
+     * @param pageable 分页参数
+     * @return 学生学习统计分页
+     */
+    Page<InstitutionLearningStatisticsVO.StudentLearningVO> getCourseStudentStatistics(
+            Long institutionId, Long courseId, Pageable pageable);
+    
+    /**
+     * 获取课程今日学习时长
+     * 
+     * @param institutionId 机构ID
+     * @param courseId 课程ID
+     * @return 今日学习时长（秒）
+     */
+    Long getCourseTodayLearningDuration(Long institutionId, Long courseId);
+    
+    /**
+     * 获取课程总学习时长
+     * 
+     * @param institutionId 机构ID
+     * @param courseId 课程ID
+     * @return 总学习时长（秒）
+     */
+    Long getCourseTotalLearningDuration(Long institutionId, Long courseId);
+    
+    /**
+     * 获取课程学习人数
+     * 
+     * @param institutionId 机构ID
+     * @param courseId 课程ID
+     * @return 学习人数
+     */
+    Long getCourseLearnerCount(Long institutionId, Long courseId);
 } 

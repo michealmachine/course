@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.time.LocalDateTime;
 
 /**
  * 机构学习统计数据VO
@@ -176,5 +177,46 @@ public class InstitutionLearningStatisticsVO {
          * 学习活动次数
          */
         private Integer activityCount;
+    }
+    
+    /**
+     * 学生学习统计VO
+     * 用于展示课程中每个学生的学习详情
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class StudentLearningVO {
+        
+        /**
+         * 用户ID
+         */
+        private Long userId;
+        
+        /**
+         * 用户名
+         */
+        private String username;
+        
+        /**
+         * 学习时长（秒）
+         */
+        private Long learningDuration;
+        
+        /**
+         * 学习进度（百分比）
+         */
+        private Integer progress;
+        
+        /**
+         * 学习活动次数
+         */
+        private Integer activityCount;
+        
+        /**
+         * 最后学习时间
+         */
+        private LocalDateTime lastLearnTime;
     }
 } 

@@ -1,5 +1,6 @@
 package com.zhangziqi.online_course_mine.service.impl;
 
+import com.zhangziqi.online_course_mine.config.CacheConfig;
 import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.exception.ResourceNotFoundException;
 import com.zhangziqi.online_course_mine.model.entity.UserCourse;
@@ -13,6 +14,8 @@ import com.zhangziqi.online_course_mine.service.WrongQuestionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +48,7 @@ public class LearningStatisticsServiceImpl implements LearningStatisticsService 
     
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.USER_STATS_CACHE, key = "'user_learning_statistics_' + #userId")
     public LearningStatisticsVO getUserLearningStatistics(Long userId) {
         log.info("获取用户学习统计数据, 用户ID: {}", userId);
         
@@ -104,6 +108,7 @@ public class LearningStatisticsServiceImpl implements LearningStatisticsService 
     
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.USER_STATS_CACHE, key = "'user_course_statistics_' + #userId + '_' + #courseId")
     public LearningStatisticsVO.CourseStatisticsVO getUserCourseLearningStatistics(Long userId, Long courseId) {
         log.info("获取用户课程学习统计数据, 用户ID: {}, 课程ID: {}", userId, courseId);
         
@@ -115,6 +120,9 @@ public class LearningStatisticsServiceImpl implements LearningStatisticsService 
     
     @Override
     @Transactional
+    @CacheEvict(value = CacheConfig.USER_STATS_CACHE, 
+                allEntries = false, 
+                key = "'user_learning_statistics_' + #userId")
     public void resetUserCourseProgress(Long userId, Long courseId) {
         log.info("重置用户课程学习进度, 用户ID: {}, 课程ID: {}", userId, courseId);
         

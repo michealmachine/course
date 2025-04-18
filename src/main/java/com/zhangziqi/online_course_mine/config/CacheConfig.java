@@ -33,6 +33,9 @@ public class CacheConfig {
     public static final String QUOTA_STATS_CACHE = "quotaStats_v2"; // 添加版本号，避免使用旧缓存
     public static final String MEDIA_ACTIVITY_CACHE = "mediaActivity"; // 媒体活动缓存
     public static final String MEDIA_STATS_CACHE = "mediaStats"; // 媒体统计缓存
+    public static final String USER_STATS_CACHE = "userStats"; // 用户统计缓存
+    public static final String INSTITUTION_STATS_CACHE = "institutionStats"; // 机构统计缓存
+    public static final String COURSE_STATS_CACHE = "courseStats"; // 课程统计缓存
 
     // 缓存时间常量（分钟）
     private static final long DEFAULT_EXPIRE_MINUTES = 30;
@@ -42,6 +45,9 @@ public class CacheConfig {
     private static final long QUOTA_STATS_EXPIRE_MINUTES = 15; // 配额统计缓存15分钟
     private static final long MEDIA_ACTIVITY_EXPIRE_MINUTES = 30; // 媒体活动缓存30分钟
     private static final long MEDIA_STATS_EXPIRE_MINUTES = 15; // 媒体统计缓存15分钟
+    private static final long USER_STATS_EXPIRE_MINUTES = 15; // 用户统计缓存15分钟
+    private static final long INSTITUTION_STATS_EXPIRE_MINUTES = 15; // 机构统计缓存15分钟
+    private static final long COURSE_STATS_EXPIRE_MINUTES = 15; // 课程统计缓存15分钟
     
     /**
      * 配置Redis缓存管理器
@@ -96,6 +102,18 @@ public class CacheConfig {
         // 媒体统计缓存配置
         cacheConfigurations.put(MEDIA_STATS_CACHE, 
             defaultCacheConfig.entryTtl(Duration.ofMinutes(MEDIA_STATS_EXPIRE_MINUTES)));
+            
+        // 用户统计缓存配置
+        cacheConfigurations.put(USER_STATS_CACHE, 
+            defaultCacheConfig.entryTtl(Duration.ofMinutes(USER_STATS_EXPIRE_MINUTES)));
+            
+        // 机构统计缓存配置
+        cacheConfigurations.put(INSTITUTION_STATS_CACHE, 
+            defaultCacheConfig.entryTtl(Duration.ofMinutes(INSTITUTION_STATS_EXPIRE_MINUTES)));
+            
+        // 课程统计缓存配置
+        cacheConfigurations.put(COURSE_STATS_CACHE, 
+            defaultCacheConfig.entryTtl(Duration.ofMinutes(COURSE_STATS_EXPIRE_MINUTES)));
 
         // 构建缓存管理器
         return RedisCacheManager.builder(connectionFactory)

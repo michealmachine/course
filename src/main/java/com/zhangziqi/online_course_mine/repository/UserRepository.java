@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -109,4 +110,110 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
             @Param("institutionId") Long institutionId, 
             @Param("keyword") String keyword,
             Pageable pageable);
+
+    /**
+     * 根据用户角色ID查询用户数量
+     *
+     * @param roleId 角色ID
+     * @return 用户数量
+     */
+    @Query("SELECT COUNT(DISTINCT u) FROM User u JOIN u.roles r WHERE r.id = :roleId")
+    long countByRoleId(@Param("roleId") Long roleId);
+    
+    /**
+     * 统计指定时间范围内创建的用户数量
+     *
+     * @param startTime 开始时间
+     * @param endTime 结束时间
+     * @return 用户数量
+     */
+    @Query("SELECT COUNT(u) FROM User u WHERE u.createdAt BETWEEN :startTime AND :endTime")
+    long countByCreatedAtBetween(
+            @Param("startTime") LocalDateTime startTime, 
+            @Param("endTime") LocalDateTime endTime);
+    
+    /**
+     * 统计指定状态的用户数量
+     *
+     * @param status 用户状态
+     * @return 用户数量
+     */
+    long countByStatus(Integer status);
+    
+    /**
+     * 统计最后登录时间在指定时间之后的用户数量
+     *
+     * @param lastLoginTime 指定时间
+     * @return 用户数量
+     */
+    @Query("SELECT COUNT(u) FROM User u WHERE u.lastLoginAt IS NOT NULL AND u.lastLoginAt >= :lastLoginTime")
+    long countByLastLoginAtAfter(@Param("lastLoginTime") LocalDateTime lastLoginTime);
+    
+    /**
+     * 统计最后登录时间在指定时间范围内的用户数量
+     *
+     * @param startTime 开始时间
+     * @param endTime 结束时间
+     * @return 用户数量
+     */
+    @Query("SELECT COUNT(u) FROM User u WHERE u.lastLoginAt IS NOT NULL AND u.lastLoginAt BETWEEN :startTime AND :endTime")
+    long countByLastLoginAtBetween(
+            @Param("startTime") LocalDateTime startTime, 
+            @Param("endTime") LocalDateTime endTime);
+    
+    /**
+     * 统计指定日期每个小时的用户登录分布
+     *
+     * @param dateStart 日期开始时间
+     * @param dateEnd 日期结束时间
+     * @return 小时 -> 用户数量 的键值对列表
+     */
+    @Query("SELECT HOUR(u.lastLoginAt) as hour, COUNT(u) as count FROM User u " +
+           "WHERE u.lastLoginAt BETWEEN :dateStart AND :dateEnd " +
+           "GROUP BY HOUR(u.lastLoginAt) ORDER BY hour")
+    List<Object[]> countUserLoginByHourOfDay(
+            @Param("dateStart") LocalDateTime dateStart, 
+            @Param("dateEnd") LocalDateTime dateEnd);
+    
+    /**
+     * 统计最近一段时间内每个星期几的用户登录分布
+     *
+     * @param startTime 开始时间
+     * @param endTime 结束时间
+     * @return 星期几(1-7) -> 用户数量 的键值对列表
+     */
+    @Query("SELECT FUNCTION('DAYOFWEEK', u.lastLoginAt) as weekday, COUNT(u) as count FROM User u " +
+           "WHERE u.lastLoginAt BETWEEN :startTime AND :endTime " +
+           "GROUP BY FUNCTION('DAYOFWEEK', u.lastLoginAt) ORDER BY weekday")
+    List<Object[]> countUserLoginByDayOfWeek(
+            @Param("startTime") LocalDateTime startTime, 
+            @Param("endTime") LocalDateTime endTime);
+    
+    /**
+     * 按日期统计用户注册数量
+     *
+     * @param startDate 开始日期
+     * @param endDate 结束日期
+     * @return 日期 -> 注册用户数 的键值对列表
+     */
+    @Query("SELECT FUNCTION('DATE_FORMAT', u.createdAt, '%Y-%m-%d') as date, COUNT(u) as count FROM User u " +
+           "WHERE u.createdAt BETWEEN :startDate AND :endDate " +
+           "GROUP BY FUNCTION('DATE_FORMAT', u.createdAt, '%Y-%m-%d') ORDER BY date")
+    List<Object[]> countUserRegistrationsByDateRange(
+            @Param("startDate") LocalDateTime startDate, 
+            @Param("endDate") LocalDateTime endDate);
+    
+    /**
+     * 按日期统计用户活跃数量
+     *
+     * @param startDate 开始日期
+     * @param endDate 结束日期
+     * @return 日期 -> 活跃用户数 的键值对列表
+     */
+    @Query("SELECT FUNCTION('DATE_FORMAT', u.lastLoginAt, '%Y-%m-%d') as date, COUNT(u) as count FROM User u " +
+           "WHERE u.lastLoginAt BETWEEN :startDate AND :endDate " +
+           "GROUP BY FUNCTION('DATE_FORMAT', u.lastLoginAt, '%Y-%m-%d') ORDER BY date")
+    List<Object[]> countUserActivityByDateRange(
+            @Param("startDate") LocalDateTime startDate, 
+            @Param("endDate") LocalDateTime endDate);
 } 

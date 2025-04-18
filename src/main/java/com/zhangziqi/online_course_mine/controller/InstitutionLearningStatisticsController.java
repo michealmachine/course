@@ -168,4 +168,126 @@ public class InstitutionLearningStatisticsController {
             public final Long totalLearners = learnerCount;
         });
     }
+    
+    /**
+     * 获取课程学习统计概览
+     */
+    @GetMapping("/courses/{courseId}/overview")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('INSTITUTION')")
+    @Operation(summary = "获取课程学习统计概览", description = "获取特定课程的学习统计概览数据")
+    public Result<InstitutionLearningStatisticsVO.CourseStatisticsVO> getCourseStatisticsOverview(
+            @Parameter(description = "课程ID") @PathVariable Long courseId) {
+        String username = SecurityUtil.getCurrentUsername();
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+        
+        log.info("获取课程学习统计概览, 用户名: {}, 机构ID: {}, 课程ID: {}", 
+                username, institutionId, courseId);
+        
+        InstitutionLearningStatisticsVO.CourseStatisticsVO statistics = 
+                statisticsService.getCourseLearningStatistics(institutionId, courseId);
+        return Result.success(statistics);
+    }
+    
+    /**
+     * 获取课程每日学习统计
+     */
+    @GetMapping("/courses/{courseId}/daily")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('INSTITUTION')")
+    @Operation(summary = "获取课程每日学习统计", description = "获取特定课程在指定日期范围内的每日学习统计数据")
+    public Result<List<DailyLearningStatVO>> getCourseDailyStatistics(
+            @Parameter(description = "课程ID") @PathVariable Long courseId,
+            @Parameter(description = "开始日期") 
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @Parameter(description = "结束日期") 
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        String username = SecurityUtil.getCurrentUsername();
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+        
+        // 默认获取最近30天数据
+        if (startDate == null) {
+            startDate = LocalDate.now().minusDays(29);
+        }
+        if (endDate == null) {
+            endDate = LocalDate.now();
+        }
+        
+        log.info("获取课程每日学习统计, 用户名: {}, 机构ID: {}, 课程ID: {}, 开始日期: {}, 结束日期: {}", 
+                username, institutionId, courseId, startDate, endDate);
+        
+        List<DailyLearningStatVO> statistics = 
+                statisticsService.getCourseDailyLearningStats(institutionId, courseId, startDate, endDate);
+        return Result.success(statistics);
+    }
+    
+    /**
+     * 获取课程活动类型统计
+     */
+    @GetMapping("/courses/{courseId}/activity-types")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('INSTITUTION')")
+    @Operation(summary = "获取课程活动类型统计", description = "获取特定课程各学习活动类型的统计数据")
+    public Result<List<ActivityTypeStatVO>> getCourseActivityTypeStatistics(
+            @Parameter(description = "课程ID") @PathVariable Long courseId) {
+        String username = SecurityUtil.getCurrentUsername();
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+        
+        log.info("获取课程活动类型统计, 用户名: {}, 机构ID: {}, 课程ID: {}", 
+                username, institutionId, courseId);
+        
+        List<ActivityTypeStatVO> statistics = 
+                statisticsService.getCourseActivityTypeStats(institutionId, courseId);
+        return Result.success(statistics);
+    }
+    
+    /**
+     * 获取课程学生学习统计
+     */
+    @GetMapping("/courses/{courseId}/students")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('INSTITUTION')")
+    @Operation(summary = "获取课程学生学习统计", description = "分页获取特定课程的学生学习统计数据")
+    public Result<Page<InstitutionLearningStatisticsVO.StudentLearningVO>> getCourseStudentStatistics(
+            @Parameter(description = "课程ID") @PathVariable Long courseId,
+            @Parameter(description = "页码") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") int size) {
+        String username = SecurityUtil.getCurrentUsername();
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+        
+        log.info("获取课程学生学习统计, 用户名: {}, 机构ID: {}, 课程ID: {}, 页码: {}, 每页数量: {}", 
+                username, institutionId, courseId, page, size);
+        
+        Pageable pageable = PageRequest.of(page, size);
+        Page<InstitutionLearningStatisticsVO.StudentLearningVO> statistics = 
+                statisticsService.getCourseStudentStatistics(institutionId, courseId, pageable);
+        return Result.success(statistics);
+    }
+    
+    /**
+     * 获取课程学习时长统计
+     */
+    @GetMapping("/courses/{courseId}/duration")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('INSTITUTION')")
+    @Operation(summary = "获取课程学习时长统计", description = "获取特定课程的今日和总学习时长统计")
+    public Result<Object> getCourseLearningDuration(
+            @Parameter(description = "课程ID") @PathVariable Long courseId) {
+        String username = SecurityUtil.getCurrentUsername();
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+        
+        log.info("获取课程学习时长统计, 用户名: {}, 机构ID: {}, 课程ID: {}", 
+                username, institutionId, courseId);
+        
+        Long todayDuration = statisticsService.getCourseTodayLearningDuration(institutionId, courseId);
+        Long totalDuration = statisticsService.getCourseTotalLearningDuration(institutionId, courseId);
+        Long learnerCount = statisticsService.getCourseLearnerCount(institutionId, courseId);
+        
+        // 构建响应
+        return Result.success(new Object() {
+            public final Long todayLearningDuration = todayDuration;
+            public final Long totalLearningDuration = totalDuration;
+            public final Long totalLearners = learnerCount;
+        });
+    }
 } 

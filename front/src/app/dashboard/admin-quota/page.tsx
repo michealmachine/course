@@ -101,33 +101,39 @@ import { MediaVO, MediaType, MediaTypeDistributionVO, TypeDistribution, AdminMed
 import { AdvancedMediaQueryParams, Page } from '@/services/media-service';
 import { mediaService } from '@/services/media-service';
 
-// 获取饼图配置
+// 定义灰阶调色板 (与 user-stats.tsx 保持一致)
+const GRAYSCALE_PALETTE = {
+  light: [
+    'hsl(0, 0%, 15%)', // 近黑
+    'hsl(0, 0%, 35%)',
+    'hsl(0, 0%, 55%)',
+    'hsl(0, 0%, 75%)',
+    'hsl(0, 0%, 88%)', // 近白
+  ],
+  dark: [
+    'hsl(0, 0%, 95%)', // 近白
+    'hsl(0, 0%, 75%)',
+    'hsl(0, 0%, 55%)',
+    'hsl(0, 0%, 35%)',
+    'hsl(0, 0%, 20%)', // 近黑
+  ],
+};
+
+// 获取饼图配置 (修改为使用灰阶调色板)
 const getPieChartConfig = (institutions: InstitutionQuotaDistributionVO[]): ChartConfig => {
-  const chartConfig: ChartConfig = {};
-  
-  // 配色方案
-  const colors = [
-    "#4f46e5", // 靛蓝色
-    "#10b981", // 翠绿色 
-    "#f59e0b", // 琥珀色
-    "#8b5cf6", // 紫色
-    "#ef4444", // 红色
-    "#0ea5e9", // 天蓝色
-    "#ec4899", // 粉色
-    "#14b8a6", // 蓝绿色
-    "#f97316", // 橙色
-    "#6366f1"  // 靛青色
-  ];
-  
+  const config: ChartConfig = {};
   institutions.forEach((item, index) => {
-    const key = `inst_${item.institutionId}`;
-    chartConfig[key] = {
+    const key = `inst_${item.institutionId}`; // 使用 institutionId 作为 key
+    const colorIndex = index % GRAYSCALE_PALETTE.light.length;
+    config[key] = {
       label: item.institutionName,
-      color: colors[index % colors.length],
+      theme: { // 使用 theme 属性
+        light: GRAYSCALE_PALETTE.light[colorIndex],
+        dark: GRAYSCALE_PALETTE.dark[colorIndex]
+      }
     };
   });
-  
-  return chartConfig;
+  return config;
 };
 
 // 获取柱状图配置
@@ -328,24 +334,21 @@ const getMediaTypeIcon = (mediaType: string) => {
 };
 
 // 媒体类型图表配置
-const getMediaTypeChartConfig = (distribution: TypeDistribution[]): ChartConfig => {
-  const colors = {
-    [MediaType.VIDEO]: "#ef4444", // 红色
-    [MediaType.AUDIO]: "#10b981", // 绿色
-    [MediaType.IMAGE]: "#f59e0b", // 琥珀色
-    [MediaType.DOCUMENT]: "#4f46e5", // 靛蓝色
-  };
-  
-  const chartConfig: ChartConfig = {};
-  
-  distribution.forEach((item) => {
-    chartConfig[item.type] = {
+const getMediaTypeChartConfig = (distribution: { type: string; typeName: string }[]): ChartConfig => {
+  const config: ChartConfig = {};
+  distribution.forEach((item, index) => {
+    // 使用 item.type 作为 key，如果 type 不可靠，可以考虑用 index 或 typeName
+    const key = item.type ? item.type.toLowerCase().replace(/[^a-z0-9]/gi, '_') : `type_${index}`; 
+    const colorIndex = index % GRAYSCALE_PALETTE.light.length;
+    config[key] = {
       label: item.typeName,
-      color: colors[item.type] || "#8b5cf6", // 默认紫色
+      theme: { // 使用 theme 属性
+        light: GRAYSCALE_PALETTE.light[colorIndex],
+        dark: GRAYSCALE_PALETTE.dark[colorIndex]
+      }
     };
   });
-  
-  return chartConfig;
+  return config;
 };
 
 export default function AdminQuotaPage() {
@@ -1025,19 +1028,23 @@ export default function AdminQuotaPage() {
                                 cx="50%"
                                 cy="50%"
                                 outerRadius={100}
-                                innerRadius={40}
-                                paddingAngle={2}
-                                labelLine={true}
-                                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                // innerRadius={40} // Removed to make it a solid pie chart
+                                // paddingAngle={2} // Optional: keep or remove padding
+                                // labelLine={false} // Removed label lines
+                                // label={...} // Removed label
                               >
-                                {mediaTypeDistribution.distribution.map((entry, index) => (
-                                  <Cell 
-                                    key={`cell-${index}`} 
-                                    fill={`var(--color-${entry.type})`} 
-                                    stroke="var(--background)"
-                                    strokeWidth={2}
-                                  />
-                                ))}
+                                {mediaTypeDistribution.distribution.map((entry, index) => {
+                                  // Regenerate the key used in getMediaTypeChartConfig to reference the color
+                                  const configKey = entry.type ? entry.type.toLowerCase().replace(/[^a-z0-9]/gi, '_') : `type_${index}`;
+                                  return (
+                                    <Cell 
+                                      key={`cell-${index}`} 
+                                      fill={`var(--color-${configKey})`} // Use the configKey to reference the theme color
+                                      stroke="var(--background)"
+                                      strokeWidth={2}
+                                    />
+                                  );
+                                })}
                               </Pie>
                               <ChartTooltip
                                 content={
@@ -1045,11 +1052,13 @@ export default function AdminQuotaPage() {
                                     formatter={(value, name, props) => {
                                       return [value, props.payload.typeName];
                                     }}
+                                    nameKey="typeName" // Ensure nameKey is set for Tooltip
+                                    indicator="dot" // Match style with user stats chart
                                   />
                                 }
                               />
                               <ChartLegend 
-                                content={<ChartLegendContent />}
+                                content={<ChartLegendContent nameKey="typeName" />} // Ensure nameKey is set for Legend
                                 layout="vertical"
                                 verticalAlign="middle" 
                                 align="right"
@@ -1245,35 +1254,38 @@ export default function AdminQuotaPage() {
                             <Pie
                               data={quotaStats.distribution}
                               dataKey="usedQuota"
-                              nameKey="institutionName"
+                              nameKey="institutionName" // Keep nameKey for Tooltip/Legend
                               cx="50%"
                               cy="50%"
                               outerRadius={100}
-                              innerRadius={40}
-                              paddingAngle={2}
-                              labelLine={true}
-                              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                              // innerRadius={40} // Removed
+                              // paddingAngle={2} // Optional
+                              // labelLine={false} // Removed
+                              // label={...} // Removed
                             >
                               {quotaStats.distribution.map((entry, index) => (
                                 <Cell 
                                   key={`cell-${index}`} 
-                                  fill={`var(--color-inst_${entry.institutionId})`} 
+                                  fill={`var(--color-inst_${entry.institutionId})`} // Key matches getPieChartConfig
                                   stroke="var(--background)"
                                   strokeWidth={2}
                                 />
                               ))}
                             </Pie>
                             <ChartTooltip
+                              cursor={false} // Added cursor=false for consistency
                               content={
                                 <ChartTooltipContent 
                                   formatter={(value, name, props) => {
                                     return [formatBytes(Number(value)), props.payload.institutionName];
                                   }}
+                                  nameKey="institutionName" // Added nameKey
+                                  indicator="dot" // Added indicator
                                 />
                               }
                             />
                             <ChartLegend 
-                              content={<ChartLegendContent />}
+                              content={<ChartLegendContent nameKey="institutionName" />} // Added nameKey
                               layout="vertical"
                               verticalAlign="middle" 
                               align="right"

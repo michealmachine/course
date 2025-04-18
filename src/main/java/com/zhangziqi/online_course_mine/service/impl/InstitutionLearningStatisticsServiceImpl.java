@@ -1,5 +1,6 @@
 package com.zhangziqi.online_course_mine.service.impl;
 
+import com.zhangziqi.online_course_mine.config.CacheConfig;
 import com.zhangziqi.online_course_mine.exception.ResourceNotFoundException;
 import com.zhangziqi.online_course_mine.model.entity.Course;
 import com.zhangziqi.online_course_mine.model.entity.Institution;
@@ -15,6 +16,7 @@ import com.zhangziqi.online_course_mine.repository.UserCourseRepository;
 import com.zhangziqi.online_course_mine.service.InstitutionLearningStatisticsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -48,6 +50,7 @@ public class InstitutionLearningStatisticsServiceImpl implements InstitutionLear
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.INSTITUTION_STATS_CACHE, key = "'institution_statistics_' + #institutionId")
     public InstitutionLearningStatisticsVO getInstitutionLearningStatistics(Long institutionId) {
         log.info("获取机构学习统计, 机构ID: {}", institutionId);
         
@@ -137,6 +140,8 @@ public class InstitutionLearningStatisticsServiceImpl implements InstitutionLear
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.INSTITUTION_STATS_CACHE, 
+              key = "'institution_daily_stats_' + #institutionId + '_' + #startDate + '_' + #endDate")
     public List<DailyLearningStatVO> getInstitutionDailyLearningStats(
             Long institutionId, LocalDate startDate, LocalDate endDate) {
         log.info("获取机构每日学习统计, 机构ID: {}, 开始日期: {}, 结束日期: {}", 
@@ -166,6 +171,8 @@ public class InstitutionLearningStatisticsServiceImpl implements InstitutionLear
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.INSTITUTION_STATS_CACHE, 
+              key = "'institution_activity_type_stats_' + #institutionId")
     public List<ActivityTypeStatVO> getInstitutionActivityTypeStats(Long institutionId) {
         log.info("获取机构活动类型统计, 机构ID: {}", institutionId);
         
@@ -193,6 +200,8 @@ public class InstitutionLearningStatisticsServiceImpl implements InstitutionLear
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.INSTITUTION_STATS_CACHE, 
+              key = "'institution_course_stats_' + #institutionId + '_page_' + #pageable.pageNumber + '_size_' + #pageable.pageSize")
     public Page<InstitutionLearningStatisticsVO.CourseStatisticsVO> getInstitutionCourseStatistics(
             Long institutionId, Pageable pageable) {
         log.info("获取机构课程学习统计, 机构ID: {}, 页码: {}, 每页数量: {}", 
@@ -266,6 +275,8 @@ public class InstitutionLearningStatisticsServiceImpl implements InstitutionLear
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.INSTITUTION_STATS_CACHE, 
+              key = "'institution_active_users_' + #institutionId + '_limit_' + #limit")
     public List<InstitutionLearningStatisticsVO.ActiveUserVO> getMostActiveUsers(Long institutionId, int limit) {
         log.info("获取机构最活跃用户, 机构ID: {}, 限制: {}", institutionId, limit);
         
@@ -292,6 +303,8 @@ public class InstitutionLearningStatisticsServiceImpl implements InstitutionLear
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.INSTITUTION_STATS_CACHE, 
+              key = "'institution_today_duration_' + #institutionId")
     public Long getInstitutionTodayLearningDuration(Long institutionId) {
         log.info("获取机构今日学习时长, 机构ID: {}", institutionId);
         
@@ -301,6 +314,8 @@ public class InstitutionLearningStatisticsServiceImpl implements InstitutionLear
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.INSTITUTION_STATS_CACHE, 
+              key = "'institution_total_duration_' + #institutionId")
     public Long getInstitutionTotalLearningDuration(Long institutionId) {
         log.info("获取机构总学习时长, 机构ID: {}", institutionId);
         
@@ -310,10 +325,274 @@ public class InstitutionLearningStatisticsServiceImpl implements InstitutionLear
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.INSTITUTION_STATS_CACHE, 
+              key = "'institution_learner_count_' + #institutionId")
     public Long getInstitutionLearnerCount(Long institutionId) {
         log.info("获取机构学习人数, 机构ID: {}", institutionId);
         
         Long count = learningRecordRepository.countUniqueUsersByInstitution(institutionId);
+        return count != null ? count : 0L;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.COURSE_STATS_CACHE, 
+              key = "'course_statistics_' + #institutionId + '_' + #courseId")
+    public InstitutionLearningStatisticsVO.CourseStatisticsVO getCourseLearningStatistics(Long institutionId, Long courseId) {
+        log.info("获取课程学习统计, 机构ID: {}, 课程ID: {}", institutionId, courseId);
+        
+        // 验证机构存在
+        institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new ResourceNotFoundException("机构不存在"));
+        
+        // 验证课程存在且属于该机构
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("课程不存在"));
+        
+        if (!institutionId.equals(course.getInstitutionId())) {
+            throw new ResourceNotFoundException("该课程不属于指定机构");
+        }
+        
+        // 查询课程学习时长
+        Long totalDuration = learningRecordRepository.findTotalLearningDurationByCourse(courseId);
+        
+        // 查询课程学习活动次数
+        List<Object[]> statResults = learningRecordRepository.findLearningStatsByCourseForInstitution(institutionId)
+                .stream()
+                .filter(result -> courseId.equals(((Number) result[0]).longValue()))
+                .collect(Collectors.toList());
+        
+        Integer activityCount = 0;
+        if (!statResults.isEmpty()) {
+            activityCount = ((Number) statResults.get(0)[3]).intValue();
+        }
+        
+        // 查询课程学习人数
+        List<Object[]> learnerCountQuery = userCourseRepository.countLearnersByCourseId(courseId);
+        Long learnerCount = learnerCountQuery.isEmpty() ? 0L : 
+                (learnerCountQuery.get(0)[0] instanceof Number ? ((Number) learnerCountQuery.get(0)[0]).longValue() : 0L);
+        
+        // 查询完成人数
+        Long completionCount = userCourseRepository.countByProgress(courseId, 100);
+        
+        // 计算平均进度
+        Double averageProgress = userCourseRepository.getAverageProgressByCourseId(courseId);
+        if (averageProgress == null) {
+            averageProgress = 0.0;
+        }
+        
+        // 构建返回对象
+        return InstitutionLearningStatisticsVO.CourseStatisticsVO.builder()
+                .courseId(courseId)
+                .courseTitle(course.getTitle())
+                .totalDuration(totalDuration != null ? totalDuration : 0L)
+                .activityCount(activityCount)
+                .learnerCount(learnerCount)
+                .completionCount(completionCount != null ? completionCount : 0L)
+                .averageProgress(averageProgress)
+                .build();
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.COURSE_STATS_CACHE, 
+              key = "'course_daily_stats_' + #institutionId + '_' + #courseId + '_' + #startDate + '_' + #endDate")
+    public List<DailyLearningStatVO> getCourseDailyLearningStats(
+            Long institutionId, Long courseId, LocalDate startDate, LocalDate endDate) {
+        log.info("获取课程每日学习统计, 机构ID: {}, 课程ID: {}, 开始日期: {}, 结束日期: {}", 
+                institutionId, courseId, startDate, endDate);
+        
+        // 验证机构存在
+        institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new ResourceNotFoundException("机构不存在"));
+        
+        // 验证课程存在且属于该机构
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("课程不存在"));
+        
+        if (!institutionId.equals(course.getInstitutionId())) {
+            throw new ResourceNotFoundException("该课程不属于指定机构");
+        }
+        
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+        
+        List<Object[]> results = learningRecordRepository.findDailyLearningStatsByCourseId(
+                courseId, startDateTime, endDateTime);
+        
+        List<DailyLearningStatVO> stats = new ArrayList<>();
+        for (Object[] result : results) {
+            String date = (String) result[0];
+            Long duration = result[1] != null ? ((Number) result[1]).longValue() : 0L;
+            Integer count = result[2] != null ? ((Number) result[2]).intValue() : 0;
+            
+            stats.add(DailyLearningStatVO.builder()
+                    .date(date)
+                    .durationSeconds(duration)
+                    .activityCount(count)
+                    .build());
+        }
+        
+        return stats;
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.COURSE_STATS_CACHE, 
+              key = "'course_activity_type_stats_' + #institutionId + '_' + #courseId")
+    public List<ActivityTypeStatVO> getCourseActivityTypeStats(Long institutionId, Long courseId) {
+        log.info("获取课程活动类型统计, 机构ID: {}, 课程ID: {}", institutionId, courseId);
+        
+        // 验证机构存在
+        institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new ResourceNotFoundException("机构不存在"));
+        
+        // 验证课程存在且属于该机构
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("课程不存在"));
+        
+        if (!institutionId.equals(course.getInstitutionId())) {
+            throw new ResourceNotFoundException("该课程不属于指定机构");
+        }
+        
+        List<Object[]> results = learningRecordRepository.findLearningStatsByActivityTypeForCourse(courseId);
+        
+        List<ActivityTypeStatVO> stats = new ArrayList<>();
+        for (Object[] result : results) {
+            String activityType = (String) result[0];
+            Long duration = result[1] != null ? ((Number) result[1]).longValue() : 0L;
+            Integer count = result[2] != null ? ((Number) result[2]).intValue() : 0;
+            
+            LearningActivityType type = LearningActivityType.getByCode(activityType);
+            String description = type != null ? type.getDescription() : activityType;
+            
+            stats.add(ActivityTypeStatVO.builder()
+                    .activityType(activityType)
+                    .activityTypeDescription(description)
+                    .totalDurationSeconds(duration)
+                    .activityCount(count)
+                    .build());
+        }
+        
+        return stats;
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.COURSE_STATS_CACHE, 
+              key = "'course_student_stats_' + #institutionId + '_' + #courseId + '_page_' + #pageable.pageNumber + '_size_' + #pageable.pageSize")
+    public Page<InstitutionLearningStatisticsVO.StudentLearningVO> getCourseStudentStatistics(
+            Long institutionId, Long courseId, Pageable pageable) {
+        log.info("获取课程学生学习统计, 机构ID: {}, 课程ID: {}, 页码: {}, 每页数量: {}", 
+                institutionId, courseId, pageable.getPageNumber(), pageable.getPageSize());
+        
+        // 验证机构存在
+        institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new ResourceNotFoundException("机构不存在"));
+        
+        // 验证课程存在且属于该机构
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("课程不存在"));
+        
+        if (!institutionId.equals(course.getInstitutionId())) {
+            throw new ResourceNotFoundException("该课程不属于指定机构");
+        }
+        
+        // 获取课程学生学习统计
+        List<Object[]> studentStats = learningRecordRepository.findStudentLearningStatsByCourse(courseId, pageable);
+        
+        List<InstitutionLearningStatisticsVO.StudentLearningVO> studentLearningList = new ArrayList<>();
+        for (Object[] stat : studentStats) {
+            Long userId = ((Number) stat[0]).longValue();
+            String username = (String) stat[1];
+            Long duration = stat[2] != null ? ((Number) stat[2]).longValue() : 0L;
+            Integer count = stat[3] != null ? ((Number) stat[3]).intValue() : 0;
+            LocalDateTime lastLearnTime = (LocalDateTime) stat[4];
+            
+            // 获取用户课程学习进度
+            Integer progress = userCourseRepository.findProgressByUserIdAndCourseId(userId, courseId);
+            
+            studentLearningList.add(InstitutionLearningStatisticsVO.StudentLearningVO.builder()
+                    .userId(userId)
+                    .username(username)
+                    .learningDuration(duration)
+                    .activityCount(count)
+                    .progress(progress != null ? progress : 0)
+                    .lastLearnTime(lastLearnTime)
+                    .build());
+        }
+        
+        // 创建分页返回对象
+        long total = learningRecordRepository.countUniqueUsersByCourse(courseId);
+        return new PageImpl<>(studentLearningList, pageable, total);
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.COURSE_STATS_CACHE, 
+              key = "'course_today_duration_' + #institutionId + '_' + #courseId")
+    public Long getCourseTodayLearningDuration(Long institutionId, Long courseId) {
+        log.info("获取课程今日学习时长, 机构ID: {}, 课程ID: {}", institutionId, courseId);
+        
+        // 验证机构存在
+        institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new ResourceNotFoundException("机构不存在"));
+        
+        // 验证课程存在且属于该机构
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("课程不存在"));
+        
+        if (!institutionId.equals(course.getInstitutionId())) {
+            throw new ResourceNotFoundException("该课程不属于指定机构");
+        }
+        
+        Long duration = learningRecordRepository.findTodayLearningDurationByCourse(courseId);
+        return duration != null ? duration : 0L;
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.COURSE_STATS_CACHE, 
+              key = "'course_total_duration_' + #institutionId + '_' + #courseId")
+    public Long getCourseTotalLearningDuration(Long institutionId, Long courseId) {
+        log.info("获取课程总学习时长, 机构ID: {}, 课程ID: {}", institutionId, courseId);
+        
+        // 验证机构存在
+        institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new ResourceNotFoundException("机构不存在"));
+        
+        // 验证课程存在且属于该机构
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("课程不存在"));
+        
+        if (!institutionId.equals(course.getInstitutionId())) {
+            throw new ResourceNotFoundException("该课程不属于指定机构");
+        }
+        
+        Long duration = learningRecordRepository.findTotalLearningDurationByCourse(courseId);
+        return duration != null ? duration : 0L;
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.COURSE_STATS_CACHE, 
+              key = "'course_learner_count_' + #institutionId + '_' + #courseId")
+    public Long getCourseLearnerCount(Long institutionId, Long courseId) {
+        log.info("获取课程学习人数, 机构ID: {}, 课程ID: {}", institutionId, courseId);
+        
+        // 验证机构存在
+        institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new ResourceNotFoundException("机构不存在"));
+        
+        // 验证课程存在且属于该机构
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("课程不存在"));
+        
+        if (!institutionId.equals(course.getInstitutionId())) {
+            throw new ResourceNotFoundException("该课程不属于指定机构");
+        }
+        
+        Long count = learningRecordRepository.countUniqueUsersByCourse(courseId);
         return count != null ? count : 0L;
     }
 } 

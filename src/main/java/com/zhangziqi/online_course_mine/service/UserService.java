@@ -4,7 +4,7 @@ import com.zhangziqi.online_course_mine.model.dto.RegisterDTO;
 import com.zhangziqi.online_course_mine.model.dto.UserDTO;
 import com.zhangziqi.online_course_mine.model.dto.UserQueryDTO;
 import com.zhangziqi.online_course_mine.model.entity.User;
-import com.zhangziqi.online_course_mine.model.vo.UserVO;
+import com.zhangziqi.online_course_mine.model.vo.*;
 import org.springframework.data.domain.Page;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -216,4 +216,39 @@ public interface UserService {
      */
     @Transactional
     void updatePassword(Long userId, String oldPassword, String newPassword);
+
+    /**
+     * 获取用户统计数据
+     *
+     * @return 用户统计数据
+     */
+    UserStatsVO getUserStats();
+
+    /**
+     * 获取用户角色分布统计
+     *
+     * @return 用户角色分布统计数据
+     */
+    UserRoleDistributionVO getUserRoleDistribution();
+
+    /**
+     * 获取用户增长统计数据
+     *
+     * @return 用户增长统计数据
+     */
+    UserGrowthStatsVO getUserGrowthStats();
+
+    /**
+     * 获取用户状态统计数据
+     *
+     * @return 用户状态统计数据
+     */
+    UserStatusStatsVO getUserStatusStats();
+
+    /**
+     * 获取用户活跃度统计数据
+     *
+     * @return 用户活跃度统计数据
+     */
+    UserActivityStatsVO getUserActivityStats();
 }

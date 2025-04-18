@@ -253,4 +253,96 @@ public interface LearningRecordRepository extends JpaRepository<LearningRecord, 
     List<Object[]> findMostActiveUsersByInstitution(
             @Param("institutionId") Long institutionId, 
             Pageable pageable);
+            
+    /**
+     * 获取课程每日学习统计
+     * 返回日期、总时长和活动次数
+     */
+    @Query("SELECT FUNCTION('DATE_FORMAT', lr.activityStartTime, '%Y-%m-%d') as date, " +
+           "SUM(lr.durationSeconds) as duration, COUNT(lr.id) as count " +
+           "FROM LearningRecord lr " +
+           "JOIN UserCourse uc ON lr.user.id = uc.user.id AND lr.course.id = uc.course.id " +
+           "WHERE lr.course.id = :courseId " +
+           "AND uc.status = 0 " + // 0 = NORMAL，只计算正常状态的课程
+           "AND lr.activityStartTime BETWEEN :startDate AND :endDate " +
+           "AND lr.durationSeconds IS NOT NULL " +
+           "GROUP BY FUNCTION('DATE_FORMAT', lr.activityStartTime, '%Y-%m-%d') " +
+           "ORDER BY date DESC")
+    List<Object[]> findDailyLearningStatsByCourseId(
+            @Param("courseId") Long courseId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+    
+    /**
+     * 获取课程按活动类型分组的学习统计
+     */
+    @Query("SELECT lr.activityType, SUM(lr.durationSeconds) as totalDuration, COUNT(lr.id) as count " +
+           "FROM LearningRecord lr " +
+           "JOIN UserCourse uc ON lr.user.id = uc.user.id AND lr.course.id = uc.course.id " +
+           "WHERE lr.course.id = :courseId " +
+           "AND uc.status = 0 " + // 0 = NORMAL，只计算正常状态的课程
+           "AND lr.durationSeconds IS NOT NULL " +
+           "GROUP BY lr.activityType")
+    List<Object[]> findLearningStatsByActivityTypeForCourse(@Param("courseId") Long courseId);
+    
+    /**
+     * 获取课程总学习时长
+     */
+    @Query("SELECT SUM(lr.durationSeconds) FROM LearningRecord lr " +
+           "JOIN UserCourse uc ON lr.user.id = uc.user.id AND lr.course.id = uc.course.id " +
+           "WHERE lr.course.id = :courseId " +
+           "AND uc.status = 0 " + // 0 = NORMAL，只计算正常状态的课程
+           "AND lr.durationSeconds IS NOT NULL")
+    Long findTotalLearningDurationByCourse(@Param("courseId") Long courseId);
+    
+    /**
+     * 获取课程今日总学习时长
+     */
+    @Query("SELECT SUM(lr.durationSeconds) FROM LearningRecord lr " +
+           "JOIN UserCourse uc ON lr.user.id = uc.user.id AND lr.course.id = uc.course.id " +
+           "WHERE lr.course.id = :courseId " +
+           "AND uc.status = 0 " + // 0 = NORMAL，只计算正常状态的课程
+           "AND FUNCTION('DATE_FORMAT', lr.activityStartTime, '%Y-%m-%d') = FUNCTION('DATE_FORMAT', CURRENT_DATE, '%Y-%m-%d') " +
+           "AND lr.durationSeconds IS NOT NULL")
+    Long findTodayLearningDurationByCourse(@Param("courseId") Long courseId);
+    
+    /**
+     * 获取课程学习人数
+     * 返回在该课程中有学习记录的不同用户数量
+     */
+    @Query("SELECT COUNT(DISTINCT lr.user.id) FROM LearningRecord lr " +
+           "JOIN UserCourse uc ON lr.user.id = uc.user.id AND lr.course.id = uc.course.id " +
+           "WHERE lr.course.id = :courseId " +
+           "AND uc.status = 0") // 0 = NORMAL，只计算正常状态的课程
+    Long countUniqueUsersByCourse(@Param("courseId") Long courseId);
+    
+    /**
+     * 获取课程中学生的学习统计
+     * 返回用户ID、用户名、总学习时长和活动次数
+     */
+    @Query("SELECT lr.user.id, lr.user.username, SUM(lr.durationSeconds) as totalDuration, COUNT(lr.id) as count, " +
+           "MAX(lr.activityStartTime) as lastLearnTime " +
+           "FROM LearningRecord lr " +
+           "JOIN UserCourse uc ON lr.user.id = uc.user.id AND lr.course.id = uc.course.id " +
+           "WHERE lr.course.id = :courseId " +
+           "AND uc.status = 0 " + // 0 = NORMAL，只计算正常状态的课程
+           "AND lr.durationSeconds IS NOT NULL " +
+           "GROUP BY lr.user.id, lr.user.username " +
+           "ORDER BY totalDuration DESC")
+    List<Object[]> findStudentLearningStatsByCourse(
+            @Param("courseId") Long courseId, 
+            Pageable pageable);
+    
+    /**
+     * 获取课程在指定时间范围内的学习记录
+     */
+    @Query("SELECT lr FROM LearningRecord lr " +
+           "JOIN UserCourse uc ON lr.user.id = uc.user.id AND lr.course.id = uc.course.id " +
+           "WHERE lr.course.id = :courseId " +
+           "AND uc.status = 0 " + // 0 = NORMAL，只计算正常状态的课程
+           "AND lr.activityStartTime BETWEEN :startDate AND :endDate")
+    List<LearningRecord> findByCourseIdAndTimeRange(
+            @Param("courseId") Long courseId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
 } 

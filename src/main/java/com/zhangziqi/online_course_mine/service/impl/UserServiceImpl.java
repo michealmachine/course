@@ -1,5 +1,6 @@
 package com.zhangziqi.online_course_mine.service.impl;
 
+import com.zhangziqi.online_course_mine.config.CacheConfig;
 import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.model.dto.RegisterDTO;
 import com.zhangziqi.online_course_mine.model.dto.UserDTO;
@@ -8,6 +9,11 @@ import com.zhangziqi.online_course_mine.model.entity.Role;
 import com.zhangziqi.online_course_mine.model.entity.User;
 import com.zhangziqi.online_course_mine.model.enums.RoleEnum;
 import com.zhangziqi.online_course_mine.model.vo.UserVO;
+import com.zhangziqi.online_course_mine.model.vo.UserStatsVO;
+import com.zhangziqi.online_course_mine.model.vo.UserRoleDistributionVO;
+import com.zhangziqi.online_course_mine.model.vo.UserGrowthStatsVO;
+import com.zhangziqi.online_course_mine.model.vo.UserStatusStatsVO;
+import com.zhangziqi.online_course_mine.model.vo.UserActivityStatsVO;
 import com.zhangziqi.online_course_mine.repository.RoleRepository;
 import com.zhangziqi.online_course_mine.repository.UserRepository;
 import com.zhangziqi.online_course_mine.security.jwt.TokenBlacklistService;
@@ -26,10 +32,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.cache.annotation.Cacheable;
 
 import jakarta.persistence.criteria.Predicate;
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -821,5 +829,259 @@ public class UserServiceImpl implements UserService {
         // 使该用户的所有token失效
         tokenBlacklistService.invalidateUserTokens(user.getUsername());
         log.info("用户 {} 的密码已更新，所有token已失效", user.getUsername());
+    }
+
+    /**
+     * 获取用户统计数据
+     *
+     * @return 用户统计数据
+     */
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.USER_STATS_CACHE, key = "'all'")
+    public UserStatsVO getUserStats() {
+        // 创建包含所有统计数据的综合VO
+        return UserStatsVO.builder()
+                .roleDistribution(getUserRoleDistribution())
+                .growthStats(getUserGrowthStats())
+                .statusStats(getUserStatusStats())
+                .activityStats(getUserActivityStats())
+                .build();
+    }
+
+    /**
+     * 获取用户角色分布统计
+     *
+     * @return 用户角色分布统计数据
+     */
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.USER_STATS_CACHE, key = "'roleDistribution'")
+    public UserRoleDistributionVO getUserRoleDistribution() {
+        // 获取总用户数
+        long totalUserCount = userRepository.count();
+        
+        // 获取所有角色
+        List<Role> allRoles = roleRepository.findAll();
+        
+        // 计算每个角色的用户分布
+        List<UserRoleDistributionVO.RoleDistribution> roleDistributions = new ArrayList<>();
+        
+        for (Role role : allRoles) {
+            // 统计该角色的用户数量
+            long userCount = userRepository.countByRoleId(role.getId());
+            
+            // 计算百分比
+            double percentage = totalUserCount > 0 
+                ? (double) userCount / totalUserCount * 100 
+                : 0;
+            
+            // 创建角色分布对象
+            UserRoleDistributionVO.RoleDistribution distribution = UserRoleDistributionVO.RoleDistribution.builder()
+                    .roleId(role.getId())
+                    .roleName(role.getName())
+                    .roleCode(role.getCode())
+                    .userCount(userCount)
+                    .percentage(Math.round(percentage * 100) / 100.0) // 保留两位小数
+                    .build();
+            
+            roleDistributions.add(distribution);
+        }
+        
+        // 创建并返回角色分布VO
+        return UserRoleDistributionVO.builder()
+                .totalUserCount(totalUserCount)
+                .roleDistributions(roleDistributions)
+                .build();
+    }
+
+    /**
+     * 获取用户增长统计数据
+     *
+     * @return 用户增长统计数据
+     */
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.USER_STATS_CACHE, key = "'growthStats'")
+    public UserGrowthStatsVO getUserGrowthStats() {
+        // 获取当前时间
+        LocalDateTime now = LocalDateTime.now();
+        
+        // 计算今日、本周、本月的开始时间
+        LocalDateTime todayStart = now.toLocalDate().atStartOfDay();
+        LocalDateTime weekStart = now.toLocalDate().minusDays(now.getDayOfWeek().getValue() - 1).atStartOfDay();
+        LocalDateTime monthStart = now.toLocalDate().withDayOfMonth(1).atStartOfDay();
+        
+        // 计算前一天、前一周、前一月的开始时间（用于计算增长率）
+        LocalDateTime yesterdayStart = todayStart.minusDays(1);
+        LocalDateTime lastWeekStart = weekStart.minusWeeks(1);
+        LocalDateTime lastMonthStart = monthStart.minusMonths(1);
+        
+        // 获取总用户数
+        long totalUserCount = userRepository.count();
+        
+        // 获取今日、本周、本月新增用户数
+        long todayNewUsers = userRepository.countByCreatedAtBetween(todayStart, now);
+        long weekNewUsers = userRepository.countByCreatedAtBetween(weekStart, now);
+        long monthNewUsers = userRepository.countByCreatedAtBetween(monthStart, now);
+        
+        // 获取前一天、前一周、前一月的新增用户数
+        long yesterdayNewUsers = userRepository.countByCreatedAtBetween(yesterdayStart, todayStart);
+        long lastWeekNewUsers = userRepository.countByCreatedAtBetween(lastWeekStart, weekStart);
+        long lastMonthNewUsers = userRepository.countByCreatedAtBetween(lastMonthStart, monthStart);
+        
+        // 计算增长率
+        double dailyGrowthRate = yesterdayNewUsers > 0 
+                ? (double) (todayNewUsers - yesterdayNewUsers) / yesterdayNewUsers * 100
+                : (todayNewUsers > 0 ? 100 : 0);
+        
+        double weeklyGrowthRate = lastWeekNewUsers > 0 
+                ? (double) (weekNewUsers - lastWeekNewUsers) / lastWeekNewUsers * 100
+                : (weekNewUsers > 0 ? 100 : 0);
+        
+        double monthlyGrowthRate = lastMonthNewUsers > 0 
+                ? (double) (monthNewUsers - lastMonthNewUsers) / lastMonthNewUsers * 100
+                : (monthNewUsers > 0 ? 100 : 0);
+        
+        // 获取过去30天的用户注册数据
+        LocalDateTime thirtyDaysAgo = now.minusDays(30);
+        List<Object[]> registrationData = userRepository.countUserRegistrationsByDateRange(thirtyDaysAgo, now);
+        
+        List<UserGrowthStatsVO.DailyRegistration> dailyRegistrations = registrationData.stream()
+                .map(data -> UserGrowthStatsVO.DailyRegistration.builder()
+                        .date((String) data[0])
+                        .count(((Number) data[1]).longValue())
+                        .build())
+                .collect(Collectors.toList());
+        
+        // 创建并返回用户增长统计VO
+        return UserGrowthStatsVO.builder()
+                .totalUserCount(totalUserCount)
+                .todayNewUsers(todayNewUsers)
+                .weekNewUsers(weekNewUsers)
+                .monthNewUsers(monthNewUsers)
+                .dailyGrowthRate(Math.round(dailyGrowthRate * 100) / 100.0) // 保留两位小数
+                .weeklyGrowthRate(Math.round(weeklyGrowthRate * 100) / 100.0)
+                .monthlyGrowthRate(Math.round(monthlyGrowthRate * 100) / 100.0)
+                .dailyRegistrations(dailyRegistrations)
+                .build();
+    }
+
+    /**
+     * 获取用户状态统计数据
+     *
+     * @return 用户状态统计数据
+     */
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.USER_STATS_CACHE, key = "'statusStats'")
+    public UserStatusStatsVO getUserStatusStats() {
+        // 获取总用户数
+        long totalUserCount = userRepository.count();
+        
+        // 获取活跃用户数（状态为1）
+        long activeUserCount = userRepository.countByStatus(1);
+        
+        // 获取禁用用户数（状态为0）
+        long disabledUserCount = userRepository.countByStatus(0);
+        
+        // 计算百分比
+        double activeUserPercentage = totalUserCount > 0 
+                ? (double) activeUserCount / totalUserCount * 100 
+                : 0;
+        
+        double disabledUserPercentage = totalUserCount > 0 
+                ? (double) disabledUserCount / totalUserCount * 100 
+                : 0;
+        
+        // 创建并返回用户状态统计VO
+        return UserStatusStatsVO.builder()
+                .totalUserCount(totalUserCount)
+                .activeUserCount(activeUserCount)
+                .disabledUserCount(disabledUserCount)
+                .activeUserPercentage(Math.round(activeUserPercentage * 100) / 100.0) // 保留两位小数
+                .disabledUserPercentage(Math.round(disabledUserPercentage * 100) / 100.0)
+                .build();
+    }
+
+    /**
+     * 获取用户活跃度统计数据
+     *
+     * @return 用户活跃度统计数据
+     */
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.USER_STATS_CACHE, key = "'activityStats'")
+    public UserActivityStatsVO getUserActivityStats() {
+        // 获取当前时间
+        LocalDateTime now = LocalDateTime.now();
+        
+        // 计算过去一天、一周、一个月的时间
+        LocalDateTime oneDayAgo = now.minusDays(1);
+        LocalDateTime oneWeekAgo = now.minusWeeks(1);
+        LocalDateTime oneMonthAgo = now.minusMonths(1);
+        
+        // 获取总用户数
+        long totalUserCount = userRepository.count();
+        
+        // 获取活跃用户数（过去30天有登录记录）
+        long activeUserCount = userRepository.countByLastLoginAtAfter(oneMonthAgo);
+        
+        // 计算非活跃用户数
+        long inactiveUserCount = totalUserCount - activeUserCount;
+        
+        // 获取今日、最近7天、最近30天活跃用户数
+        long todayActiveUsers = userRepository.countByLastLoginAtAfter(oneDayAgo);
+        long weekActiveUsers = userRepository.countByLastLoginAtAfter(oneWeekAgo);
+        long monthActiveUsers = activeUserCount;
+        
+        // 计算活跃用户占比
+        double activeUserPercentage = totalUserCount > 0 
+                ? (double) activeUserCount / totalUserCount * 100 
+                : 0;
+        
+        // 获取过去30天的用户活跃数据
+        List<Object[]> activityData = userRepository.countUserActivityByDateRange(oneMonthAgo, now);
+        
+        List<UserActivityStatsVO.DailyActiveUsers> dailyActiveUsers = activityData.stream()
+                .map(data -> UserActivityStatsVO.DailyActiveUsers.builder()
+                        .date((String) data[0])
+                        .count(((Number) data[1]).longValue())
+                        .build())
+                .collect(Collectors.toList());
+        
+        // 获取每小时的用户活跃分布（过去7天）
+        Map<Integer, Long> hourlyActiveDistribution = new HashMap<>();
+        List<Object[]> hourlyData = userRepository.countUserLoginByHourOfDay(oneWeekAgo, now);
+        
+        for (Object[] data : hourlyData) {
+            Integer hour = ((Number) data[0]).intValue();
+            Long count = ((Number) data[1]).longValue();
+            hourlyActiveDistribution.put(hour, count);
+        }
+        
+        // 获取每周几的用户活跃分布（过去30天）
+        Map<Integer, Long> weekdayActiveDistribution = new HashMap<>();
+        List<Object[]> weekdayData = userRepository.countUserLoginByDayOfWeek(oneMonthAgo, now);
+        
+        for (Object[] data : weekdayData) {
+            Integer weekday = ((Number) data[0]).intValue();
+            Long count = ((Number) data[1]).longValue();
+            weekdayActiveDistribution.put(weekday, count);
+        }
+        
+        // 创建并返回用户活跃度统计VO
+        return UserActivityStatsVO.builder()
+                .totalUserCount(totalUserCount)
+                .activeUserCount(activeUserCount)
+                .inactiveUserCount(inactiveUserCount)
+                .todayActiveUsers(todayActiveUsers)
+                .weekActiveUsers(weekActiveUsers)
+                .monthActiveUsers(monthActiveUsers)
+                .activeUserPercentage(Math.round(activeUserPercentage * 100) / 100.0) // 保留两位小数
+                .dailyActiveUsers(dailyActiveUsers)
+                .hourlyActiveDistribution(hourlyActiveDistribution)
+                .weekdayActiveDistribution(weekdayActiveDistribution)
+                .build();
     }
 } 
