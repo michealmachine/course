@@ -3,6 +3,8 @@ package com.zhangziqi.online_course_mine.controller;
 import com.zhangziqi.online_course_mine.model.vo.ActivityTypeStatVO;
 import com.zhangziqi.online_course_mine.model.vo.DailyLearningStatVO;
 import com.zhangziqi.online_course_mine.model.vo.InstitutionLearningStatisticsVO;
+import com.zhangziqi.online_course_mine.model.vo.LearningHeatmapVO;
+import com.zhangziqi.online_course_mine.model.vo.LearningProgressTrendVO;
 import com.zhangziqi.online_course_mine.model.vo.Result;
 import com.zhangziqi.online_course_mine.security.SecurityUtil;
 import com.zhangziqi.online_course_mine.service.InstitutionAuthService;
@@ -47,13 +49,13 @@ public class InstitutionLearningStatisticsController {
     public Result<InstitutionLearningStatisticsVO> getStatisticsOverview() {
         String username = SecurityUtil.getCurrentUsername();
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
-        
+
         log.info("获取机构学习统计概览, 用户名: {}, 机构ID: {}", username, institutionId);
-        
+
         InstitutionLearningStatisticsVO statistics = statisticsService.getInstitutionLearningStatistics(institutionId);
         return Result.success(statistics);
     }
-    
+
     /**
      * 获取机构每日学习统计
      */
@@ -62,13 +64,13 @@ public class InstitutionLearningStatisticsController {
     @PreAuthorize("hasRole('INSTITUTION')")
     @Operation(summary = "获取机构每日学习统计", description = "获取机构在指定日期范围内的每日学习统计数据")
     public Result<List<DailyLearningStatVO>> getDailyStatistics(
-            @Parameter(description = "开始日期") 
+            @Parameter(description = "开始日期")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @Parameter(description = "结束日期") 
+            @Parameter(description = "结束日期")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         String username = SecurityUtil.getCurrentUsername();
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
-        
+
         // 默认获取最近30天数据
         if (startDate == null) {
             startDate = LocalDate.now().minusDays(29);
@@ -76,15 +78,15 @@ public class InstitutionLearningStatisticsController {
         if (endDate == null) {
             endDate = LocalDate.now();
         }
-        
-        log.info("获取机构每日学习统计, 用户名: {}, 机构ID: {}, 开始日期: {}, 结束日期: {}", 
+
+        log.info("获取机构每日学习统计, 用户名: {}, 机构ID: {}, 开始日期: {}, 结束日期: {}",
                 username, institutionId, startDate, endDate);
-        
-        List<DailyLearningStatVO> statistics = 
+
+        List<DailyLearningStatVO> statistics =
                 statisticsService.getInstitutionDailyLearningStats(institutionId, startDate, endDate);
         return Result.success(statistics);
     }
-    
+
     /**
      * 获取机构活动类型统计
      */
@@ -95,14 +97,14 @@ public class InstitutionLearningStatisticsController {
     public Result<List<ActivityTypeStatVO>> getActivityTypeStatistics() {
         String username = SecurityUtil.getCurrentUsername();
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
-        
+
         log.info("获取机构活动类型统计, 用户名: {}, 机构ID: {}", username, institutionId);
-        
-        List<ActivityTypeStatVO> statistics = 
+
+        List<ActivityTypeStatVO> statistics =
                 statisticsService.getInstitutionActivityTypeStats(institutionId);
         return Result.success(statistics);
     }
-    
+
     /**
      * 获取机构课程学习统计
      */
@@ -115,16 +117,16 @@ public class InstitutionLearningStatisticsController {
             @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") int size) {
         String username = SecurityUtil.getCurrentUsername();
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
-        
-        log.info("获取机构课程学习统计, 用户名: {}, 机构ID: {}, 页码: {}, 每页数量: {}", 
+
+        log.info("获取机构课程学习统计, 用户名: {}, 机构ID: {}, 页码: {}, 每页数量: {}",
                 username, institutionId, page, size);
-        
+
         Pageable pageable = PageRequest.of(page, size);
-        Page<InstitutionLearningStatisticsVO.CourseStatisticsVO> statistics = 
+        Page<InstitutionLearningStatisticsVO.CourseStatisticsVO> statistics =
                 statisticsService.getInstitutionCourseStatistics(institutionId, pageable);
         return Result.success(statistics);
     }
-    
+
     /**
      * 获取机构最活跃用户
      */
@@ -136,14 +138,14 @@ public class InstitutionLearningStatisticsController {
             @Parameter(description = "用户数量限制") @RequestParam(defaultValue = "10") int limit) {
         String username = SecurityUtil.getCurrentUsername();
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
-        
+
         log.info("获取机构最活跃用户, 用户名: {}, 机构ID: {}, 限制: {}", username, institutionId, limit);
-        
-        List<InstitutionLearningStatisticsVO.ActiveUserVO> users = 
+
+        List<InstitutionLearningStatisticsVO.ActiveUserVO> users =
                 statisticsService.getMostActiveUsers(institutionId, limit);
         return Result.success(users);
     }
-    
+
     /**
      * 获取机构学习时长统计
      */
@@ -154,13 +156,13 @@ public class InstitutionLearningStatisticsController {
     public Result<Object> getLearningDuration() {
         String username = SecurityUtil.getCurrentUsername();
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
-        
+
         log.info("获取机构学习时长统计, 用户名: {}, 机构ID: {}", username, institutionId);
-        
+
         Long todayDuration = statisticsService.getInstitutionTodayLearningDuration(institutionId);
         Long totalDuration = statisticsService.getInstitutionTotalLearningDuration(institutionId);
         Long learnerCount = statisticsService.getInstitutionLearnerCount(institutionId);
-        
+
         // 构建响应
         return Result.success(new Object() {
             public final Long todayLearningDuration = todayDuration;
@@ -168,7 +170,7 @@ public class InstitutionLearningStatisticsController {
             public final Long totalLearners = learnerCount;
         });
     }
-    
+
     /**
      * 获取课程学习统计概览
      */
@@ -180,15 +182,15 @@ public class InstitutionLearningStatisticsController {
             @Parameter(description = "课程ID") @PathVariable Long courseId) {
         String username = SecurityUtil.getCurrentUsername();
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
-        
-        log.info("获取课程学习统计概览, 用户名: {}, 机构ID: {}, 课程ID: {}", 
+
+        log.info("获取课程学习统计概览, 用户名: {}, 机构ID: {}, 课程ID: {}",
                 username, institutionId, courseId);
-        
-        InstitutionLearningStatisticsVO.CourseStatisticsVO statistics = 
+
+        InstitutionLearningStatisticsVO.CourseStatisticsVO statistics =
                 statisticsService.getCourseLearningStatistics(institutionId, courseId);
         return Result.success(statistics);
     }
-    
+
     /**
      * 获取课程每日学习统计
      */
@@ -198,13 +200,13 @@ public class InstitutionLearningStatisticsController {
     @Operation(summary = "获取课程每日学习统计", description = "获取特定课程在指定日期范围内的每日学习统计数据")
     public Result<List<DailyLearningStatVO>> getCourseDailyStatistics(
             @Parameter(description = "课程ID") @PathVariable Long courseId,
-            @Parameter(description = "开始日期") 
+            @Parameter(description = "开始日期")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @Parameter(description = "结束日期") 
+            @Parameter(description = "结束日期")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         String username = SecurityUtil.getCurrentUsername();
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
-        
+
         // 默认获取最近30天数据
         if (startDate == null) {
             startDate = LocalDate.now().minusDays(29);
@@ -212,15 +214,15 @@ public class InstitutionLearningStatisticsController {
         if (endDate == null) {
             endDate = LocalDate.now();
         }
-        
-        log.info("获取课程每日学习统计, 用户名: {}, 机构ID: {}, 课程ID: {}, 开始日期: {}, 结束日期: {}", 
+
+        log.info("获取课程每日学习统计, 用户名: {}, 机构ID: {}, 课程ID: {}, 开始日期: {}, 结束日期: {}",
                 username, institutionId, courseId, startDate, endDate);
-        
-        List<DailyLearningStatVO> statistics = 
+
+        List<DailyLearningStatVO> statistics =
                 statisticsService.getCourseDailyLearningStats(institutionId, courseId, startDate, endDate);
         return Result.success(statistics);
     }
-    
+
     /**
      * 获取课程活动类型统计
      */
@@ -232,15 +234,15 @@ public class InstitutionLearningStatisticsController {
             @Parameter(description = "课程ID") @PathVariable Long courseId) {
         String username = SecurityUtil.getCurrentUsername();
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
-        
-        log.info("获取课程活动类型统计, 用户名: {}, 机构ID: {}, 课程ID: {}", 
+
+        log.info("获取课程活动类型统计, 用户名: {}, 机构ID: {}, 课程ID: {}",
                 username, institutionId, courseId);
-        
-        List<ActivityTypeStatVO> statistics = 
+
+        List<ActivityTypeStatVO> statistics =
                 statisticsService.getCourseActivityTypeStats(institutionId, courseId);
         return Result.success(statistics);
     }
-    
+
     /**
      * 获取课程学生学习统计
      */
@@ -254,16 +256,16 @@ public class InstitutionLearningStatisticsController {
             @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") int size) {
         String username = SecurityUtil.getCurrentUsername();
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
-        
-        log.info("获取课程学生学习统计, 用户名: {}, 机构ID: {}, 课程ID: {}, 页码: {}, 每页数量: {}", 
+
+        log.info("获取课程学生学习统计, 用户名: {}, 机构ID: {}, 课程ID: {}, 页码: {}, 每页数量: {}",
                 username, institutionId, courseId, page, size);
-        
+
         Pageable pageable = PageRequest.of(page, size);
-        Page<InstitutionLearningStatisticsVO.StudentLearningVO> statistics = 
+        Page<InstitutionLearningStatisticsVO.StudentLearningVO> statistics =
                 statisticsService.getCourseStudentStatistics(institutionId, courseId, pageable);
         return Result.success(statistics);
     }
-    
+
     /**
      * 获取课程学习时长统计
      */
@@ -275,14 +277,14 @@ public class InstitutionLearningStatisticsController {
             @Parameter(description = "课程ID") @PathVariable Long courseId) {
         String username = SecurityUtil.getCurrentUsername();
         Long institutionId = SecurityUtil.getCurrentInstitutionId();
-        
-        log.info("获取课程学习时长统计, 用户名: {}, 机构ID: {}, 课程ID: {}", 
+
+        log.info("获取课程学习时长统计, 用户名: {}, 机构ID: {}, 课程ID: {}",
                 username, institutionId, courseId);
-        
+
         Long todayDuration = statisticsService.getCourseTodayLearningDuration(institutionId, courseId);
         Long totalDuration = statisticsService.getCourseTotalLearningDuration(institutionId, courseId);
         Long learnerCount = statisticsService.getCourseLearnerCount(institutionId, courseId);
-        
+
         // 构建响应
         return Result.success(new Object() {
             public final Long todayLearningDuration = todayDuration;
@@ -290,4 +292,171 @@ public class InstitutionLearningStatisticsController {
             public final Long totalLearners = learnerCount;
         });
     }
-} 
+
+    /**
+     * 获取课程学习热力图数据
+     */
+    @GetMapping("/courses/{courseId}/heatmap")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('INSTITUTION')")
+    @Operation(summary = "获取课程学习热力图数据", description = "获取特定课程的学习活动热力图数据")
+    public Result<LearningHeatmapVO> getCourseLearningHeatmap(
+            @Parameter(description = "课程ID") @PathVariable Long courseId,
+            @Parameter(description = "开始日期")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @Parameter(description = "结束日期")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        String username = SecurityUtil.getCurrentUsername();
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+
+        // 默认获取最近30天数据
+        if (startDate == null) {
+            startDate = LocalDate.now().minusDays(29);
+        }
+        if (endDate == null) {
+            endDate = LocalDate.now();
+        }
+
+        log.info("获取课程学习热力图数据, 用户名: {}, 机构ID: {}, 课程ID: {}, 开始日期: {}, 结束日期: {}",
+                username, institutionId, courseId, startDate, endDate);
+
+        LearningHeatmapVO heatmap = statisticsService.getCourseLearningHeatmap(institutionId, courseId, startDate, endDate);
+        return Result.success(heatmap);
+    }
+
+    /**
+     * 获取课程学习进度趋势
+     */
+    @GetMapping("/courses/{courseId}/progress-trend")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('INSTITUTION')")
+    @Operation(summary = "获取课程学习进度趋势", description = "获取特定课程的学习进度趋势数据")
+    public Result<LearningProgressTrendVO> getCourseLearningProgressTrend(
+            @Parameter(description = "课程ID") @PathVariable Long courseId,
+            @Parameter(description = "开始日期")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @Parameter(description = "结束日期")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        String username = SecurityUtil.getCurrentUsername();
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+
+        // 默认获取最近30天数据
+        if (startDate == null) {
+            startDate = LocalDate.now().minusDays(29);
+        }
+        if (endDate == null) {
+            endDate = LocalDate.now();
+        }
+
+        log.info("获取课程学习进度趋势, 用户名: {}, 机构ID: {}, 课程ID: {}, 开始日期: {}, 结束日期: {}",
+                username, institutionId, courseId, startDate, endDate);
+
+        LearningProgressTrendVO trend = statisticsService.getCourseLearningProgressTrend(institutionId, courseId, startDate, endDate);
+        return Result.success(trend);
+    }
+
+    /**
+     * 获取用户课程学习详情
+     */
+    @GetMapping("/courses/{courseId}/users/{userId}/detail")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('INSTITUTION')")
+    @Operation(summary = "获取用户课程学习详情", description = "获取特定用户在特定课程的详细学习数据")
+    public Result<InstitutionLearningStatisticsVO.StudentLearningDetailVO> getUserCourseLearningDetail(
+            @Parameter(description = "课程ID") @PathVariable Long courseId,
+            @Parameter(description = "用户ID") @PathVariable Long userId) {
+        String username = SecurityUtil.getCurrentUsername();
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+
+        log.info("获取用户课程学习详情, 用户名: {}, 机构ID: {}, 课程ID: {}, 用户ID: {}",
+                username, institutionId, courseId, userId);
+
+        InstitutionLearningStatisticsVO.StudentLearningDetailVO detail =
+                statisticsService.getUserCourseLearningDetail(institutionId, courseId, userId);
+        return Result.success(detail);
+    }
+
+    /**
+     * 获取用户课程学习热力图数据
+     */
+    @GetMapping("/courses/{courseId}/users/{userId}/heatmap")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('INSTITUTION')")
+    @Operation(summary = "获取用户课程学习热力图数据", description = "获取特定用户在特定课程的学习活动热力图数据")
+    public Result<LearningHeatmapVO> getUserCourseLearningHeatmap(
+            @Parameter(description = "课程ID") @PathVariable Long courseId,
+            @Parameter(description = "用户ID") @PathVariable Long userId,
+            @Parameter(description = "开始日期")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @Parameter(description = "结束日期")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        String username = SecurityUtil.getCurrentUsername();
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+
+        // 默认获取最近30天数据
+        if (startDate == null) {
+            startDate = LocalDate.now().minusDays(29);
+        }
+        if (endDate == null) {
+            endDate = LocalDate.now();
+        }
+
+        log.info("获取用户课程学习热力图数据, 用户名: {}, 机构ID: {}, 课程ID: {}, 用户ID: {}, 开始日期: {}, 结束日期: {}",
+                username, institutionId, courseId, userId, startDate, endDate);
+
+        LearningHeatmapVO heatmap = statisticsService.getUserCourseLearningHeatmap(institutionId, courseId, userId, startDate, endDate);
+        return Result.success(heatmap);
+    }
+
+    /**
+     * 获取用户课程学习进度趋势
+     */
+    @GetMapping("/courses/{courseId}/users/{userId}/progress-trend")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('INSTITUTION')")
+    @Operation(summary = "获取用户课程学习进度趋势", description = "获取特定用户在特定课程的学习进度趋势数据")
+    public Result<LearningProgressTrendVO> getUserCourseLearningProgressTrend(
+            @Parameter(description = "课程ID") @PathVariable Long courseId,
+            @Parameter(description = "用户ID") @PathVariable Long userId,
+            @Parameter(description = "开始日期")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @Parameter(description = "结束日期")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        String username = SecurityUtil.getCurrentUsername();
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+
+        // 默认获取最近30天数据
+        if (startDate == null) {
+            startDate = LocalDate.now().minusDays(29);
+        }
+        if (endDate == null) {
+            endDate = LocalDate.now();
+        }
+
+        log.info("获取用户课程学习进度趋势, 用户名: {}, 机构ID: {}, 课程ID: {}, 用户ID: {}, 开始日期: {}, 结束日期: {}",
+                username, institutionId, courseId, userId, startDate, endDate);
+
+        LearningProgressTrendVO trend = statisticsService.getUserCourseLearningProgressTrend(institutionId, courseId, userId, startDate, endDate);
+        return Result.success(trend);
+    }
+
+    /**
+     * 获取用户课程活动类型统计
+     */
+    @GetMapping("/courses/{courseId}/users/{userId}/activity-types")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('INSTITUTION')")
+    @Operation(summary = "获取用户课程活动类型统计", description = "获取特定用户在特定课程的学习活动类型统计数据")
+    public Result<List<ActivityTypeStatVO>> getUserCourseActivityTypeStats(
+            @Parameter(description = "课程ID") @PathVariable Long courseId,
+            @Parameter(description = "用户ID") @PathVariable Long userId) {
+        String username = SecurityUtil.getCurrentUsername();
+        Long institutionId = SecurityUtil.getCurrentInstitutionId();
+
+        log.info("获取用户课程活动类型统计, 用户名: {}, 机构ID: {}, 课程ID: {}, 用户ID: {}",
+                username, institutionId, courseId, userId);
+
+        List<ActivityTypeStatVO> stats = statisticsService.getUserCourseActivityTypeStats(institutionId, courseId, userId);
+        return Result.success(stats);
+    }
+}

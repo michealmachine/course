@@ -3,13 +3,14 @@
 import { request } from './api';
 import { AxiosResponse } from 'axios';
 import { ApiResponse, Page } from '@/types/api';
-import { 
-  CourseStructureVO, 
-  MediaVO, 
+import { DateLearningHeatmapVO, LearningHeatmapVO } from '@/types/learning-stats';
+import {
+  CourseStructureVO,
+  MediaVO,
   QuestionGroupVO,
-  UserQuestionAnswerDTO, 
-  SectionResourceVO, 
-  UserLearningProgressVO 
+  UserQuestionAnswerDTO,
+  SectionResourceVO,
+  UserLearningProgressVO
 } from '@/types/learning';
 import { UserCourseVO } from '@/types/userCourse';
 
@@ -140,6 +141,7 @@ interface LearningPositionDTO {
   chapterId: number;
   sectionId: number;
   sectionProgress: number;
+  isReviewing?: boolean; // 新增字段，标记是否为复习模式
 }
 
 /**
@@ -164,9 +166,9 @@ const learningService = {
    */
   getCourseStructure: async (courseId: string | number): Promise<LearningCourseStructureVO> => {
     try {
-      const response: AxiosResponse<ApiResponse<LearningCourseStructureVO>> = 
+      const response: AxiosResponse<ApiResponse<LearningCourseStructureVO>> =
         await request.get(`/learning/courses/${courseId}`);
-      
+
       console.log('课程结构API响应:', response.data);
       return response.data.data;
     } catch (error) {
@@ -174,7 +176,7 @@ const learningService = {
       throw error;
     }
   },
-  
+
   /**
    * 获取用户课程学习进度
    * @param courseId 课程ID
@@ -182,16 +184,16 @@ const learningService = {
    */
   getUserLearningProgress: async (courseId: string | number): Promise<UserLearningProgressVO> => {
     try {
-      const response: AxiosResponse<ApiResponse<UserLearningProgressVO>> = 
+      const response: AxiosResponse<ApiResponse<UserLearningProgressVO>> =
         await request.get(`/learning/courses/${courseId}/progress`);
-      
+
       return response.data.data;
     } catch (error) {
       console.error(`获取用户课程学习进度失败, 课程ID: ${courseId}:`, error);
       throw error;
     }
   },
-  
+
   /**
    * 获取章节媒体资源
    * @param sectionId 章节ID
@@ -199,16 +201,16 @@ const learningService = {
    */
   getSectionMedia: async (sectionId: string | number): Promise<MediaVO> => {
     try {
-      const response: AxiosResponse<ApiResponse<MediaVO>> = 
+      const response: AxiosResponse<ApiResponse<MediaVO>> =
         await request.get(`/learning/sections/${sectionId}/media`);
-      
+
       return response.data.data;
     } catch (error) {
       console.error(`获取章节媒体资源失败, 章节ID: ${sectionId}:`, error);
       throw error;
     }
   },
-  
+
   /**
    * 获取章节问题组
    * @param sectionId 章节ID
@@ -217,23 +219,23 @@ const learningService = {
   getSectionQuestionGroup: async (sectionId: string | number): Promise<QuestionGroupVO> => {
     try {
       console.log(`开始获取章节问题组, 章节ID: ${sectionId}`);
-      const response: AxiosResponse<ApiResponse<QuestionGroupVO>> = 
+      const response: AxiosResponse<ApiResponse<QuestionGroupVO>> =
         await request.get(`/learning/sections/${sectionId}/question-group`);
-      
+
       console.log(`获取章节问题组成功, 章节ID: ${sectionId}, 响应:`, response.data);
-      
+
       // 检查返回的数据格式
       const questionGroup = response.data.data;
       if (!questionGroup) {
         console.error(`章节问题组数据为空, 章节ID: ${sectionId}`);
         throw new Error('题组数据为空');
       }
-      
+
       // 处理后端返回的数据结构
       // 1. 从items数组中提取questions
       if (questionGroup.items && Array.isArray(questionGroup.items)) {
         console.log(`题组包含 ${questionGroup.items.length} 个题目项`);
-        
+
         // 将items中的question对象提取到questions数组
         const questions = questionGroup.items.map(item => {
           if (item.question) {
@@ -253,33 +255,33 @@ const learningService = {
             };
           }
         });
-        
+
         // 将提取的题目添加到questionGroup
         questionGroup.questions = questions;
         console.log('提取的题目数据:', questions);
       }
-      
+
       // 2. 处理title和name的兼容性
       if (questionGroup.name && !questionGroup.title) {
         questionGroup.title = questionGroup.name;
       }
-      
+
       // 3. 添加sectionId字段（如果没有）
       if (!questionGroup.sectionId) {
         console.log(`为问题组添加sectionId字段: ${sectionId}`);
         questionGroup.sectionId = Number(sectionId);
       }
-      
+
       // 4. 添加必要的统计字段
       // 使用questionCount或计算questions长度
-      questionGroup.totalQuestions = questionGroup.questionCount || 
+      questionGroup.totalQuestions = questionGroup.questionCount ||
                                      (questionGroup.questions ? questionGroup.questions.length : 0);
-      
+
       // 计算总分
       if (questionGroup.questions && !questionGroup.totalScore) {
         questionGroup.totalScore = questionGroup.questions.reduce((sum, q) => sum + (q.score || 0), 0);
       }
-      
+
       console.log('处理后的题组数据:', {
         id: questionGroup.id,
         title: questionGroup.title || questionGroup.name,
@@ -287,14 +289,14 @@ const learningService = {
         questionCount: questionGroup.totalQuestions,
         totalScore: questionGroup.totalScore
       });
-      
+
       return questionGroup;
     } catch (error) {
       console.error(`获取章节问题组失败, 章节ID: ${sectionId}:`, error);
       throw error;
     }
   },
-  
+
   /**
    * 提交问题答案
    * @param sectionId 章节ID
@@ -302,20 +304,20 @@ const learningService = {
    * @returns 答案结果
    */
   submitQuestionAnswer: async (
-    sectionId: string | number, 
+    sectionId: string | number,
     answer: UserQuestionAnswerDTO
   ): Promise<UserQuestionAnswerResultDTO> => {
     try {
-      const response: AxiosResponse<ApiResponse<UserQuestionAnswerResultDTO>> = 
+      const response: AxiosResponse<ApiResponse<UserQuestionAnswerResultDTO>> =
         await request.post(`/learning/sections/${sectionId}/questions/${answer.questionId}/answer`, answer);
-      
+
       return response.data.data;
     } catch (error) {
       console.error(`提交问题答案失败, 章节ID: ${sectionId}:`, error);
       throw error;
     }
   },
-  
+
   /**
    * 更新学习进度
    * @param position 学习位置信息
@@ -325,7 +327,8 @@ const learningService = {
       const response = await request.put(`/learning/courses/${position.courseId}/progress`, {
         chapterId: position.chapterId,
         sectionId: position.sectionId,
-        sectionProgress: position.sectionProgress
+        sectionProgress: position.sectionProgress,
+        isReviewing: position.isReviewing // 添加复习模式标记
       });
       return response.data.data as UserCourseVO;
     } catch (error) {
@@ -333,7 +336,7 @@ const learningService = {
       throw error;
     }
   },
-  
+
   /**
    * 记录学习时长（旧方法，已废弃，建议使用学习记录相关接口）
    * @param data 学习时长数据
@@ -392,9 +395,9 @@ const learningService = {
         sectionId: dto.sectionId ? Number(dto.sectionId) : undefined,
         durationSeconds: Math.max(1, Number(dto.durationSeconds))
       };
-      
+
       console.log('发送学习记录请求, 参数:', JSON.stringify(sanitizedDto));
-      
+
       const response = await request.post('/learning/records/completed', sanitizedDto);
       console.log('学习记录请求成功', response.data);
       return response.data.data as LearningRecordVO;
@@ -457,8 +460,8 @@ const learningService = {
    * @param size 每页大小
    */
   getUserCourseLearningRecords: async (
-    courseId: number, 
-    page: number = 0, 
+    courseId: number,
+    page: number = 0,
     size: number = 10
   ): Promise<Page<LearningRecordVO>> => {
     try {
@@ -478,7 +481,7 @@ const learningService = {
    * @param endDate 结束日期（YYYY-MM-DD）
    */
   getLearningHeatmap: async (
-    startDate?: string, 
+    startDate?: string,
     endDate?: string
   ): Promise<DailyLearningStatVO[]> => {
     try {
@@ -488,6 +491,46 @@ const learningService = {
       return response.data.data as DailyLearningStatVO[];
     } catch (error) {
       console.error('获取学习热图数据失败:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * 获取学习热力图数据（按星期和小时分组）
+   * @param startDate 开始日期（YYYY-MM-DD）
+   * @param endDate 结束日期（YYYY-MM-DD）
+   */
+  getLearningHeatmapByHour: async (
+    startDate?: string,
+    endDate?: string
+  ): Promise<LearningHeatmapVO> => {
+    try {
+      const response = await request.get('/learning/stats/heatmap-by-hour', {
+        params: { startDate, endDate }
+      });
+      return response.data.data as LearningHeatmapVO;
+    } catch (error) {
+      console.error('获取学习热力图数据失败:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * 获取学习热力图数据（按日期分组）
+   * @param startDate 开始日期（YYYY-MM-DD）
+   * @param endDate 结束日期（YYYY-MM-DD）
+   */
+  getLearningHeatmapByDate: async (
+    startDate?: string,
+    endDate?: string
+  ): Promise<DateLearningHeatmapVO> => {
+    try {
+      const response = await request.get('/learning/stats/heatmap-by-date', {
+        params: { startDate, endDate }
+      });
+      return response.data.data as DateLearningHeatmapVO;
+    } catch (error) {
+      console.error('获取学习热力图数据失败:', error);
       throw error;
     }
   },
@@ -572,4 +615,4 @@ const learningService = {
   }
 };
 
-export default learningService; 
+export default learningService;

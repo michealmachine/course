@@ -53,6 +53,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import CourseStatusBadge from '@/components/dashboard/courses/CourseStatusBadge';
 import CoursePublishBadge from '@/components/dashboard/courses/CoursePublishBadge';
+import { CourseLearningStats } from '@/components/dashboard/courses/course-learning-stats';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
@@ -838,116 +839,46 @@ export default function CoursesPage() {
                     {/* 展开后显示的详细信息 */}
                     {isExpanded && (
                       <div className="p-4 animate-in slide-in-from-top duration-300">
-                        {/* 统计数据可视化 */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                          {/* 学习趋势图表 */}
+                        {/* 基础统计数据 */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                           <Card>
-                            <CardHeader className="pb-2">
-                              <CardTitle className="text-base font-medium flex items-center">
-                                <BarChart2 className="w-4 h-4 mr-2" />
-                                学习趋势
-                              </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              {dailyLoading[course.id] ? (
-                                <Skeleton className="h-[200px] w-full" />
-                              ) : dailyData.length > 0 ? (
-                                <ChartContainer
-                                  config={dailyChartConfig}
-                                  className="h-[200px]"
-                                >
-                                  <LineChart
-                                    data={dailyData.map(item => ({
-                                      ...item,
-                                      date: item.date.substring(5), // 去掉年份，只显示月-日
-                                      duration: Math.round(item.totalDurationSeconds / 60) // 转换为分钟
-                                    }))}
-                                    margin={{ top: 5, right: 10, left: 10, bottom: 20 }}
-                                  >
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="date" />
-                                    <YAxis />
-                                    <ChartTooltip content={<ChartTooltipContent />} />
-                                    <Line type="monotone" dataKey="duration" name="学习时长(分钟)" strokeWidth={2} dot={false} />
-                                    <Line type="monotone" dataKey="userCount" name="学习人数" strokeWidth={2} dot={false} />
-                                  </LineChart>
-                                </ChartContainer>
-                              ) : (
-                                <div className="flex items-center justify-center h-[200px] text-muted-foreground">
-                                  暂无学习趋势数据
-                                </div>
-                              )}
+                            <CardContent className="p-4 flex flex-col items-center justify-center">
+                              <Users className="h-8 w-8 text-primary mb-2" />
+                              <div className="text-2xl font-bold">{stats?.totalLearners || 0}</div>
+                              <div className="text-xs text-muted-foreground">学习人数</div>
                             </CardContent>
                           </Card>
 
-                          {/* 活动类型分布 */}
                           <Card>
-                            <CardHeader>
-                              <CardTitle className="text-base font-medium flex items-center">
-                                <Activity className="w-4 h-4 mr-2" />
-                                学习活动分布
-                              </CardTitle>
-                              <CardDescription className="text-xs">
-                                不同类型学习活动的时间分布
-                              </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                              {activityLoading[course.id] ? (
-                                <Skeleton className="h-[220px] w-full" />
-                              ) : activityData.length > 0 ? (
-                                <ChartContainer
-                                  config={activityChartConfig}
-                                  className="mx-auto aspect-square max-h-[220px]"
-                                >
-                                  <RadarChart data={activityData.map(item => ({
-                                    name: item.activityTypeDescription,
-                                    value: Math.round(item.totalDurationSeconds / 60), // 转换为分钟
-                                    count: item.activityCount,
-                                    activityType: item.activityType
-                                  }))}>
-                                    <ChartTooltip
-                                      cursor={false}
-                                      content={
-                                        <ChartTooltipContent
-                                          formatter={(value) => `${value} 分钟`}
-                                        />
-                                      }
-                                    />
-                                    <PolarAngleAxis dataKey="name" />
-                                    <PolarGrid />
-                                    <Radar
-                                      name="学习时长"
-                                      dataKey="value"
-                                      stroke="var(--color-VIDEO_WATCH)"
-                                      fill="var(--color-VIDEO_WATCH)"
-                                      fillOpacity={0.6}
-                                    />
-                                  </RadarChart>
-                                </ChartContainer>
-                              ) : (
-                                <div className="flex flex-col items-center justify-center h-[220px] text-muted-foreground">
-                                  <PieChartIcon className="h-12 w-12 mb-4 opacity-20" />
-                                  <p>暂无活动类型数据</p>
-                                  <p className="text-xs mt-1">该课程尚未有学习记录</p>
-                                </div>
-                              )}
+                            <CardContent className="p-4 flex flex-col items-center justify-center">
+                              <Clock className="h-8 w-8 text-primary mb-2" />
+                              <div className="text-2xl font-bold">{formatLearningDuration(stats?.totalLearningDuration || 0)}</div>
+                              <div className="text-xs text-muted-foreground">总学习时长</div>
                             </CardContent>
-                            {activityData.length > 0 && (
-                              <CardFooter className="flex-col gap-2 text-xs pt-0">
-                                <div className="flex items-center gap-2 font-medium leading-none">
-                                  {activityData.sort((a, b) => b.activityCount - a.activityCount)[0]?.activityTypeDescription || ""} 活动最多
-                                  <TrendingUp className="h-3.5 w-3.5" />
-                                </div>
-                                <div className="flex items-center gap-2 leading-none text-muted-foreground">
-                                  共 {activityData.reduce((sum, entry) => sum + entry.activityCount, 0)} 次学习活动
-                                </div>
-                              </CardFooter>
-                            )}
+                          </Card>
+
+                          <Card>
+                            <CardContent className="p-4 flex flex-col items-center justify-center">
+                              <Activity className="h-8 w-8 text-primary mb-2" />
+                              <div className="text-2xl font-bold">{stats?.totalActivities || 0}</div>
+                              <div className="text-xs text-muted-foreground">学习活动次数</div>
+                            </CardContent>
+                          </Card>
+
+                          <Card>
+                            <CardContent className="p-4 flex flex-col items-center justify-center">
+                              <BarChart2 className="h-8 w-8 text-primary mb-2" />
+                              <div className="text-2xl font-bold">{stats?.averageProgress?.toFixed(1) || 0}%</div>
+                              <div className="text-xs text-muted-foreground">平均学习进度</div>
+                            </CardContent>
                           </Card>
                         </div>
 
+                        {/* 高级统计数据 - 使用新组件 */}
+                        <CourseLearningStats courseId={course.id} />
+
                         {/* 最新评论 */}
-                        <Card>
+                        <Card className="mt-6">
                           <CardHeader className="pb-2">
                             <CardTitle className="text-base font-medium flex items-center">
                               <MessageSquare className="w-4 h-4 mr-2" />

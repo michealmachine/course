@@ -2,45 +2,47 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  Card, 
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  Card,
   CardContent,
   CardHeader,
-  CardTitle 
+  CardTitle
 } from '@/components/ui/card';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from '@/components/ui/table';
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue, 
+  SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { 
-  Pagination, 
-  PaginationContent, 
-  PaginationEllipsis, 
-  PaginationItem, 
-  PaginationLink, 
-  PaginationNext, 
-  PaginationPrevious 
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious
 } from '@/components/ui/pagination';
 import { toast } from 'sonner';
-import { 
-  Check, 
-  X, 
-  Trash, 
-  Edit, 
-  ChevronRight, 
+import {
+  Check,
+  X,
+  Trash,
+  Edit,
+  ChevronRight,
   AlertCircle,
   BookOpen
 } from 'lucide-react';
@@ -53,9 +55,9 @@ interface WrongQuestionListProps {
   showCourseColumn?: boolean; // 是否显示课程列
 }
 
-export default function WrongQuestionList({ 
-  courseId, 
-  showCourseColumn = true 
+export default function WrongQuestionList({
+  courseId,
+  showCourseColumn = true
 }: WrongQuestionListProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -67,6 +69,8 @@ export default function WrongQuestionList({
   const [wrongQuestions, setWrongQuestions] = useState<UserWrongQuestionVO[]>([]);
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [expandedQuestionId, setExpandedQuestionId] = useState<number | null>(null);
+  const [questionDetails, setQuestionDetails] = useState<Record<number, any>>({});
 
   // 加载错题数据
   const loadWrongQuestions = async () => {
@@ -121,7 +125,7 @@ export default function WrongQuestionList({
   // 删除错题
   const handleDelete = async (wrongQuestionId: number) => {
     if (!window.confirm('确定要删除这道错题吗？')) return;
-    
+
     try {
       await wrongQuestionService.deleteWrongQuestion(wrongQuestionId);
       toast.success('错题已删除');
@@ -135,7 +139,7 @@ export default function WrongQuestionList({
   // 清空所有错题
   const handleClearAll = async () => {
     if (!window.confirm('确定要清空所有错题吗？这个操作不可撤销。')) return;
-    
+
     try {
       if (courseId) {
         await wrongQuestionService.deleteAllCourseWrongQuestions(courseId);
@@ -154,16 +158,16 @@ export default function WrongQuestionList({
   const renderPagination = () => {
     const pages = [];
     const maxVisiblePages = 5;
-    
+
     // 显示当前页码附近的页码
     let startPage = Math.max(0, currentPage - Math.floor(maxVisiblePages / 2));
     let endPage = Math.min(totalPages - 1, startPage + maxVisiblePages - 1);
-    
+
     // 如果结束页码小于总页数，调整开始页码
     if (endPage - startPage + 1 < maxVisiblePages) {
       startPage = Math.max(0, endPage - maxVisiblePages + 1);
     }
-    
+
     for (let i = startPage; i <= endPage; i++) {
       pages.push(
         <PaginationItem key={i}>
@@ -176,7 +180,7 @@ export default function WrongQuestionList({
         </PaginationItem>
       );
     }
-    
+
     return (
       <Pagination>
         <PaginationContent>
@@ -187,7 +191,7 @@ export default function WrongQuestionList({
               <PaginationPrevious onClick={() => setCurrentPage(Math.max(0, currentPage - 1))} />
             )}
           </PaginationItem>
-          
+
           {startPage > 0 && (
             <>
               <PaginationItem>
@@ -196,9 +200,9 @@ export default function WrongQuestionList({
               {startPage > 1 && <PaginationEllipsis />}
             </>
           )}
-          
+
           {pages}
-          
+
           {endPage < totalPages - 1 && (
             <>
               {endPage < totalPages - 2 && <PaginationEllipsis />}
@@ -209,7 +213,7 @@ export default function WrongQuestionList({
               </PaginationItem>
             </>
           )}
-          
+
           <PaginationItem>
             {currentPage === totalPages - 1 || totalPages === 0 ? (
               <PaginationNext className="pointer-events-none opacity-50" />
@@ -223,9 +227,45 @@ export default function WrongQuestionList({
   };
 
   // 查看题目详情
-  const handleViewQuestion = (sectionId: number, questionId: number) => {
-    // 导航到题目页面
-    router.push(`/dashboard/learn/section/${sectionId}/question/${questionId}`);
+  const handleViewQuestion = async (wrongQuestion: UserWrongQuestionVO) => {
+    const questionId = wrongQuestion.questionId;
+
+    // 如果已经展开，则收起
+    if (expandedQuestionId === questionId) {
+      setExpandedQuestionId(null);
+      return;
+    }
+
+    // 如果已经有详情数据，直接展开
+    if (questionDetails[questionId]) {
+      setExpandedQuestionId(questionId);
+      return;
+    }
+
+    // 否则，获取题目详情
+    try {
+      setLoading(true);
+      // 这里我们直接使用错题中的数据，因为错题本中已经包含了题目的基本信息
+      // 如果需要更详细的信息，可以调用API获取
+      setQuestionDetails(prev => ({
+        ...prev,
+        [questionId]: {
+          id: questionId,
+          title: wrongQuestion.questionTitle,
+          type: wrongQuestion.questionType,
+          userAnswers: wrongQuestion.userAnswers || [],
+          correctAnswers: wrongQuestion.correctAnswers || [],
+          explanation: wrongQuestion.explanation || '暂无解析'
+        }
+      }));
+
+      setExpandedQuestionId(questionId);
+    } catch (error) {
+      toast.error('获取题目详情失败');
+      console.error('获取题目详情失败:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading && wrongQuestions.length === 0) {
@@ -243,8 +283,8 @@ export default function WrongQuestionList({
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">排序:</span>
-            <Select 
-              value={sortBy} 
+            <Select
+              value={sortBy}
               onValueChange={setSortBy}
             >
               <SelectTrigger className="w-[140px]">
@@ -256,8 +296,8 @@ export default function WrongQuestionList({
                 <SelectItem value="questionTitle">题目名称</SelectItem>
               </SelectContent>
             </Select>
-            <Select 
-              value={sortDirection} 
+            <Select
+              value={sortDirection}
               onValueChange={(value) => setSortDirection(value as 'asc' | 'desc')}
             >
               <SelectTrigger className="w-[80px]">
@@ -269,8 +309,8 @@ export default function WrongQuestionList({
               </SelectContent>
             </Select>
           </div>
-          <Button 
-            variant="destructive" 
+          <Button
+            variant="destructive"
             size="sm"
             onClick={handleClearAll}
           >
@@ -279,8 +319,8 @@ export default function WrongQuestionList({
         </div>
       </CardHeader>
       <CardContent>
-        <Tabs 
-          defaultValue="all" 
+        <Tabs
+          defaultValue="all"
           className="w-full"
           value={currentTab}
           onValueChange={setCurrentTab}
@@ -289,7 +329,7 @@ export default function WrongQuestionList({
             <TabsTrigger value="all">全部错题</TabsTrigger>
             <TabsTrigger value="unresolved">未解决</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="all" className="mt-0">
             {wrongQuestions.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">
@@ -310,82 +350,155 @@ export default function WrongQuestionList({
                   </TableHeader>
                   <TableBody>
                     {wrongQuestions.map((question) => (
-                      <TableRow key={question.id}>
-                        {showCourseColumn && (
-                          <TableCell>
-                            <div className="font-medium max-w-[200px] truncate">
-                              {question.courseTitle}
-                            </div>
-                          </TableCell>
-                        )}
-                        <TableCell>
-                          <div className="font-medium max-w-[300px] truncate">
-                            {question.questionTitle}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {question.questionType === 'SINGLE_CHOICE' && '单选题'}
-                          {question.questionType === 'MULTIPLE_CHOICE' && '多选题'}
-                          {question.questionType === 'TRUE_FALSE' && '判断题'}
-                          {question.questionType === 'FILL_BLANK' && '填空题'}
-                          {question.questionType === 'SHORT_ANSWER' && '简答题'}
-                        </TableCell>
-                        <TableCell>
-                          {question.status === WrongQuestionStatus.RESOLVED ? (
-                            <span className="flex items-center text-success">
-                              <Check className="mr-1 h-4 w-4" /> 已解决
-                            </span>
-                          ) : (
-                            <span className="flex items-center text-destructive">
-                              <AlertCircle className="mr-1 h-4 w-4" /> 未解决
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {formatDate(question.createdAt)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end space-x-2">
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={() => handleViewQuestion(question.sectionId, question.questionId)}
-                              title="查看题目"
-                            >
-                              <BookOpen className="h-4 w-4" />
-                            </Button>
-                            
-                            {question.status === WrongQuestionStatus.UNRESOLVED && (
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                onClick={() => handleResolve(question.id)}
-                                title="标记为已解决"
-                              >
-                                <Check className="h-4 w-4" />
-                              </Button>
+                      <Collapsible
+                        key={question.id}
+                        open={expandedQuestionId === question.questionId}
+                        onOpenChange={() => handleViewQuestion(question)}
+                      >
+                        <CollapsibleTrigger asChild>
+                          <TableRow className="cursor-pointer hover:bg-muted/50">
+                            {showCourseColumn && (
+                              <TableCell>
+                                <div className="font-medium max-w-[200px] truncate">
+                                  {question.courseTitle}
+                                </div>
+                              </TableCell>
                             )}
-                            
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={() => handleDelete(question.id)}
-                              title="删除"
-                            >
-                              <Trash className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                            <TableCell>
+                              <div className="font-medium max-w-[300px] truncate">
+                                {question.questionTitle}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {question.questionType === 'SINGLE_CHOICE' && '单选题'}
+                              {question.questionType === 'MULTIPLE_CHOICE' && '多选题'}
+                              {question.questionType === 'TRUE_FALSE' && '判断题'}
+                              {question.questionType === 'FILL_BLANK' && '填空题'}
+                              {question.questionType === 'SHORT_ANSWER' && '简答题'}
+                            </TableCell>
+                            <TableCell>
+                              {question.status === WrongQuestionStatus.RESOLVED ? (
+                                <span className="flex items-center text-success">
+                                  <Check className="mr-1 h-4 w-4" /> 已解决
+                                </span>
+                              ) : (
+                                <span className="flex items-center text-destructive">
+                                  <AlertCircle className="mr-1 h-4 w-4" /> 未解决
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {formatDate(question.createdAt)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end space-x-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleViewQuestion(question);
+                                  }}
+                                  title="查看题目"
+                                >
+                                  <BookOpen className="h-4 w-4" />
+                                </Button>
+
+                                {question.status === WrongQuestionStatus.UNRESOLVED && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleResolve(question.id);
+                                    }}
+                                    title="标记为已解决"
+                                  >
+                                    <Check className="h-4 w-4" />
+                                  </Button>
+                                )}
+
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDelete(question.id);
+                                  }}
+                                  title="删除"
+                                >
+                                  <Trash className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <TableRow>
+                            <TableCell colSpan={showCourseColumn ? 6 : 5} className="p-0">
+                              <div className="bg-muted/50 p-4 border-t border-b">
+                                {expandedQuestionId === question.questionId && questionDetails[question.questionId] && (
+                                  <div className="space-y-4">
+                                    <div>
+                                      <h4 className="font-medium">题目内容</h4>
+                                      <p className="mt-1">{questionDetails[question.questionId].title}</p>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <div>
+                                        <h4 className="font-medium">正确答案</h4>
+                                        <div className="mt-1 p-3 bg-green-50 dark:bg-green-950/20 rounded-md border border-green-200 dark:border-green-800">
+                                          {questionDetails[question.questionId].correctAnswers.length > 0 ? (
+                                            <ul className="list-disc list-inside">
+                                              {questionDetails[question.questionId].correctAnswers.map((answer: string, index: number) => (
+                                                <li key={index}>{answer}</li>
+                                              ))}
+                                            </ul>
+                                          ) : (
+                                            <p>暂无正确答案信息</p>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      <div>
+                                        <h4 className="font-medium">您的答案</h4>
+                                        <div className="mt-1 p-3 bg-red-50 dark:bg-red-950/20 rounded-md border border-red-200 dark:border-red-800">
+                                          {questionDetails[question.questionId].userAnswers.length > 0 ? (
+                                            <ul className="list-disc list-inside">
+                                              {questionDetails[question.questionId].userAnswers.map((answer: string, index: number) => (
+                                                <li key={index}>{answer}</li>
+                                              ))}
+                                            </ul>
+                                          ) : (
+                                            <p>暂无您的答案信息</p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {questionDetails[question.questionId].explanation && (
+                                      <Alert>
+                                        <AlertCircle className="h-4 w-4" />
+                                        <AlertTitle>解析</AlertTitle>
+                                        <AlertDescription>{questionDetails[question.questionId].explanation}</AlertDescription>
+                                      </Alert>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    ))
                   </TableBody>
                 </Table>
-                
+
                 <div className="flex items-center justify-between mt-4">
                   <div className="text-sm text-muted-foreground">
-                    共 {totalElements} 条记录，每页 
-                    <Select 
-                      value={pageSize.toString()} 
+                    共 {totalElements} 条记录，每页
+                    <Select
+                      value={pageSize.toString()}
                       onValueChange={(value) => {
                         setPageSize(parseInt(value));
                         setCurrentPage(0);
@@ -403,13 +516,13 @@ export default function WrongQuestionList({
                     </Select>
                     条
                   </div>
-                  
+
                   {renderPagination()}
                 </div>
               </div>
             )}
           </TabsContent>
-          
+
           <TabsContent value="unresolved" className="mt-0">
             {wrongQuestions.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">
@@ -430,69 +543,142 @@ export default function WrongQuestionList({
                   </TableHeader>
                   <TableBody>
                     {wrongQuestions.map((question) => (
-                      <TableRow key={question.id}>
-                        {showCourseColumn && (
-                          <TableCell>
-                            <div className="font-medium max-w-[200px] truncate">
-                              {question.courseTitle}
-                            </div>
-                          </TableCell>
-                        )}
-                        <TableCell>
-                          <div className="font-medium max-w-[300px] truncate">
-                            {question.questionTitle}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {question.questionType === 'SINGLE_CHOICE' && '单选题'}
-                          {question.questionType === 'MULTIPLE_CHOICE' && '多选题'}
-                          {question.questionType === 'TRUE_FALSE' && '判断题'}
-                          {question.questionType === 'FILL_BLANK' && '填空题'}
-                          {question.questionType === 'SHORT_ANSWER' && '简答题'}
-                        </TableCell>
-                        <TableCell>
-                          {formatDate(question.createdAt)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end space-x-2">
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={() => handleViewQuestion(question.sectionId, question.questionId)}
-                              title="查看题目"
-                            >
-                              <BookOpen className="h-4 w-4" />
-                            </Button>
-                            
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={() => handleResolve(question.id)}
-                              title="标记为已解决"
-                            >
-                              <Check className="h-4 w-4" />
-                            </Button>
-                            
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={() => handleDelete(question.id)}
-                              title="删除"
-                            >
-                              <Trash className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                      <Collapsible
+                        key={question.id}
+                        open={expandedQuestionId === question.questionId}
+                        onOpenChange={() => handleViewQuestion(question)}
+                      >
+                        <CollapsibleTrigger asChild>
+                          <TableRow className="cursor-pointer hover:bg-muted/50">
+                            {showCourseColumn && (
+                              <TableCell>
+                                <div className="font-medium max-w-[200px] truncate">
+                                  {question.courseTitle}
+                                </div>
+                              </TableCell>
+                            )}
+                            <TableCell>
+                              <div className="font-medium max-w-[300px] truncate">
+                                {question.questionTitle}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {question.questionType === 'SINGLE_CHOICE' && '单选题'}
+                              {question.questionType === 'MULTIPLE_CHOICE' && '多选题'}
+                              {question.questionType === 'TRUE_FALSE' && '判断题'}
+                              {question.questionType === 'FILL_BLANK' && '填空题'}
+                              {question.questionType === 'SHORT_ANSWER' && '简答题'}
+                            </TableCell>
+                            <TableCell>
+                              {formatDate(question.createdAt)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end space-x-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleViewQuestion(question);
+                                  }}
+                                  title="查看题目"
+                                >
+                                  <BookOpen className="h-4 w-4" />
+                                </Button>
+
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleResolve(question.id);
+                                  }}
+                                  title="标记为已解决"
+                                >
+                                  <Check className="h-4 w-4" />
+                                </Button>
+
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDelete(question.id);
+                                  }}
+                                  title="删除"
+                                >
+                                  <Trash className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <TableRow>
+                            <TableCell colSpan={showCourseColumn ? 5 : 4} className="p-0">
+                              <div className="bg-muted/50 p-4 border-t border-b">
+                                {expandedQuestionId === question.questionId && questionDetails[question.questionId] && (
+                                  <div className="space-y-4">
+                                    <div>
+                                      <h4 className="font-medium">题目内容</h4>
+                                      <p className="mt-1">{questionDetails[question.questionId].title}</p>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <div>
+                                        <h4 className="font-medium">正确答案</h4>
+                                        <div className="mt-1 p-3 bg-green-50 dark:bg-green-950/20 rounded-md border border-green-200 dark:border-green-800">
+                                          {questionDetails[question.questionId].correctAnswers.length > 0 ? (
+                                            <ul className="list-disc list-inside">
+                                              {questionDetails[question.questionId].correctAnswers.map((answer: string, index: number) => (
+                                                <li key={index}>{answer}</li>
+                                              ))}
+                                            </ul>
+                                          ) : (
+                                            <p>暂无正确答案信息</p>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      <div>
+                                        <h4 className="font-medium">您的答案</h4>
+                                        <div className="mt-1 p-3 bg-red-50 dark:bg-red-950/20 rounded-md border border-red-200 dark:border-red-800">
+                                          {questionDetails[question.questionId].userAnswers.length > 0 ? (
+                                            <ul className="list-disc list-inside">
+                                              {questionDetails[question.questionId].userAnswers.map((answer: string, index: number) => (
+                                                <li key={index}>{answer}</li>
+                                              ))}
+                                            </ul>
+                                          ) : (
+                                            <p>暂无您的答案信息</p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {questionDetails[question.questionId].explanation && (
+                                      <Alert>
+                                        <AlertCircle className="h-4 w-4" />
+                                        <AlertTitle>解析</AlertTitle>
+                                        <AlertDescription>{questionDetails[question.questionId].explanation}</AlertDescription>
+                                      </Alert>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    ))
                   </TableBody>
                 </Table>
-                
+
                 <div className="flex items-center justify-between mt-4">
                   <div className="text-sm text-muted-foreground">
-                    共 {totalElements} 条记录，每页 
-                    <Select 
-                      value={pageSize.toString()} 
+                    共 {totalElements} 条记录，每页
+                    <Select
+                      value={pageSize.toString()}
                       onValueChange={(value) => {
                         setPageSize(parseInt(value));
                         setCurrentPage(0);
@@ -510,7 +696,7 @@ export default function WrongQuestionList({
                     </Select>
                     条
                   </div>
-                  
+
                   {renderPagination()}
                 </div>
               </div>
@@ -520,4 +706,4 @@ export default function WrongQuestionList({
       </CardContent>
     </Card>
   );
-} 
+}

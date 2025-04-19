@@ -36,6 +36,7 @@ public class CacheConfig {
     public static final String USER_STATS_CACHE = "userStats"; // 用户统计缓存
     public static final String INSTITUTION_STATS_CACHE = "institutionStats"; // 机构统计缓存
     public static final String COURSE_STATS_CACHE = "courseStats"; // 课程统计缓存
+    public static final String ADMIN_STATS_CACHE = "adminStats"; // 管理员统计缓存
 
     // 缓存时间常量（分钟）
     private static final long DEFAULT_EXPIRE_MINUTES = 30;
@@ -48,7 +49,8 @@ public class CacheConfig {
     private static final long USER_STATS_EXPIRE_MINUTES = 15; // 用户统计缓存15分钟
     private static final long INSTITUTION_STATS_EXPIRE_MINUTES = 15; // 机构统计缓存15分钟
     private static final long COURSE_STATS_EXPIRE_MINUTES = 15; // 课程统计缓存15分钟
-    
+    private static final long ADMIN_STATS_EXPIRE_MINUTES = 15; // 管理员统计缓存15分钟
+
     /**
      * 配置Redis缓存管理器
      */
@@ -62,7 +64,7 @@ public class CacheConfig {
             LaissezFaireSubTypeValidator.instance,
             ObjectMapper.DefaultTyping.NON_FINAL
         );
-        
+
         // 使用新的API方式创建Jackson2JsonRedisSerializer
         Jackson2JsonRedisSerializer<Object> serializer = new Jackson2JsonRedisSerializer<>(
             objectMapper,
@@ -78,42 +80,46 @@ public class CacheConfig {
 
         // 自定义不同缓存名称的配置
         Map<String, RedisCacheConfiguration> cacheConfigurations = new HashMap<>();
-        
+
         // 用户缓存配置
-        cacheConfigurations.put(USER_CACHE, 
+        cacheConfigurations.put(USER_CACHE,
             defaultCacheConfig.entryTtl(Duration.ofMinutes(USER_EXPIRE_MINUTES)));
 
         // 权限缓存配置
-        cacheConfigurations.put(PERMISSION_CACHE, 
+        cacheConfigurations.put(PERMISSION_CACHE,
             defaultCacheConfig.entryTtl(Duration.ofMinutes(PERMISSION_EXPIRE_MINUTES)));
 
         // 角色缓存配置
-        cacheConfigurations.put(ROLE_CACHE, 
+        cacheConfigurations.put(ROLE_CACHE,
             defaultCacheConfig.entryTtl(Duration.ofMinutes(ROLE_EXPIRE_MINUTES)));
-            
+
         // 配额统计缓存配置
-        cacheConfigurations.put(QUOTA_STATS_CACHE, 
+        cacheConfigurations.put(QUOTA_STATS_CACHE,
             defaultCacheConfig.entryTtl(Duration.ofMinutes(QUOTA_STATS_EXPIRE_MINUTES)));
 
         // 媒体活动缓存配置
-        cacheConfigurations.put(MEDIA_ACTIVITY_CACHE, 
+        cacheConfigurations.put(MEDIA_ACTIVITY_CACHE,
             defaultCacheConfig.entryTtl(Duration.ofMinutes(MEDIA_ACTIVITY_EXPIRE_MINUTES)));
 
         // 媒体统计缓存配置
-        cacheConfigurations.put(MEDIA_STATS_CACHE, 
+        cacheConfigurations.put(MEDIA_STATS_CACHE,
             defaultCacheConfig.entryTtl(Duration.ofMinutes(MEDIA_STATS_EXPIRE_MINUTES)));
-            
+
         // 用户统计缓存配置
-        cacheConfigurations.put(USER_STATS_CACHE, 
+        cacheConfigurations.put(USER_STATS_CACHE,
             defaultCacheConfig.entryTtl(Duration.ofMinutes(USER_STATS_EXPIRE_MINUTES)));
-            
+
         // 机构统计缓存配置
-        cacheConfigurations.put(INSTITUTION_STATS_CACHE, 
+        cacheConfigurations.put(INSTITUTION_STATS_CACHE,
             defaultCacheConfig.entryTtl(Duration.ofMinutes(INSTITUTION_STATS_EXPIRE_MINUTES)));
-            
+
         // 课程统计缓存配置
-        cacheConfigurations.put(COURSE_STATS_CACHE, 
+        cacheConfigurations.put(COURSE_STATS_CACHE,
             defaultCacheConfig.entryTtl(Duration.ofMinutes(COURSE_STATS_EXPIRE_MINUTES)));
+
+        // 管理员统计缓存配置
+        cacheConfigurations.put(ADMIN_STATS_CACHE,
+            defaultCacheConfig.entryTtl(Duration.ofMinutes(ADMIN_STATS_EXPIRE_MINUTES)));
 
         // 构建缓存管理器
         return RedisCacheManager.builder(connectionFactory)
@@ -122,4 +128,4 @@ public class CacheConfig {
                 .transactionAware()
                 .build();
     }
-} 
+}

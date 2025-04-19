@@ -12,7 +12,9 @@ import com.zhangziqi.online_course_mine.model.vo.ChapterVO;
 import com.zhangziqi.online_course_mine.model.vo.CourseVO;
 import com.zhangziqi.online_course_mine.model.vo.SectionVO;
 import com.zhangziqi.online_course_mine.model.vo.UserCourseVO;
+import com.zhangziqi.online_course_mine.repository.ChapterRepository;
 import com.zhangziqi.online_course_mine.repository.CourseRepository;
+import com.zhangziqi.online_course_mine.repository.LearningRecordRepository;
 import com.zhangziqi.online_course_mine.repository.OrderRepository;
 import com.zhangziqi.online_course_mine.repository.UserCourseRepository;
 import com.zhangziqi.online_course_mine.repository.UserRepository;
@@ -54,6 +56,12 @@ public class UserCourseServiceTest {
 
     @Mock
     private OrderRepository orderRepository;
+
+    @Mock
+    private ChapterRepository chapterRepository;
+
+    @Mock
+    private LearningRecordRepository learningRecordRepository;
 
     @InjectMocks
     private UserCourseServiceImpl userCourseService;
@@ -123,17 +131,17 @@ public class UserCourseServiceTest {
     void getUserPurchasedCourses_Success() {
         // 准备测试数据
         when(userCourseRepository.findByUser_IdAndStatus(anyLong(), anyInt())).thenReturn(List.of(testUserCourse));
-        
+
         // 执行方法
         List<UserCourseVO> result = userCourseService.getUserPurchasedCourses(testUser.getId());
-        
+
         // 验证结果
         assertNotNull(result);
         assertEquals(1, result.size());
         assertEquals(testUserCourse.getId(), result.get(0).getId());
         assertEquals(testUser.getId(), result.get(0).getUserId());
         assertEquals(testCourse.getId(), result.get(0).getCourseId());
-        
+
         // 验证方法调用
         verify(userCourseRepository).findByUser_IdAndStatus(testUser.getId(), UserCourseStatus.NORMAL.getValue());
     }
@@ -144,19 +152,19 @@ public class UserCourseServiceTest {
         // 准备测试数据
         Pageable pageable = PageRequest.of(0, 10);
         Page<UserCourse> userCoursePage = new PageImpl<>(List.of(testUserCourse), pageable, 1);
-        
+
         when(userCourseRepository.findByUser_IdAndStatus(anyLong(), anyInt(), any(Pageable.class))).thenReturn(userCoursePage);
-        
+
         // 执行方法
         Page<UserCourseVO> result = userCourseService.getUserPurchasedCourses(testUser.getId(), pageable);
-        
+
         // 验证结果
         assertNotNull(result);
         assertEquals(1, result.getTotalElements());
         assertEquals(testUserCourse.getId(), result.getContent().get(0).getId());
         assertEquals(testUser.getId(), result.getContent().get(0).getUserId());
         assertEquals(testCourse.getId(), result.getContent().get(0).getCourseId());
-        
+
         // 验证方法调用
         verify(userCourseRepository).findByUser_IdAndStatus(testUser.getId(), UserCourseStatus.NORMAL.getValue(), pageable);
     }
@@ -166,10 +174,10 @@ public class UserCourseServiceTest {
     void getUserCourseRecord_Success() {
         // 准备测试数据
         when(userCourseRepository.findByUser_IdAndCourse_Id(anyLong(), anyLong())).thenReturn(Optional.of(testUserCourse));
-        
+
         // 执行方法
         UserCourseVO result = userCourseService.getUserCourseRecord(testUser.getId(), testCourse.getId());
-        
+
         // 验证结果
         assertNotNull(result);
         assertEquals(testUserCourse.getId(), result.getId());
@@ -177,7 +185,7 @@ public class UserCourseServiceTest {
         assertEquals(testCourse.getId(), result.getCourseId());
         assertEquals(testUserCourse.getProgress(), result.getProgress());
         assertEquals(testUserCourse.getStatus(), result.getStatus());
-        
+
         // 验证方法调用
         verify(userCourseRepository).findByUser_IdAndCourse_Id(testUser.getId(), testCourse.getId());
     }
@@ -187,13 +195,13 @@ public class UserCourseServiceTest {
     void getUserCourseRecord_CourseNotPurchased() {
         // 准备测试数据
         when(userCourseRepository.findByUser_IdAndCourse_Id(anyLong(), anyLong())).thenReturn(Optional.empty());
-        
+
         // 验证抛出异常
-        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, 
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class,
                 () -> userCourseService.getUserCourseRecord(testUser.getId(), testCourse.getId()));
-        
+
         assertTrue(exception.getMessage().contains("未找到学习记录，请先购买课程"));
-        
+
         // 验证方法调用
         verify(userCourseRepository).findByUser_IdAndCourse_Id(testUser.getId(), testCourse.getId());
     }
@@ -203,50 +211,125 @@ public class UserCourseServiceTest {
     void updateLearningProgress_Success() {
         // 准备测试数据
         testUserCourse.setProgress(30);
-        LearningProgressUpdateDTO dto = new LearningProgressUpdateDTO(1L, 1L, 50);
-        
+        LearningProgressUpdateDTO dto = LearningProgressUpdateDTO.builder()
+                .chapterId(1L)
+                .sectionId(1L)
+                .sectionProgress(50)
+                .build();
+
         // 确保课程有章节和小节信息
         ChapterVO chapterVO = new ChapterVO();
         chapterVO.setId(1L);
-        
+
         SectionVO section = new SectionVO();
         section.setId(1L);
-        
+
         List<SectionVO> sections = new ArrayList<>();
         sections.add(section);
         chapterVO.setSections(sections);
-        
+
         List<ChapterVO> chaptersVO = new ArrayList<>();
         chaptersVO.add(chapterVO);
-        
+
         // 创建对应的实体类型
         Chapter chapter = new Chapter();
         chapter.setId(1L);
-        
+        chapter.setEstimatedMinutes(30); // 设置预计学习时长为30分钟
+
         Section sectionEntity = new Section();
         sectionEntity.setId(1L);
-        
+
         List<Section> sectionEntities = new ArrayList<>();
         sectionEntities.add(sectionEntity);
         chapter.setSections(sectionEntities);
-        
+
         List<Chapter> chapters = new ArrayList<>();
         chapters.add(chapter);
         testCourse.setChapters(chapters);
-        
+
         when(userCourseRepository.findByUser_IdAndCourse_Id(anyLong(), anyLong())).thenReturn(Optional.of(testUserCourse));
         when(userCourseRepository.save(any(UserCourse.class))).thenReturn(testUserCourse);
-        
+        when(chapterRepository.findById(anyLong())).thenReturn(Optional.of(chapter));
+        when(learningRecordRepository.getChapterLearningDuration(anyLong(), anyLong(), anyLong())).thenReturn(1200); // 返回20分钟的学习时长，未超过预计时长
+
         // 执行方法
         UserCourseVO result = userCourseService.updateLearningProgress(testUser.getId(), testCourse.getId(), dto);
-        
+
         // 验证结果
         assertNotNull(result);
         assertEquals(dto.getSectionProgress(), result.getCurrentSectionProgress());
         assertNotNull(testUserCourse.getLastLearnAt());
-        
+
         // 验证方法调用
         verify(userCourseRepository).findByUser_IdAndCourse_Id(testUser.getId(), testCourse.getId());
+        verify(userCourseRepository).save(testUserCourse);
+    }
+
+    @Test
+    @DisplayName("更新学习进度 - 复习模式")
+    void updateLearningProgress_ReviewingMode() {
+        // 准备测试数据
+        testUserCourse.setProgress(50);
+        LearningProgressUpdateDTO dto = LearningProgressUpdateDTO.builder()
+                .chapterId(1L)
+                .sectionId(1L)
+                .sectionProgress(100)
+                .isReviewing(true) // 设置为复习模式
+                .build();
+
+        // 创建对应的实体类型
+        Chapter chapter = new Chapter();
+        chapter.setId(1L);
+
+        when(userCourseRepository.findByUser_IdAndCourse_Id(anyLong(), anyLong())).thenReturn(Optional.of(testUserCourse));
+        when(userCourseRepository.save(any(UserCourse.class))).thenReturn(testUserCourse);
+        when(chapterRepository.findById(anyLong())).thenReturn(Optional.of(chapter));
+
+        // 执行方法
+        UserCourseVO result = userCourseService.updateLearningProgress(testUser.getId(), testCourse.getId(), dto);
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(50, result.getProgress()); // 复习模式下进度不应该被更新
+
+        // 验证方法调用
+        verify(userCourseRepository).findByUser_IdAndCourse_Id(testUser.getId(), testCourse.getId());
+        verify(chapterRepository).findById(dto.getChapterId());
+        verify(userCourseRepository).save(testUserCourse);
+    }
+
+    @Test
+    @DisplayName("更新学习进度 - 超过预设学习时长")
+    void updateLearningProgress_ExceedsEstimatedTime() {
+        // 准备测试数据
+        testUserCourse.setProgress(50);
+        LearningProgressUpdateDTO dto = LearningProgressUpdateDTO.builder()
+                .chapterId(1L)
+                .sectionId(1L)
+                .sectionProgress(100)
+                .build();
+
+        // 创建对应的实体类型
+        Chapter chapter = new Chapter();
+        chapter.setId(1L);
+        chapter.setEstimatedMinutes(30); // 设置预计学习时长为30分钟
+
+        when(userCourseRepository.findByUser_IdAndCourse_Id(anyLong(), anyLong())).thenReturn(Optional.of(testUserCourse));
+        when(userCourseRepository.save(any(UserCourse.class))).thenReturn(testUserCourse);
+        when(chapterRepository.findById(anyLong())).thenReturn(Optional.of(chapter));
+        when(learningRecordRepository.getChapterLearningDuration(anyLong(), anyLong(), anyLong())).thenReturn(2400); // 返回40分钟的学习时长，超过预计时长
+
+        // 执行方法
+        UserCourseVO result = userCourseService.updateLearningProgress(testUser.getId(), testCourse.getId(), dto);
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(50, result.getProgress()); // 超过预设时长时进度不应该被更新
+
+        // 验证方法调用
+        verify(userCourseRepository).findByUser_IdAndCourse_Id(testUser.getId(), testCourse.getId());
+        verify(chapterRepository).findById(dto.getChapterId());
+        verify(learningRecordRepository).getChapterLearningDuration(testUser.getId(), testCourse.getId(), dto.getChapterId());
         verify(userCourseRepository).save(testUserCourse);
     }
 
@@ -255,34 +338,48 @@ public class UserCourseServiceTest {
     void updateLearningProgress_NewProgressLessThanCurrent() {
         // 准备测试数据
         testUserCourse.setProgress(50);
-        LearningProgressUpdateDTO dto = new LearningProgressUpdateDTO(1L, 1L, 30);
-        
+        LearningProgressUpdateDTO dto = LearningProgressUpdateDTO.builder()
+                .chapterId(1L)
+                .sectionId(1L)
+                .sectionProgress(30)
+                .build();
+
+        // 创建对应的实体类型
+        Chapter chapter = new Chapter();
+        chapter.setId(1L);
+
         when(userCourseRepository.findByUser_IdAndCourse_Id(anyLong(), anyLong())).thenReturn(Optional.of(testUserCourse));
-        
+        when(chapterRepository.findById(anyLong())).thenReturn(Optional.of(chapter));
+
         // 执行方法
         UserCourseVO result = userCourseService.updateLearningProgress(testUser.getId(), testCourse.getId(), dto);
-        
+
         // 验证结果
         assertNotNull(result);
         assertEquals(testUserCourse.getProgress(), result.getProgress()); // 进度不应该被更新
-        
+
         // 验证方法调用
         verify(userCourseRepository).findByUser_IdAndCourse_Id(testUser.getId(), testCourse.getId());
-        verify(userCourseRepository, never()).save(any(UserCourse.class));
+        verify(chapterRepository).findById(dto.getChapterId());
+        verify(userCourseRepository).save(testUserCourse);
     }
 
     @Test
     @DisplayName("更新学习进度 - 进度超出范围")
     void updateLearningProgress_ProgressOutOfRange() {
         // 准备测试数据
-        LearningProgressUpdateDTO dto = new LearningProgressUpdateDTO(1L, 1L, 110); // 超过100
-        
+        LearningProgressUpdateDTO dto = LearningProgressUpdateDTO.builder()
+                .chapterId(1L)
+                .sectionId(1L)
+                .sectionProgress(110) // 超过100
+                .build();
+
         // 验证抛出异常
-        BusinessException exception = assertThrows(BusinessException.class, 
+        BusinessException exception = assertThrows(BusinessException.class,
                 () -> userCourseService.updateLearningProgress(testUser.getId(), testCourse.getId(), dto));
-        
+
         assertTrue(exception.getMessage().contains("学习进度必须在0-100之间"));
-        
+
         // 验证方法调用
         verify(userCourseRepository, never()).findByUser_IdAndCourse_Id(anyLong(), anyLong());
         verify(userCourseRepository, never()).save(any(UserCourse.class));
@@ -294,18 +391,18 @@ public class UserCourseServiceTest {
         // 准备测试数据
         testUserCourse.setLearnDuration(100); // 当前学习时长100秒
         Integer additionalDuration = 60; // 新增60秒
-        
+
         when(userCourseRepository.findByUser_IdAndCourse_Id(anyLong(), anyLong())).thenReturn(Optional.of(testUserCourse));
         when(userCourseRepository.save(any(UserCourse.class))).thenReturn(testUserCourse);
-        
+
         // 执行方法
         UserCourseVO result = userCourseService.recordLearningDuration(testUser.getId(), testCourse.getId(), additionalDuration);
-        
+
         // 验证结果
         assertNotNull(result);
         assertEquals(160, result.getLearnDuration()); // 100 + 60 = 160
         assertNotNull(testUserCourse.getLastLearnAt());
-        
+
         // 验证方法调用
         verify(userCourseRepository).findByUser_IdAndCourse_Id(testUser.getId(), testCourse.getId());
         verify(userCourseRepository).save(testUserCourse);
@@ -316,13 +413,13 @@ public class UserCourseServiceTest {
     void recordLearningDuration_InvalidDuration() {
         // 准备测试数据
         Integer invalidDuration = 0; // 无效时长
-        
+
         // 验证抛出异常
-        BusinessException exception = assertThrows(BusinessException.class, 
+        BusinessException exception = assertThrows(BusinessException.class,
                 () -> userCourseService.recordLearningDuration(testUser.getId(), testCourse.getId(), invalidDuration));
-        
+
         assertTrue(exception.getMessage().contains("学习时长必须大于0"));
-        
+
         // 验证方法调用
         verify(userCourseRepository, never()).findByUser_IdAndCourse_Id(anyLong(), anyLong());
         verify(userCourseRepository, never()).save(any(UserCourse.class));
@@ -333,13 +430,13 @@ public class UserCourseServiceTest {
     void hasPurchasedCourse_CourseIsPurchased() {
         // 准备测试数据
         when(userCourseRepository.existsByUser_IdAndCourse_IdAndStatus(anyLong(), anyLong(), anyInt())).thenReturn(true);
-        
+
         // 执行方法
         boolean result = userCourseService.hasPurchasedCourse(testUser.getId(), testCourse.getId());
-        
+
         // 验证结果
         assertTrue(result);
-        
+
         // 验证方法调用
         verify(userCourseRepository).existsByUser_IdAndCourse_IdAndStatus(testUser.getId(), testCourse.getId(), UserCourseStatus.NORMAL.getValue());
     }
@@ -349,13 +446,13 @@ public class UserCourseServiceTest {
     void hasPurchasedCourse_CourseNotPurchased() {
         // 准备测试数据
         when(userCourseRepository.existsByUser_IdAndCourse_IdAndStatus(anyLong(), anyLong(), anyInt())).thenReturn(false);
-        
+
         // 执行方法
         boolean result = userCourseService.hasPurchasedCourse(testUser.getId(), testCourse.getId());
-        
+
         // 验证结果
         assertFalse(result);
-        
+
         // 验证方法调用
         verify(userCourseRepository).existsByUser_IdAndCourse_IdAndStatus(testUser.getId(), testCourse.getId(), UserCourseStatus.NORMAL.getValue());
     }
@@ -365,17 +462,17 @@ public class UserCourseServiceTest {
     void getCourseStudents_Success() {
         // 准备测试数据
         when(userCourseRepository.findByCourse_Id(anyLong())).thenReturn(List.of(testUserCourse));
-        
+
         // 执行方法
         List<UserCourseVO> result = userCourseService.getCourseStudents(testCourse.getId());
-        
+
         // 验证结果
         assertNotNull(result);
         assertEquals(1, result.size());
         assertEquals(testUserCourse.getId(), result.get(0).getId());
         assertEquals(testUser.getId(), result.get(0).getUserId());
         assertEquals(testCourse.getId(), result.get(0).getCourseId());
-        
+
         // 验证方法调用
         verify(userCourseRepository).findByCourse_Id(testCourse.getId());
     }
@@ -386,19 +483,19 @@ public class UserCourseServiceTest {
         // 准备测试数据
         Pageable pageable = PageRequest.of(0, 10);
         Page<UserCourse> userCoursePage = new PageImpl<>(List.of(testUserCourse), pageable, 1);
-        
+
         when(userCourseRepository.findByCourse_Id(anyLong(), any(Pageable.class))).thenReturn(userCoursePage);
-        
+
         // 执行方法
         Page<UserCourseVO> result = userCourseService.getCourseStudents(testCourse.getId(), pageable);
-        
+
         // 验证结果
         assertNotNull(result);
         assertEquals(1, result.getTotalElements());
         assertEquals(testUserCourse.getId(), result.getContent().get(0).getId());
         assertEquals(testUser.getId(), result.getContent().get(0).getUserId());
         assertEquals(testCourse.getId(), result.getContent().get(0).getCourseId());
-        
+
         // 验证方法调用
         verify(userCourseRepository).findByCourse_Id(testCourse.getId(), pageable);
     }
@@ -408,17 +505,17 @@ public class UserCourseServiceTest {
     void getInstitutionStudents_Success() {
         // 准备测试数据
         when(userCourseRepository.findByInstitutionId(anyLong())).thenReturn(List.of(testUserCourse));
-        
+
         // 执行方法
         List<UserCourseVO> result = userCourseService.getInstitutionStudents(testInstitution.getId());
-        
+
         // 验证结果
         assertNotNull(result);
         assertEquals(1, result.size());
         assertEquals(testUserCourse.getId(), result.get(0).getId());
         assertEquals(testUser.getId(), result.get(0).getUserId());
         assertEquals(testCourse.getId(), result.get(0).getCourseId());
-        
+
         // 验证方法调用
         verify(userCourseRepository).findByInstitutionId(testInstitution.getId());
     }
@@ -429,19 +526,19 @@ public class UserCourseServiceTest {
         // 准备测试数据
         Pageable pageable = PageRequest.of(0, 10);
         Page<UserCourse> userCoursePage = new PageImpl<>(List.of(testUserCourse), pageable, 1);
-        
+
         when(userCourseRepository.findByInstitutionId(anyLong(), any(Pageable.class))).thenReturn(userCoursePage);
-        
+
         // 执行方法
         Page<UserCourseVO> result = userCourseService.getInstitutionStudents(testInstitution.getId(), pageable);
-        
+
         // 验证结果
         assertNotNull(result);
         assertEquals(1, result.getTotalElements());
         assertEquals(testUserCourse.getId(), result.getContent().get(0).getId());
         assertEquals(testUser.getId(), result.getContent().get(0).getUserId());
         assertEquals(testCourse.getId(), result.getContent().get(0).getCourseId());
-        
+
         // 验证方法调用
         verify(userCourseRepository).findByInstitutionId(testInstitution.getId(), pageable);
     }
@@ -452,16 +549,16 @@ public class UserCourseServiceTest {
         // 准备测试数据
         when(userCourseRepository.findRecentLearnedCourses(anyLong(), any(Pageable.class)))
             .thenReturn(List.of(testUserCourse));
-        
+
         // 执行方法
         List<CourseVO> result = userCourseService.getRecentLearnedCourses(testUser.getId(), 5);
-        
+
         // 验证结果
         assertNotNull(result);
         assertEquals(1, result.size());
         assertEquals(testCourse.getId(), result.get(0).getId());
         assertEquals(testCourse.getTitle(), result.get(0).getTitle());
-        
+
         // 验证方法调用
         verify(userCourseRepository).findRecentLearnedCourses(eq(testUser.getId()), any(Pageable.class));
     }
@@ -476,20 +573,20 @@ public class UserCourseServiceTest {
         when(orderRepository.findById(anyLong())).thenReturn(Optional.of(testOrder));
         when(userCourseRepository.save(any(UserCourse.class))).thenReturn(testUserCourse);
         when(courseRepository.save(any(Course.class))).thenReturn(testCourse);
-        
+
         // 执行方法
         UserCourse result = userCourseService.createUserCourseRelation(testUser.getId(), testCourse.getId(), testOrder.getId(), true);
-        
+
         // 验证结果
         assertNotNull(result);
         assertEquals(testUser, result.getUser());
         assertEquals(testCourse, result.getCourse());
         assertEquals(testOrder, result.getOrder());
         assertEquals(UserCourseStatus.NORMAL.ordinal(), result.getStatus());
-        
+
         // 验证课程学生数增加
         assertEquals(11, testCourse.getStudentCount()); // 原来是10，增加1个
-        
+
         // 验证方法调用
         verify(userCourseRepository).findByUser_IdAndCourse_Id(testUser.getId(), testCourse.getId());
         verify(userRepository).findById(testUser.getId());
@@ -504,14 +601,14 @@ public class UserCourseServiceTest {
     void createUserCourseRelation_RelationAlreadyExists() {
         // 准备测试数据
         when(userCourseRepository.findByUser_IdAndCourse_Id(anyLong(), anyLong())).thenReturn(Optional.of(testUserCourse));
-        
+
         // 执行方法
         UserCourse result = userCourseService.createUserCourseRelation(testUser.getId(), testCourse.getId(), testOrder.getId(), true);
-        
+
         // 验证结果
         assertNotNull(result);
         assertEquals(testUserCourse, result);
-        
+
         // 验证方法调用
         verify(userCourseRepository).findByUser_IdAndCourse_Id(testUser.getId(), testCourse.getId());
         verify(userRepository, never()).findById(anyLong());
@@ -530,17 +627,17 @@ public class UserCourseServiceTest {
         when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
         when(userCourseRepository.save(any(UserCourse.class))).thenReturn(testUserCourse);
         when(courseRepository.save(any(Course.class))).thenReturn(testCourse);
-        
+
         // 执行方法
         UserCourse result = userCourseService.createUserCourseRelation(testUser.getId(), testCourse.getId(), null, true);
-        
+
         // 验证结果
         assertNotNull(result);
         assertEquals(testUser, result.getUser());
         assertEquals(testCourse, result.getCourse());
         assertNull(result.getOrder());
         assertEquals(UserCourseStatus.NORMAL.ordinal(), result.getStatus());
-        
+
         // 验证方法调用
         verify(userCourseRepository).findByUser_IdAndCourse_Id(testUser.getId(), testCourse.getId());
         verify(userRepository).findById(testUser.getId());
@@ -558,17 +655,17 @@ public class UserCourseServiceTest {
         when(userCourseRepository.save(any(UserCourse.class))).thenReturn(testUserCourse);
         when(courseRepository.findById(anyLong())).thenReturn(Optional.of(testCourse));
         when(courseRepository.save(any(Course.class))).thenReturn(testCourse);
-        
+
         // 执行方法
         UserCourse result = userCourseService.updateUserCourseRefunded(testOrder.getId());
-        
+
         // 验证结果
         assertNotNull(result);
         assertEquals(UserCourseStatus.REFUNDED.ordinal(), result.getStatus());
-        
+
         // 验证课程学生数减少
         assertEquals(9, testCourse.getStudentCount()); // 原来是10，减少1个
-        
+
         // 验证方法调用
         verify(userCourseRepository).findByOrder_Id(testOrder.getId());
         verify(userCourseRepository).save(testUserCourse);
@@ -581,13 +678,13 @@ public class UserCourseServiceTest {
     void updateUserCourseRefunded_RelationNotFound() {
         // 准备测试数据
         when(userCourseRepository.findByOrder_Id(anyLong())).thenReturn(Optional.empty());
-        
+
         // 验证抛出异常
-        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, 
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class,
                 () -> userCourseService.updateUserCourseRefunded(999L));
-        
+
         assertTrue(exception.getMessage().contains("未找到与订单关联的课程记录"));
-        
+
         // 验证方法调用
         verify(userCourseRepository).findByOrder_Id(999L);
         verify(userCourseRepository, never()).save(any(UserCourse.class));
@@ -600,14 +697,14 @@ public class UserCourseServiceTest {
     void findByOrderId_Success() {
         // 准备测试数据
         when(userCourseRepository.findByOrder_Id(anyLong())).thenReturn(Optional.of(testUserCourse));
-        
+
         // 执行方法
         Optional<UserCourse> result = userCourseService.findByOrderId(testOrder.getId());
-        
+
         // 验证结果
         assertTrue(result.isPresent());
         assertEquals(testUserCourse, result.get());
-        
+
         // 验证方法调用
         verify(userCourseRepository).findByOrder_Id(testOrder.getId());
     }
@@ -617,13 +714,13 @@ public class UserCourseServiceTest {
     void findByOrderId_NotFound() {
         // 准备测试数据
         when(userCourseRepository.findByOrder_Id(anyLong())).thenReturn(Optional.empty());
-        
+
         // 执行方法
         Optional<UserCourse> result = userCourseService.findByOrderId(999L);
-        
+
         // 验证结果
         assertFalse(result.isPresent());
-        
+
         // 验证方法调用
         verify(userCourseRepository).findByOrder_Id(999L);
     }
@@ -635,13 +732,13 @@ public class UserCourseServiceTest {
         Pageable pageable = PageRequest.of(0, 10);
         Integer status = UserCourseStatus.NORMAL.ordinal();
         Page<UserCourse> userCoursePage = new PageImpl<>(List.of(testUserCourse), pageable, 1);
-        
+
         when(userCourseRepository.findByUser_IdAndStatus(anyLong(), anyInt(), any(Pageable.class)))
                 .thenReturn(userCoursePage);
-        
+
         // 执行方法
         Page<UserCourse> result = userCourseService.findByUserIdAndStatus(testUser.getId(), status, pageable);
-        
+
         // 验证结果
         assertNotNull(result);
         assertEquals(1, result.getTotalElements());
@@ -649,11 +746,11 @@ public class UserCourseServiceTest {
         assertEquals(testUserCourse.getUser().getId(), result.getContent().get(0).getUser().getId());
         assertEquals(testUserCourse.getCourse().getId(), result.getContent().get(0).getCourse().getId());
         assertEquals(status, result.getContent().get(0).getStatus());
-        
+
         // 验证方法调用
         verify(userCourseRepository).findByUser_IdAndStatus(testUser.getId(), status, pageable);
     }
-    
+
     @Test
     @DisplayName("分页查询用户指定状态的课程关系 - 无记录")
     void findByUserIdAndStatus_NoRecords() {
@@ -661,18 +758,18 @@ public class UserCourseServiceTest {
         Pageable pageable = PageRequest.of(0, 10);
         Integer status = UserCourseStatus.REFUNDED.ordinal();
         Page<UserCourse> emptyPage = new PageImpl<>(Collections.emptyList(), pageable, 0);
-        
+
         when(userCourseRepository.findByUser_IdAndStatus(anyLong(), anyInt(), any(Pageable.class)))
                 .thenReturn(emptyPage);
-        
+
         // 执行方法
         Page<UserCourse> result = userCourseService.findByUserIdAndStatus(testUser.getId(), status, pageable);
-        
+
         // 验证结果
         assertNotNull(result);
         assertEquals(0, result.getTotalElements());
         assertTrue(result.getContent().isEmpty());
-        
+
         // 验证方法调用
         verify(userCourseRepository).findByUser_IdAndStatus(testUser.getId(), status, pageable);
     }
