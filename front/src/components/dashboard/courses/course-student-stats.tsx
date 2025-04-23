@@ -21,12 +21,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Pagination } from '@/components/ui/pagination';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
-import { Users, Clock, BarChart2, Activity, Eye } from 'lucide-react';
+import { Users, Clock, BarChart2, Activity } from 'lucide-react';
 import { StudentLearningVO } from '@/types/institution-stats';
 import { Page } from '@/types/api';
 import institutionLearningStatsService from '@/services/institution-learning-stats-service';
 import { formatDuration } from '@/lib/utils';
-import { StudentLearningDetailDialog } from './student-learning-detail-dialog';
 
 interface CourseStudentStatsProps {
   courseId: number;
@@ -40,10 +39,6 @@ export function CourseStudentStats({ courseId }: CourseStudentStatsProps) {
   const [totalPages, setTotalPages] = useState(1);
   const [totalElements, setTotalElements] = useState(0);
   const pageSize = 10;
-
-  // 学生详情对话框状态
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<{id: number, name: string} | null>(null);
 
   // 加载学生学习统计数据
   const loadStudentStats = async (pageNumber: number = 0) => {
@@ -109,17 +104,6 @@ export function CourseStudentStats({ courseId }: CourseStudentStatsProps) {
     setPage(newPage);
   };
 
-  // 打开学生详情对话框
-  const handleViewStudentDetail = (student: StudentLearningVO) => {
-    if (!student || !student.userId) return;
-
-    setSelectedStudent({
-      id: student.userId,
-      name: student.username || '未知用户'
-    });
-    setDetailDialogOpen(true);
-  };
-
   return (
     <Card>
       <CardHeader>
@@ -175,7 +159,6 @@ export function CourseStudentStats({ courseId }: CourseStudentStatsProps) {
                     <TableHead>学习时长</TableHead>
                     <TableHead>活动次数</TableHead>
                     <TableHead>最后学习</TableHead>
-                    <TableHead className="text-right">操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -208,17 +191,6 @@ export function CourseStudentStats({ courseId }: CourseStudentStatsProps) {
                       <TableCell className="text-muted-foreground">
                         {formatLastLearnTime(student?.lastLearnTime || '')}
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewStudentDetail(student)}
-                          className="flex items-center gap-1"
-                        >
-                          <Eye className="h-4 w-4" />
-                          <span>查看详情</span>
-                        </Button>
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -238,17 +210,6 @@ export function CourseStudentStats({ courseId }: CourseStudentStatsProps) {
           </>
         )}
       </CardContent>
-
-      {/* 学生学习详情对话框 */}
-      {selectedStudent && (
-        <StudentLearningDetailDialog
-          open={detailDialogOpen}
-          onOpenChange={setDetailDialogOpen}
-          courseId={courseId}
-          userId={selectedStudent.id}
-          username={selectedStudent.name}
-        />
-      )}
     </Card>
   );
 }
