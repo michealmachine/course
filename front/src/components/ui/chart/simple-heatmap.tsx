@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { format, subDays } from 'date-fns';
 import { LearningHeatmapVO } from '@/types/learning-stats';
+import { formatDuration, formatDurationShort } from '@/lib/utils/format';
 
 interface SimpleHeatmapProps {
   courseId: number;
@@ -20,8 +21,8 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
 export function SimpleHeatmap({
   courseId,
   fetchHeatmapData,
-  title = '学习活动热力图',
-  description = '按星期几和小时分布的学习活动热力图'
+  title = '学习时长热力图',
+  description = '按星期几和小时分布的学习时长热力图'
 }: SimpleHeatmapProps) {
   const [data, setData] = useState<Record<number, Record<number, number>>>({});
   const [maxValue, setMaxValue] = useState(0);
@@ -34,11 +35,11 @@ export function SimpleHeatmap({
     try {
       setLoading(true);
       setError(null);
-      
+
       // 计算日期范围
       const endDate = new Date();
       let startDate;
-      
+
       switch (timeRange) {
         case '7':
           startDate = subDays(endDate, 7);
@@ -55,13 +56,13 @@ export function SimpleHeatmap({
         default:
           startDate = subDays(endDate, 30);
       }
-      
+
       const formattedStartDate = format(startDate, 'yyyy-MM-dd');
       const formattedEndDate = format(endDate, 'yyyy-MM-dd');
-      
+
       // 获取热力图数据
       const response = await fetchHeatmapData(courseId, formattedStartDate, formattedEndDate);
-      
+
       if (response && response.heatmapData) {
         setData(response.heatmapData);
         setMaxValue(response.maxActivityCount || 0);
@@ -88,9 +89,9 @@ export function SimpleHeatmap({
   const getHeatColor = (count: number) => {
     if (count === 0) return 'bg-gray-100';
     if (maxValue === 0) return 'bg-gray-100';
-    
+
     const intensity = Math.min(Math.max(count / maxValue, 0), 1);
-    
+
     if (intensity < 0.2) return 'bg-blue-100';
     if (intensity < 0.4) return 'bg-blue-200';
     if (intensity < 0.6) return 'bg-blue-300';
@@ -144,7 +145,7 @@ export function SimpleHeatmap({
                     {hour}
                   </div>
                 ))}
-                
+
                 {/* 热力图数据 */}
                 {WEEKDAYS.map((day, index) => {
                   const dayIndex = index === 0 ? 7 : index; // 调整周日的索引
@@ -152,14 +153,14 @@ export function SimpleHeatmap({
                     <React.Fragment key={dayIndex}>
                       <div className="text-right pr-2 font-medium text-sm">{day}</div>
                       {HOURS.map((hour) => {
-                        const count = data[dayIndex]?.[hour] || 0;
+                        const duration = data[dayIndex]?.[hour] || 0;
                         return (
                           <div
                             key={`${dayIndex}-${hour}`}
-                            className={`h-6 ${getHeatColor(count)} rounded-sm flex items-center justify-center`}
-                            title={`${day} ${hour}:00 - ${count}次学习活动`}
+                            className={`h-6 ${getHeatColor(duration)} rounded-sm flex items-center justify-center`}
+                            title={`${day} ${hour}:00 - ${formatDuration(duration)}`}
                           >
-                            <span className="text-xs text-gray-700">{count > 0 ? count : ''}</span>
+                            <span className="text-xs text-gray-700">{duration > 0 ? formatDurationShort(duration) : ''}</span>
                           </div>
                         );
                       })}
@@ -168,7 +169,7 @@ export function SimpleHeatmap({
                 })}
               </div>
             </div>
-            
+
             {/* 图例 */}
             <div className="mt-4 flex items-center gap-2">
               <span className="text-sm font-medium">活动频率:</span>

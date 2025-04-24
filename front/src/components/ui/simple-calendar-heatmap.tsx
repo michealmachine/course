@@ -6,9 +6,10 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { formatDuration } from "@/lib/utils/format"
 
 export interface HeatmapData {
-  [date: string]: number; // 日期字符串(YYYY-MM-DD)到活动次数的映射
+  [date: string]: number; // 日期字符串(YYYY-MM-DD)到学习时长(秒)的映射
 }
 
 interface SimpleCalendarHeatmapProps {
@@ -88,7 +89,7 @@ export function SimpleCalendarHeatmap({
             heatClass,
             isSameMonth(date, new Date()) && date.getDate() === new Date().getDate() ? "border border-primary" : ""
           )}
-          title={`${dateStr}: ${count}次学习活动`}
+          title={`${dateStr}: ${formatDuration(count)}`}
         >
           {day}
         </div>

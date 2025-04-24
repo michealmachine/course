@@ -796,7 +796,7 @@ export default function CoursesPage() {
                         <div className="flex items-center gap-4 text-sm">
                           <div className="flex items-center">
                             <Users className="w-4 h-4 mr-1 text-muted-foreground" />
-                            <span>{course.studentCount || stats?.totalLearners || 0} 学习</span>
+                            <span>{course.studentCount || stats?.learnerCount || 0} 学习</span>
                           </div>
                           <div className="flex items-center">
                             <Star className="w-4 h-4 mr-1 text-yellow-500" />
@@ -811,7 +811,7 @@ export default function CoursesPage() {
                           </div>
                           <div className="flex items-center">
                             <Clock className="w-4 h-4 mr-1 text-blue-500" />
-                            <span>{stats ? formatLearningDuration(stats.totalLearningDuration) : '0分钟'}</span>
+                            <span>{stats ? formatLearningDuration(stats.totalDuration) : '0分钟'}</span>
                           </div>
                         </div>
                       </div>
@@ -840,11 +840,11 @@ export default function CoursesPage() {
                     {isExpanded && (
                       <div className="p-4 animate-in slide-in-from-top duration-300">
                         {/* 基础统计数据 */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
                           <Card>
                             <CardContent className="p-4 flex flex-col items-center justify-center">
                               <Users className="h-8 w-8 text-primary mb-2" />
-                              <div className="text-2xl font-bold">{stats?.totalLearners || 0}</div>
+                              <div className="text-2xl font-bold">{course.studentCount || 0}</div>
                               <div className="text-xs text-muted-foreground">学习人数</div>
                             </CardContent>
                           </Card>
@@ -852,16 +852,8 @@ export default function CoursesPage() {
                           <Card>
                             <CardContent className="p-4 flex flex-col items-center justify-center">
                               <Clock className="h-8 w-8 text-primary mb-2" />
-                              <div className="text-2xl font-bold">{formatLearningDuration(stats?.totalLearningDuration || 0)}</div>
+                              <div className="text-2xl font-bold">{formatLearningDuration(stats?.totalDuration || 0)}</div>
                               <div className="text-xs text-muted-foreground">总学习时长</div>
-                            </CardContent>
-                          </Card>
-
-                          <Card>
-                            <CardContent className="p-4 flex flex-col items-center justify-center">
-                              <Activity className="h-8 w-8 text-primary mb-2" />
-                              <div className="text-2xl font-bold">{stats?.totalActivities || 0}</div>
-                              <div className="text-xs text-muted-foreground">学习活动次数</div>
                             </CardContent>
                           </Card>
 

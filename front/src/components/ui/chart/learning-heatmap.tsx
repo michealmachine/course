@@ -14,6 +14,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { LearningHeatmapVO } from '@/types/learning-stats'
+import { formatDuration } from '@/lib/utils/format'
 
 interface LearningHeatmapProps {
   courseId: number
@@ -62,7 +63,7 @@ const transformHeatmapData = (data: LearningHeatmapVO | null) => {
         return {
           x: hour,
           y: value,
-          formattedValue: `${value} 次活动`
+          formattedValue: formatDuration(value)
         };
       })
     }
@@ -72,8 +73,8 @@ const transformHeatmapData = (data: LearningHeatmapVO | null) => {
 export function LearningHeatmap({
   courseId,
   fetchHeatmapData,
-  title = '学习活动热力图',
-  description = '按星期几和小时分布的学习活动热力图'
+  title = '学习时长热力图',
+  description = '按星期几和小时分布的学习时长热力图'
 }: LearningHeatmapProps) {
   const [heatmapData, setHeatmapData] = React.useState<LearningHeatmapVO | null>(null)
   const [loading, setLoading] = React.useState<boolean>(false)
@@ -160,7 +161,7 @@ export function LearningHeatmap({
             <ResponsiveHeatMap
               data={chartData}
               margin={{ top: 20, right: 60, bottom: 60, left: 60 }}
-              valueFormat={(value) => `${value} 次活动`}
+              valueFormat={(value) => formatDuration(value)}
               axisTop={null}
               axisRight={null}
               axisBottom={{

@@ -26,7 +26,8 @@ import {
   TrendingUp
 } from 'lucide-react'
 import { learningService } from '@/services'
-import { formatDuration } from '@/lib/utils'
+import { formatDuration, formatDurationShort } from '@/lib/utils/format'
+import { CustomDurationTooltipContent } from '@/components/ui/chart/custom-tooltip'
 import { DateLearningHeatmapVO, LearningHeatmapVO } from '@/types/learning-stats'
 import { SimpleHeatmap } from '@/components/ui/chart/simple-heatmap'
 import { addDays, format, subDays, eachDayOfInterval, isSameMonth } from 'date-fns'
@@ -175,9 +176,17 @@ export function CourseStatistics({ courseId }: CourseStatisticsProps) {
     // 使用映射中的描述，如果没有则使用原始描述
     const description = activityTypeMap[stat.activityType] || stat.activityTypeDescription;
 
+    // 判断是否需要使用小时作为单位
+    const seconds = stat.totalDurationSeconds;
+    const useHours = seconds >= 3600; // 大于等于1小时时使用小时作为单位
+
     return {
       name: description,
-      value: Math.round(stat.totalDurationSeconds / 60), // 转换为分钟
+      value: useHours
+        ? Math.round((seconds / 3600) * 10) / 10 // 转换为小时，保由1位小数
+        : Math.round(seconds / 60), // 转换为分钟
+      unit: useHours ? '小时' : '分钟',
+      seconds: seconds, // 保存原始秒数，便于提示显示
       count: stat.activityCount,
       activityType: stat.activityType
     };
@@ -257,6 +266,10 @@ export function CourseStatistics({ courseId }: CourseStatisticsProps) {
   // 获取要展示的统计数据(全局统计或课程特定统计)
   const statsData = courseId ? courseStats : statistics;
 
+  // 调试输出
+  console.log('statsData:', statsData);
+  console.log('activityStats:', activityStats);
+
   // 计算总体完成率
   const completionRate = statsData?.totalCourses
     ? Math.round((statsData.completedCourses / statsData.totalCourses) * 100)
@@ -273,9 +286,9 @@ export function CourseStatistics({ courseId }: CourseStatisticsProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatDuration(courseId
-                ? statsData?.learningDuration || 0
-                : statsData?.totalLearningDuration || 0)}
+              {courseId
+                ? formatDuration(statsData?.learningDuration || 0)
+                : formatDuration(activityStats.reduce((sum, stat) => sum + stat.totalDurationSeconds, 0))}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {courseId
@@ -446,7 +459,7 @@ export function CourseStatistics({ courseId }: CourseStatisticsProps) {
                   className="mx-auto aspect-square max-h-[350px]"
                 >
                   <RadarChart data={activityTypeData}>
-                    <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                    <ChartTooltip cursor={false} content={<CustomDurationTooltipContent />} />
                     <PolarAngleAxis dataKey="name" />
                     <PolarGrid />
                     <Radar
@@ -455,6 +468,22 @@ export function CourseStatistics({ courseId }: CourseStatisticsProps) {
                       stroke="var(--color-daily)"
                       fill="var(--color-daily)"
                       fillOpacity={0.6}
+                      label={({ x, y, value, index }) => {
+                        const item = activityTypeData[index];
+                        if (!item || value === 0) return null;
+                        return (
+                          <text
+                            x={x}
+                            y={y}
+                            textAnchor="middle"
+                            fill="#666"
+                            fontSize={12}
+                            dy={-10}
+                          >
+                            {`${value}${item.unit}`}
+                          </text>
+                        );
+                      }}
                     />
                   </RadarChart>
                 </ChartContainer>
@@ -469,7 +498,7 @@ export function CourseStatistics({ courseId }: CourseStatisticsProps) {
             {activityTypeData.length > 0 && (
               <CardFooter className="flex-col gap-2 text-sm">
                 <div className="flex items-center gap-2 font-medium leading-none">
-                  {activityTypeData.sort((a, b) => b.value - a.value)[0]?.name || ""} 活动最多
+                  {activityTypeData.sort((a, b) => b.seconds - a.seconds)[0]?.name || ""} 学习时长最长
                   <TrendingUp className="h-4 w-4" />
                 </div>
                 <div className="flex items-center gap-2 leading-none text-muted-foreground">
@@ -510,7 +539,7 @@ export function CourseStatistics({ courseId }: CourseStatisticsProps) {
                   {/* 图例 */}
                   <div className="flex flex-col items-center gap-4">
                     <div className="flex items-center justify-center gap-2">
-                      <span className="text-sm font-medium">活动频率:</span>
+                      <span className="text-sm font-medium">学习时长:</span>
                       <div className="flex items-center gap-1">
                         <div className="w-4 h-4 bg-muted rounded-sm"></div>
                         <span className="text-xs">无</span>
@@ -529,7 +558,7 @@ export function CourseStatistics({ courseId }: CourseStatisticsProps) {
                       </div>
                     </div>
                     <div className="text-xs text-muted-foreground text-center max-w-md">
-                      注意：此图表展示的是您在一周内不同时间段的学习活动频率，而非特定日期的活动。相同星期的日期将显示相同的活动模式。
+                      注意：此图表展示的是您在一周内不同时间段的学习时长，颜色越深表示学习时间越长。相同星期的日期将显示相同的学习模式。
                     </div>
                   </div>
                 </div>

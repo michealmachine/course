@@ -319,9 +319,9 @@ public class LearningRecordServiceTest {
 
         // 模拟热力图数据
         List<Object[]> heatmapData = new ArrayList<>();
-        heatmapData.add(new Object[]{1, 9, 5}); // 周一9点有5次活动
-        heatmapData.add(new Object[]{2, 14, 3}); // 周二14点有3次活动
-        heatmapData.add(new Object[]{3, 20, 7}); // 周三20点有7次活动
+        heatmapData.add(new Object[]{1, 9, 300}); // 周一9点学习时长300秒
+        heatmapData.add(new Object[]{2, 14, 180}); // 周二14点学习时长180秒
+        heatmapData.add(new Object[]{3, 20, 420}); // 周三20点学习时长420秒
 
         LocalDate startDate = LocalDate.now().minusDays(7);
         LocalDate endDate = LocalDate.now();
@@ -336,20 +336,20 @@ public class LearningRecordServiceTest {
         // 验证结果
         assertNotNull(result);
         assertNull(result.getCourseId()); // 用户总体热力图没有特定课程
-        assertEquals(7, result.getMaxActivityCount()); // 最大活动次数应为7
+        assertEquals(420, result.getMaxActivityCount()); // 最大学习时长应为420秒
 
         // 验证热力图数据
         Map<Integer, Map<Integer, Integer>> heatmap = result.getHeatmapData();
         assertEquals(3, heatmap.size()); // 应有3个工作日的数据
 
         // 验证周一9点的数据
-        assertEquals(5, heatmap.get(1).get(9));
+        assertEquals(300, heatmap.get(1).get(9));
 
         // 验证周二14点的数据
-        assertEquals(3, heatmap.get(2).get(14));
+        assertEquals(180, heatmap.get(2).get(14));
 
         // 验证周三20点的数据
-        assertEquals(7, heatmap.get(3).get(20));
+        assertEquals(420, heatmap.get(3).get(20));
 
         // 验证仓库方法调用
         verify(userRepository).findById(1L);
@@ -365,9 +365,9 @@ public class LearningRecordServiceTest {
 
         // 模拟按日期分组的热力图数据
         List<Object[]> heatmapData = new ArrayList<>();
-        heatmapData.add(new Object[]{"2023-06-01", 5}); // 2023-06-01有5次活动
-        heatmapData.add(new Object[]{"2023-06-02", 3}); // 2023-06-02有3次活动
-        heatmapData.add(new Object[]{"2023-06-03", 7}); // 2023-06-03有7次活动
+        heatmapData.add(new Object[]{"2023-06-01", 300}); // 2023-06-01学习时长300秒
+        heatmapData.add(new Object[]{"2023-06-02", 180}); // 2023-06-02学习时长180秒
+        heatmapData.add(new Object[]{"2023-06-03", 420}); // 2023-06-03学习时长420秒
 
         LocalDate startDate = LocalDate.of(2023, 6, 1);
         LocalDate endDate = LocalDate.of(2023, 6, 3);
@@ -382,16 +382,16 @@ public class LearningRecordServiceTest {
         // 验证结果
         assertNotNull(result);
         assertNull(result.getCourseId()); // 用户总体热力图没有特定课程
-        assertEquals(7, result.getMaxActivityCount()); // 最大活动次数应为7
+        assertEquals(420, result.getMaxActivityCount()); // 最大学习时长应为420秒
 
         // 验证热力图数据
         Map<String, Integer> heatmap = result.getHeatmapData();
         assertEquals(3, heatmap.size()); // 应有3天的数据
 
         // 验证各日期的数据
-        assertEquals(5, heatmap.get("2023-06-01").intValue());
-        assertEquals(3, heatmap.get("2023-06-02").intValue());
-        assertEquals(7, heatmap.get("2023-06-03").intValue());
+        assertEquals(300, heatmap.get("2023-06-01").intValue());
+        assertEquals(180, heatmap.get("2023-06-02").intValue());
+        assertEquals(420, heatmap.get("2023-06-03").intValue());
 
         // 验证仓库方法调用
         verify(userRepository).findById(1L);

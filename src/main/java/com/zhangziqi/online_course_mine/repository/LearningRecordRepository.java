@@ -63,13 +63,14 @@ public interface LearningRecordRepository extends JpaRepository<LearningRecord, 
 
     /**
      * 获取用户学习热力图数据
-     * 按星期几和小时分组统计学习活动次数
+     * 按星期几和小时分组统计学习时长（秒）
      */
     @Query("SELECT FUNCTION('DAYOFWEEK', lr.activityStartTime) as weekday, " +
-           "HOUR(lr.activityStartTime) as hour, COUNT(lr.id) as count " +
+           "HOUR(lr.activityStartTime) as hour, SUM(lr.durationSeconds) as duration " +
            "FROM LearningRecord lr " +
            "WHERE lr.user.id = :userId " +
            "AND lr.activityStartTime BETWEEN :startDate AND :endDate " +
+           "AND lr.durationSeconds IS NOT NULL " +
            "GROUP BY FUNCTION('DAYOFWEEK', lr.activityStartTime), HOUR(lr.activityStartTime)")
     List<Object[]> findLearningHeatmapDataByUser(
             @Param("userId") Long userId,
@@ -78,12 +79,14 @@ public interface LearningRecordRepository extends JpaRepository<LearningRecord, 
 
     /**
      * 获取用户按日期分组的学习热力图数据
+     * 返回日期和学习时长（秒）
      */
     @Query("SELECT FUNCTION('DATE_FORMAT', lr.activityStartTime, '%Y-%m-%d') as date, " +
-           "COUNT(lr.id) as count " +
+           "SUM(lr.durationSeconds) as duration " +
            "FROM LearningRecord lr " +
            "WHERE lr.user.id = :userId " +
            "AND lr.activityStartTime BETWEEN :startDate AND :endDate " +
+           "AND lr.durationSeconds IS NOT NULL " +
            "GROUP BY FUNCTION('DATE_FORMAT', lr.activityStartTime, '%Y-%m-%d')")
     List<Object[]> findLearningHeatmapDataByUserGroupByDate(
             @Param("userId") Long userId,
@@ -408,15 +411,16 @@ public interface LearningRecordRepository extends JpaRepository<LearningRecord, 
 
     /**
      * 获取课程学习活动热力图数据
-     * 按星期几和小时分组统计学习活动次数
+     * 按星期几和小时分组统计学习时长（秒）
      */
     @Query("SELECT FUNCTION('DAYOFWEEK', lr.activityStartTime) as weekday, " +
-           "HOUR(lr.activityStartTime) as hour, COUNT(lr.id) as count " +
+           "HOUR(lr.activityStartTime) as hour, SUM(lr.durationSeconds) as duration " +
            "FROM LearningRecord lr " +
            "JOIN UserCourse uc ON lr.user.id = uc.user.id AND lr.course.id = uc.course.id " +
            "WHERE lr.course.id = :courseId " +
            "AND uc.status = 0 " + // 0 = NORMAL，只计算正常状态的课程
            "AND lr.activityStartTime BETWEEN :startDate AND :endDate " +
+           "AND lr.durationSeconds IS NOT NULL " +
            "GROUP BY FUNCTION('DAYOFWEEK', lr.activityStartTime), HOUR(lr.activityStartTime)")
     List<Object[]> findLearningHeatmapDataByCourse(
             @Param("courseId") Long courseId,
@@ -425,16 +429,17 @@ public interface LearningRecordRepository extends JpaRepository<LearningRecord, 
 
     /**
      * 获取特定用户在特定课程的学习热力图数据
-     * 按星期几和小时分组统计学习活动次数
+     * 按星期几和小时分组统计学习时长（秒）
      */
     @Query("SELECT FUNCTION('DAYOFWEEK', lr.activityStartTime) as weekday, " +
-           "HOUR(lr.activityStartTime) as hour, COUNT(lr.id) as count " +
+           "HOUR(lr.activityStartTime) as hour, SUM(lr.durationSeconds) as duration " +
            "FROM LearningRecord lr " +
            "JOIN UserCourse uc ON lr.user.id = uc.user.id AND lr.course.id = uc.course.id " +
            "WHERE lr.user.id = :userId " +
            "AND lr.course.id = :courseId " +
            "AND uc.status = 0 " + // 0 = NORMAL，只计算正常状态的课程
            "AND lr.activityStartTime BETWEEN :startDate AND :endDate " +
+           "AND lr.durationSeconds IS NOT NULL " +
            "GROUP BY FUNCTION('DAYOFWEEK', lr.activityStartTime), HOUR(lr.activityStartTime)")
     List<Object[]> findLearningHeatmapDataByUserAndCourse(
             @Param("userId") Long userId,

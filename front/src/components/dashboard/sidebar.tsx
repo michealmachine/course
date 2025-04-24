@@ -54,6 +54,7 @@ const menuItems: MenuItem[] = [
     title: '我的收藏',
     href: '/dashboard/favorites',
     icon: <Heart className="w-5 h-5" />,
+    roles: [UserRole.USER],
   },
   {
     title: '我的订单',
@@ -64,6 +65,7 @@ const menuItems: MenuItem[] = [
     title: '课程搜索',
     href: '/dashboard/course-search',
     icon: <Search className="w-5 h-5" />,
+    roles: [UserRole.USER],
   },
   {
     title: '我的课程',
@@ -167,21 +169,21 @@ export default function Sidebar() {
     (item) => {
       // 如果菜单项没有角色限制，所有人可见
       if (!item.roles) return true;
-      
+
       // 如果用户不存在或没有角色信息，不显示
       if (!user || !user.roles || user.roles.length === 0) return false;
-      
+
       // 检查用户角色数组中是否有菜单要求的角色
-      return item.roles.some(requiredRole => 
+      return item.roles.some(requiredRole =>
         user.roles.some(userRole => {
           // 从角色代码中提取角色名，考虑多种可能的格式
           const userRoleCode = userRole.code || '';
           const roleName = userRoleCode.replace('ROLE_', '').toUpperCase();
           const requiredRoleUpper = requiredRole.toUpperCase();
-          
+
           // 输出调试信息
           console.log(`检查角色: 需要 ${requiredRoleUpper}, 用户有 ${roleName} (原始: ${userRoleCode})`);
-          
+
           // 比较角色是否匹配（忽略大小写，去除前缀）
           return roleName === requiredRoleUpper;
         })
@@ -258,4 +260,4 @@ export default function Sidebar() {
       </aside>
     </>
   );
-} 
+}

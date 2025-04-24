@@ -7,6 +7,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Button } from '@/components/ui/button';
 import { LearningHeatmapVO } from '@/types/learning-stats';
 import { format, subDays } from 'date-fns';
+import { formatDuration, formatDurationShort } from '@/lib/utils/format';
 
 interface LearningHeatmapProps {
   courseId: number;
@@ -21,8 +22,8 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const LearningHeatmap: React.FC<LearningHeatmapProps> = ({
   courseId,
   fetchHeatmapData,
-  title = '学习活动热力图',
-  description = '按星期几和小时分布的学习活动热力图'
+  title = '学习时长热力图',
+  description = '按星期几和小时分布的学习时长热力图'
 }) => {
   const [heatmapData, setHeatmapData] = useState<LearningHeatmapVO | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -35,7 +36,7 @@ const LearningHeatmap: React.FC<LearningHeatmapProps> = ({
       setLoading(true);
       const formattedStartDate = format(startDate, 'yyyy-MM-dd');
       const formattedEndDate = format(endDate, 'yyyy-MM-dd');
-      
+
       const data = await fetchHeatmapData(courseId, formattedStartDate, formattedEndDate);
       setHeatmapData(data);
     } catch (error) {
@@ -53,7 +54,7 @@ const LearningHeatmap: React.FC<LearningHeatmapProps> = ({
     setTimeRange(value);
     const end = new Date();
     let start;
-    
+
     switch (value) {
       case '7':
         start = subDays(end, 7);
@@ -70,7 +71,7 @@ const LearningHeatmap: React.FC<LearningHeatmapProps> = ({
       default:
         start = subDays(end, 30);
     }
-    
+
     setStartDate(start);
     setEndDate(end);
   };
@@ -80,11 +81,11 @@ const LearningHeatmap: React.FC<LearningHeatmapProps> = ({
   };
 
   // 计算热度颜色
-  const getHeatColor = (count: number, maxCount: number) => {
-    if (count === 0) return 'bg-gray-100';
-    
-    const intensity = Math.min(Math.max(count / maxCount, 0), 1);
-    
+  const getHeatColor = (duration: number, maxDuration: number) => {
+    if (duration === 0) return 'bg-gray-100';
+
+    const intensity = Math.min(Math.max(duration / maxDuration, 0), 1);
+
     if (intensity < 0.2) return 'bg-blue-100';
     if (intensity < 0.4) return 'bg-blue-200';
     if (intensity < 0.6) return 'bg-blue-300';
@@ -141,7 +142,7 @@ const LearningHeatmap: React.FC<LearningHeatmapProps> = ({
                     {hour}
                   </div>
                 ))}
-                
+
                 {/* 热力图数据 */}
                 {WEEKDAYS.map((day, index) => {
                   const dayIndex = index === 0 ? 7 : index; // 调整周日的索引
@@ -149,14 +150,14 @@ const LearningHeatmap: React.FC<LearningHeatmapProps> = ({
                     <React.Fragment key={dayIndex}>
                       <div className="text-right pr-2 font-medium text-sm">{day}</div>
                       {HOURS.map((hour) => {
-                        const count = heatmapData.heatmapData[dayIndex]?.[hour] || 0;
+                        const duration = heatmapData.heatmapData[dayIndex]?.[hour] || 0;
                         return (
                           <div
                             key={`${dayIndex}-${hour}`}
-                            className={`h-6 ${getHeatColor(count, heatmapData.maxActivityCount)} rounded-sm flex items-center justify-center`}
-                            title={`${day} ${hour}:00 - ${count}个活动`}
+                            className={`h-6 ${getHeatColor(duration, heatmapData.maxActivityCount)} rounded-sm flex items-center justify-center`}
+                            title={`${day} ${hour}:00 - ${formatDuration(duration)}`}
                           >
-                            <span className="text-xs text-gray-700">{count > 0 ? count : ''}</span>
+                            <span className="text-xs text-gray-700">{duration > 0 ? formatDurationShort(duration) : ''}</span>
                           </div>
                         );
                       })}
@@ -165,13 +166,13 @@ const LearningHeatmap: React.FC<LearningHeatmapProps> = ({
                 })}
               </div>
             </div>
-            
+
             {/* 图例 */}
             <div className="mt-4 flex items-center gap-2">
-              <span className="text-sm font-medium">活动次数:</span>
+              <span className="text-sm font-medium">学习时长:</span>
               <div className="flex items-center gap-1">
                 <div className="w-4 h-4 bg-gray-100 rounded-sm"></div>
-                <span className="text-xs">0</span>
+                <span className="text-xs">0分钟</span>
               </div>
               <div className="flex items-center gap-1">
                 <div className="w-4 h-4 bg-blue-100 rounded-sm"></div>

@@ -570,9 +570,9 @@ public class InstitutionLearningStatisticsServiceTest {
 
         // 模拟热力图数据
         List<Object[]> heatmapData = new ArrayList<>();
-        heatmapData.add(new Object[]{1, 9, 5}); // 周一，9点，5个活动
-        heatmapData.add(new Object[]{2, 14, 8}); // 周二，14点，8个活动
-        heatmapData.add(new Object[]{3, 18, 12}); // 周三，18点，12个活动
+        heatmapData.add(new Object[]{1, 9, 300}); // 周一，9点，300秒学习时长
+        heatmapData.add(new Object[]{2, 14, 480}); // 周二，14点，480秒学习时长
+        heatmapData.add(new Object[]{3, 18, 720}); // 周三，18点，720秒学习时长
 
         when(learningRecordRepository.findLearningHeatmapDataByCourse(
                 eq(1L), any(LocalDateTime.class), any(LocalDateTime.class)))
@@ -586,7 +586,7 @@ public class InstitutionLearningStatisticsServiceTest {
         // 验证结果
         assertNotNull(result);
         assertEquals(1L, result.getCourseId());
-        assertEquals(12, result.getMaxActivityCount()); // 最大值应该是12
+        assertEquals(720, result.getMaxActivityCount()); // 最大学习时长应该是720秒
 
         // 验证热力图数据
         Map<Integer, Map<Integer, Integer>> resultData = result.getHeatmapData();
@@ -596,15 +596,15 @@ public class InstitutionLearningStatisticsServiceTest {
         // 检查特定条目
         assertTrue(resultData.containsKey(1));
         assertTrue(resultData.get(1).containsKey(9));
-        assertEquals(5, resultData.get(1).get(9));
+        assertEquals(300, resultData.get(1).get(9));
 
         assertTrue(resultData.containsKey(2));
         assertTrue(resultData.get(2).containsKey(14));
-        assertEquals(8, resultData.get(2).get(14));
+        assertEquals(480, resultData.get(2).get(14));
 
         assertTrue(resultData.containsKey(3));
         assertTrue(resultData.get(3).containsKey(18));
-        assertEquals(12, resultData.get(3).get(18));
+        assertEquals(720, resultData.get(3).get(18));
     }
 
     @Test
@@ -661,9 +661,9 @@ public class InstitutionLearningStatisticsServiceTest {
 
         // 模拟热力图数据
         List<Object[]> heatmapData = new ArrayList<>();
-        heatmapData.add(new Object[]{1, 9, 3}); // 周一，9点，3个活动
-        heatmapData.add(new Object[]{2, 14, 5}); // 周二，14点，5个活动
-        heatmapData.add(new Object[]{3, 18, 7}); // 周三，18点，7个活动
+        heatmapData.add(new Object[]{1, 9, 180}); // 周一，9点，180秒学习时长
+        heatmapData.add(new Object[]{2, 14, 300}); // 周二，14点，300秒学习时长
+        heatmapData.add(new Object[]{3, 18, 420}); // 周三，18点，420秒学习时长
 
         when(learningRecordRepository.findLearningHeatmapDataByUserAndCourse(
                 eq(1L), eq(1L), any(LocalDateTime.class), any(LocalDateTime.class)))
@@ -677,7 +677,7 @@ public class InstitutionLearningStatisticsServiceTest {
         // 验证结果
         assertNotNull(result);
         assertEquals(1L, result.getCourseId());
-        assertEquals(7, result.getMaxActivityCount()); // 最大值应该是7
+        assertEquals(420, result.getMaxActivityCount()); // 最大学习时长应该是420秒
 
         // 验证热力图数据
         Map<Integer, Map<Integer, Integer>> resultData = result.getHeatmapData();
@@ -687,15 +687,15 @@ public class InstitutionLearningStatisticsServiceTest {
         // 检查特定条目
         assertTrue(resultData.containsKey(1));
         assertTrue(resultData.get(1).containsKey(9));
-        assertEquals(3, resultData.get(1).get(9));
+        assertEquals(180, resultData.get(1).get(9));
 
         assertTrue(resultData.containsKey(2));
         assertTrue(resultData.get(2).containsKey(14));
-        assertEquals(5, resultData.get(2).get(14));
+        assertEquals(300, resultData.get(2).get(14));
 
         assertTrue(resultData.containsKey(3));
         assertTrue(resultData.get(3).containsKey(18));
-        assertEquals(7, resultData.get(3).get(18));
+        assertEquals(420, resultData.get(3).get(18));
     }
 
     @Test

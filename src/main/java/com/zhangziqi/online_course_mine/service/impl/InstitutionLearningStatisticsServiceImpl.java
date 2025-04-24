@@ -648,27 +648,27 @@ public class InstitutionLearningStatisticsServiceImpl implements InstitutionLear
 
         // 处理查询结果
         Map<Integer, Map<Integer, Integer>> heatmapData = new HashMap<>();
-        int maxCount = 0;
+        int maxDuration = 0;
 
         for (Object[] result : results) {
             int weekday = ((Number) result[0]).intValue();
             int hour = ((Number) result[1]).intValue();
-            int count = ((Number) result[2]).intValue();
+            int duration = result[2] != null ? ((Number) result[2]).intValue() : 0;
 
-            // 更新最大活动次数
-            if (count > maxCount) {
-                maxCount = count;
+            // 更新最大学习时长
+            if (duration > maxDuration) {
+                maxDuration = duration;
             }
 
             // 更新热力图数据
             heatmapData.computeIfAbsent(weekday, k -> new HashMap<>())
-                    .put(hour, count);
+                    .put(hour, duration);
         }
 
         return LearningHeatmapVO.builder()
                 .courseId(courseId)
                 .heatmapData(heatmapData)
-                .maxActivityCount(maxCount)
+                .maxActivityCount(maxDuration) // 字段名保持不变，但实际存储的是最大学习时长
                 .build();
     }
 
@@ -749,27 +749,27 @@ public class InstitutionLearningStatisticsServiceImpl implements InstitutionLear
 
         // 处理查询结果
         Map<Integer, Map<Integer, Integer>> heatmapData = new HashMap<>();
-        int maxCount = 0;
+        int maxDuration = 0;
 
         for (Object[] result : results) {
             int weekday = ((Number) result[0]).intValue();
             int hour = ((Number) result[1]).intValue();
-            int count = ((Number) result[2]).intValue();
+            int duration = result[2] != null ? ((Number) result[2]).intValue() : 0;
 
-            // 更新最大活动次数
-            if (count > maxCount) {
-                maxCount = count;
+            // 更新最大学习时长
+            if (duration > maxDuration) {
+                maxDuration = duration;
             }
 
             // 更新热力图数据
             heatmapData.computeIfAbsent(weekday, k -> new HashMap<>())
-                    .put(hour, count);
+                    .put(hour, duration);
         }
 
         LearningHeatmapVO heatmapVO = LearningHeatmapVO.builder()
                 .courseId(courseId)
                 .heatmapData(heatmapData)
-                .maxActivityCount(maxCount)
+                .maxActivityCount(maxDuration) // 字段名保持不变，但实际存储的是最大学习时长
                 .build();
         // 注意：LearningHeatmapVO类中没有userId字段，所以不能设置
         return heatmapVO;

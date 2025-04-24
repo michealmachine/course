@@ -14,15 +14,15 @@ export interface LearningHeatmapVO {
 
   /**
    * 热力图数据
-   * 外层Map: 星期几(1-7) -> 内层Map: 小时(0-23) -> 活动次数
+   * 外层Map: 星期几(1-7) -> 内层Map: 小时(0-23) -> 学习时长(秒)
    */
   heatmapData: Record<number, Record<number, number>>;
 
   /**
-   * 最大活动次数
+   * 最大学习时长(秒)
    * 用于前端计算热度颜色
    */
-  maxActivityCount: number;
+  maxActivityCount: number; // 字段名保持不变，但实际存储的是最大学习时长
 }
 
 /**
@@ -37,17 +37,17 @@ export interface DateLearningHeatmapVO {
 
   /**
    * 热力图数据
-   * 按日期分组的学习活动统计
+   * 按日期分组的学习时长统计
    * 键: 日期字符串 (yyyy-MM-dd格式)
-   * 值: 该日期的活动次数
+   * 值: 该日期的学习时长(秒)
    */
   heatmapData: Record<string, number>;
 
   /**
-   * 最大活动次数
+   * 最大学习时长(秒)
    * 用于前端计算热度颜色
    */
-  maxActivityCount: number;
+  maxActivityCount: number; // 字段名保持不变，但实际存储的是最大学习时长
 }
 
 /**
