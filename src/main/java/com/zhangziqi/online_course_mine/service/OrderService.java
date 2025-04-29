@@ -3,7 +3,7 @@ package com.zhangziqi.online_course_mine.service;
 import com.zhangziqi.online_course_mine.model.dto.order.OrderCreateDTO;
 import com.zhangziqi.online_course_mine.model.dto.order.OrderRefundDTO;
 import com.zhangziqi.online_course_mine.model.dto.order.OrderSearchDTO;
-import com.zhangziqi.online_course_mine.model.vo.OrderVO;
+import com.zhangziqi.online_course_mine.model.vo.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -57,7 +57,7 @@ public interface OrderService {
      * @return 订单VO
      */
     OrderVO getOrderById(Long id);
-    
+
     /**
      * 取消订单
      *
@@ -66,7 +66,7 @@ public interface OrderService {
      * @return 取消后的订单VO
      */
     OrderVO cancelOrder(Long id, Long userId);
-    
+
     /**
      * 申请退款
      *
@@ -76,7 +76,7 @@ public interface OrderService {
      * @return 更新后的订单VO
      */
     OrderVO refundOrder(Long id, OrderRefundDTO dto, Long userId);
-    
+
     /**
      * 处理退款（机构管理员或平台管理员）
      *
@@ -86,7 +86,7 @@ public interface OrderService {
      * @return 更新后的订单VO
      */
     OrderVO processRefund(Long id, boolean approved, Long operatorId);
-    
+
     /**
      * 统计机构总收入（不含退款）
      *
@@ -94,7 +94,7 @@ public interface OrderService {
      * @return 总收入金额
      */
     BigDecimal calculateInstitutionTotalIncome(Long institutionId);
-    
+
     /**
      * 统计机构总退款
      *
@@ -102,7 +102,7 @@ public interface OrderService {
      * @return 总退款金额
      */
     BigDecimal calculateInstitutionTotalRefund(Long institutionId);
-    
+
     /**
      * 获取机构净收入
      *
@@ -110,7 +110,7 @@ public interface OrderService {
      * @return 净收入金额（总收入-总退款）
      */
     BigDecimal calculateInstitutionNetIncome(Long institutionId);
-    
+
     /**
      * 统计指定时间范围内的机构收入
      *
@@ -120,7 +120,7 @@ public interface OrderService {
      * @return 时间范围内的收入金额
      */
     BigDecimal calculateInstitutionTotalIncome(Long institutionId, LocalDateTime startTime, LocalDateTime endTime);
-    
+
     /**
      * 统计指定时间范围内的机构退款
      *
@@ -130,7 +130,7 @@ public interface OrderService {
      * @return 时间范围内的退款金额
      */
     BigDecimal calculateInstitutionTotalRefund(Long institutionId, LocalDateTime startTime, LocalDateTime endTime);
-    
+
     /**
      * 获取指定时间范围内的机构净收入
      *
@@ -140,7 +140,7 @@ public interface OrderService {
      * @return 时间范围内的净收入金额
      */
     BigDecimal calculateInstitutionNetIncome(Long institutionId, LocalDateTime startTime, LocalDateTime endTime);
-    
+
     /**
      * 获取当日机构收入
      *
@@ -148,7 +148,7 @@ public interface OrderService {
      * @return 当日收入金额
      */
     BigDecimal calculateInstitutionDailyIncome(Long institutionId);
-    
+
     /**
      * 获取当日机构退款
      *
@@ -156,7 +156,7 @@ public interface OrderService {
      * @return 当日退款金额
      */
     BigDecimal calculateInstitutionDailyRefund(Long institutionId);
-    
+
     /**
      * 获取当日机构净收入
      *
@@ -164,7 +164,7 @@ public interface OrderService {
      * @return 当日净收入金额
      */
     BigDecimal calculateInstitutionDailyNetIncome(Long institutionId);
-    
+
     /**
      * 获取本周机构收入
      *
@@ -172,7 +172,7 @@ public interface OrderService {
      * @return 本周收入金额
      */
     BigDecimal calculateInstitutionWeeklyIncome(Long institutionId);
-    
+
     /**
      * 获取本周机构退款
      *
@@ -180,7 +180,7 @@ public interface OrderService {
      * @return 本周退款金额
      */
     BigDecimal calculateInstitutionWeeklyRefund(Long institutionId);
-    
+
     /**
      * 获取本周机构净收入
      *
@@ -188,7 +188,7 @@ public interface OrderService {
      * @return 本周净收入金额
      */
     BigDecimal calculateInstitutionWeeklyNetIncome(Long institutionId);
-    
+
     /**
      * 获取本月机构收入
      *
@@ -196,7 +196,7 @@ public interface OrderService {
      * @return 本月收入金额
      */
     BigDecimal calculateInstitutionMonthlyIncome(Long institutionId);
-    
+
     /**
      * 获取本月机构退款
      *
@@ -204,7 +204,7 @@ public interface OrderService {
      * @return 本月退款金额
      */
     BigDecimal calculateInstitutionMonthlyRefund(Long institutionId);
-    
+
     /**
      * 获取本月机构净收入
      *
@@ -212,7 +212,7 @@ public interface OrderService {
      * @return 本月净收入金额
      */
     BigDecimal calculateInstitutionMonthlyNetIncome(Long institutionId);
-    
+
     /**
      * 执行支付宝退款
      *
@@ -222,7 +222,7 @@ public interface OrderService {
      * @return 退款结果，true表示成功，false表示失败
      */
     boolean executeAlipayRefund(String orderNo, BigDecimal refundAmount, String refundReason);
-    
+
     /**
      * 处理支付成功回调
      *
@@ -238,7 +238,7 @@ public interface OrderService {
      * @return 分页订单VO
      */
     Page<OrderVO> searchUserOrders(OrderSearchDTO searchDTO, Long userId);
-    
+
     /**
      * 根据搜索条件查询机构订单
      *
@@ -247,7 +247,7 @@ public interface OrderService {
      * @return 分页订单VO
      */
     Page<OrderVO> searchInstitutionOrders(OrderSearchDTO searchDTO, Long institutionId);
-    
+
     /**
      * 根据搜索条件查询所有订单（管理员）
      *
@@ -255,7 +255,7 @@ public interface OrderService {
      * @return 分页订单VO
      */
     Page<OrderVO> searchAllOrders(OrderSearchDTO searchDTO);
-    
+
     /**
      * 获取机构待处理退款申请
      *
@@ -263,7 +263,7 @@ public interface OrderService {
      * @return 待处理退款申请列表
      */
     List<OrderVO> getInstitutionPendingRefunds(Long institutionId);
-    
+
     /**
      * 生成支付表单
      *
@@ -271,4 +271,64 @@ public interface OrderService {
      * @return 支付表单HTML字符串
      */
     String generatePaymentForm(String orderNo);
+
+    /**
+     * 获取机构收入趋势
+     *
+     * @param institutionId 机构ID
+     * @param timeRange 时间范围（7d, 30d, 90d）
+     * @param groupBy 分组方式（day, week, month）
+     * @return 收入趋势数据列表
+     */
+    List<IncomeTrendVO> getInstitutionIncomeTrend(Long institutionId, String timeRange, String groupBy);
+
+    /**
+     * 获取机构订单状态分布
+     *
+     * @param institutionId 机构ID
+     * @return 订单状态分布数据列表
+     */
+    List<OrderStatusDistributionVO> getInstitutionOrderStatusDistribution(Long institutionId);
+
+    /**
+     * 获取机构课程收入排行
+     *
+     * @param institutionId 机构ID
+     * @param limit 返回数量限制
+     * @return 课程收入排行数据列表
+     */
+    List<CourseIncomeRankingVO> getInstitutionCourseIncomeRanking(Long institutionId, int limit);
+
+    /**
+     * 获取平台收入趋势
+     *
+     * @param timeRange 时间范围（7d, 30d, 90d）
+     * @param groupBy 分组方式（day, week, month）
+     * @return 收入趋势数据列表
+     */
+    List<IncomeTrendVO> getPlatformIncomeTrend(String timeRange, String groupBy);
+
+    /**
+     * 获取平台订单状态分布
+     *
+     * @return 订单状态分布数据列表
+     */
+    List<OrderStatusDistributionVO> getPlatformOrderStatusDistribution();
+
+    /**
+     * 获取平台课程收入排行
+     *
+     * @param limit 返回数量限制
+     * @return 课程收入排行数据列表（包含机构信息）
+     */
+    List<AdminCourseIncomeRankingVO> getPlatformCourseIncomeRanking(int limit);
+
+    /**
+     * 获取平台收入统计
+     *
+     * @param startDate 开始日期（可选）
+     * @param endDate 结束日期（可选）
+     * @return 平台收入统计数据
+     */
+    PlatformIncomeStatsVO getPlatformIncomeStats(LocalDateTime startDate, LocalDateTime endDate);
 }
