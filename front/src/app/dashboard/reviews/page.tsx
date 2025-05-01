@@ -3,26 +3,27 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { CourseStatus } from '@/types/course';
-import { 
-  Table, 
-  TableBody, 
-  TableCaption, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { 
-  CheckCircle, 
-  Clock, 
-  FileText, 
-  Loader2, 
-  Search, 
-  Building, 
+import {
+  CheckCircle,
+  Clock,
+  FileText,
+  Loader2,
+  Search,
+  Building,
   PlusCircle,
   Filter,
-  Eye
+  Eye,
+  History
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -41,21 +42,24 @@ import {
 } from '@/components/ui/select';
 import { formatDate } from '@/utils/date';
 import reviewService from '@/services/review-service';
-import { 
-  Pagination, 
-  PaginationContent, 
-  PaginationItem, 
-  PaginationLink, 
-  PaginationNext, 
-  PaginationPrevious 
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious
 } from '@/components/ui/pagination';
 import { ReviewPagination } from '@/components/ui/review-pagination';
 import { toast } from 'sonner';
 import { CoursePreviewDialog } from '@/components/dashboard/reviews/course-preview-dialog';
+import ReviewHistoryTable from '@/components/dashboard/review-history/review-history-table';
+import { ReviewType } from '@/types/review-record';
+import { useAuthStore } from '@/stores/auth-store';
 
 export default function ReviewsPage() {
   const router = useRouter();
-  
+
   const [activeTab, setActiveTab] = useState<string>('pending');
   const [courses, setCourses] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -65,17 +69,17 @@ export default function ReviewsPage() {
   const [totalPages, setTotalPages] = useState<number>(0);
   const [totalItems, setTotalItems] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(10);
-  
+
   // 预览对话框状态
   const [showPreviewDialog, setShowPreviewDialog] = useState<boolean>(false);
   const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
-  
+
   // 加载待审核任务
   const loadCourses = async () => {
     try {
       setIsLoading(true);
       setError(null);
-      
+
       let response;
       if (activeTab === 'pending') {
         // 加载待审核课程
@@ -84,7 +88,7 @@ export default function ReviewsPage() {
         // 加载正在审核中的课程
         response = await reviewService.getReviewingCourses(currentPage, pageSize);
       }
-      
+
       setCourses(response.content);
       setTotalPages(response.totalPages);
       setTotalItems(response.totalElements);
@@ -95,12 +99,12 @@ export default function ReviewsPage() {
       setIsLoading(false);
     }
   };
-  
+
   // 根据当前选项卡加载数据
   useEffect(() => {
     loadCourses();
   }, [activeTab, currentPage, pageSize, keyword]);
-  
+
   // 处理开始审核操作
   const handleStartReview = async (courseId: number) => {
     try {
@@ -114,19 +118,19 @@ export default function ReviewsPage() {
       });
     }
   };
-  
+
   // 处理继续审核操作
   const handleContinueReview = (courseId: number) => {
     // 跳转到全屏预览页面，而不是显示对话框
     router.push(`/dashboard/reviews/${courseId}/preview`);
   };
-  
+
   // 审核完成后刷新数据
   const handleReviewComplete = () => {
     loadCourses();
     toast.success('审核操作已完成');
   };
-  
+
   // 渲染审核状态标签
   const renderStatusBadge = (status: number) => {
     switch (status) {
@@ -142,18 +146,19 @@ export default function ReviewsPage() {
         return <Badge variant="outline">未知</Badge>;
     }
   };
-  
+
   return (
     <div className="container py-6">
       <h1 className="text-3xl font-bold tracking-tight mb-6">内容审核</h1>
-      
+
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex justify-between items-center mb-4">
           <TabsList>
             <TabsTrigger value="pending">待审核课程</TabsTrigger>
             <TabsTrigger value="reviewing">审核中课程</TabsTrigger>
+            <TabsTrigger value="history">审核历史</TabsTrigger>
           </TabsList>
-          
+
           <div className="flex gap-2">
             <Input
               placeholder="搜索课程..."
@@ -161,7 +166,7 @@ export default function ReviewsPage() {
               onChange={(e) => setKeyword(e.target.value)}
               className="w-64"
             />
-            
+
             <Select value={pageSize.toString()} onValueChange={(value) => setPageSize(Number(value))}>
               <SelectTrigger className="w-[120px]">
                 <SelectValue placeholder="每页显示" />
@@ -175,7 +180,7 @@ export default function ReviewsPage() {
             </Select>
           </div>
         </div>
-        
+
         <TabsContent value="pending">
           {isLoading ? (
             <div className="flex justify-center items-center py-12">
@@ -213,9 +218,9 @@ export default function ReviewsPage() {
                       <TableCell>{renderStatusBadge(course.status)}</TableCell>
                       <TableCell>{course.submittedAt ? formatDate(course.submittedAt) : '未知'}</TableCell>
                       <TableCell className="text-right">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleStartReview(course.id)}
                           className="gap-1"
                         >
@@ -227,20 +232,20 @@ export default function ReviewsPage() {
                   ))}
                 </TableBody>
               </Table>
-              
+
               {totalPages > 1 && (
                 <div className="mt-4 flex justify-center">
-                  <ReviewPagination 
-                    currentPage={currentPage} 
-                    totalPages={totalPages} 
-                    onPageChange={setCurrentPage} 
+                  <ReviewPagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
                   />
                 </div>
               )}
             </>
           )}
         </TabsContent>
-        
+
         <TabsContent value="reviewing">
           {isLoading ? (
             <div className="flex justify-center items-center py-12">
@@ -278,9 +283,9 @@ export default function ReviewsPage() {
                       <TableCell>{renderStatusBadge(course.status)}</TableCell>
                       <TableCell>{course.reviewStartedAt ? formatDate(course.reviewStartedAt) : '未知'}</TableCell>
                       <TableCell className="text-right">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleContinueReview(course.id)}
                           className="gap-1"
                         >
@@ -292,24 +297,38 @@ export default function ReviewsPage() {
                   ))}
                 </TableBody>
               </Table>
-              
+
               {totalPages > 1 && (
                 <div className="mt-4 flex justify-center">
-                  <ReviewPagination 
-                    currentPage={currentPage} 
-                    totalPages={totalPages} 
-                    onPageChange={setCurrentPage} 
+                  <ReviewPagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
                   />
                 </div>
               )}
             </>
           )}
         </TabsContent>
+
+        <TabsContent value="history">
+          <div className="mb-4">
+            <h2 className="text-xl font-semibold mb-2">审核历史记录</h2>
+            <p className="text-muted-foreground">
+              查看所有课程的审核历史记录
+            </p>
+          </div>
+
+          <ReviewHistoryTable
+            isAdmin={useAuthStore.getState().user?.roles?.some(role => role.code === 'ROLE_ADMIN')}
+            reviewType={ReviewType.COURSE}
+          />
+        </TabsContent>
       </Tabs>
-      
+
       {/* 课程预览与审核对话框 */}
       {selectedCourseId && (
-        <CoursePreviewDialog 
+        <CoursePreviewDialog
           open={showPreviewDialog}
           onOpenChange={setShowPreviewDialog}
           courseId={selectedCourseId}
@@ -318,4 +337,4 @@ export default function ReviewsPage() {
       )}
     </div>
   );
-} 
+}

@@ -56,12 +56,15 @@ class InstitutionServiceTest {
 
     @Mock
     private EmailService emailService;
-    
+
     @Mock
     private StorageQuotaService storageQuotaService;
 
     @Mock
     private MinioService minioService;
+
+    @Mock
+    private ReviewRecordService reviewRecordService;
 
     @InjectMocks
     private InstitutionServiceImpl institutionService;
@@ -80,7 +83,8 @@ class InstitutionServiceTest {
                 userRepository,
                 emailService,
                 storageQuotaService,
-                minioService
+                minioService,
+                reviewRecordService
         );
 
         // 设置申请DTO
@@ -233,7 +237,7 @@ class InstitutionServiceTest {
         assertNotNull(result);
         assertEquals(institution.getId(), result.getId());
         assertEquals(institution.getName(), result.getName());
-        
+
         // 验证存储配额初始化
         verify(storageQuotaService, times(1)).setQuota(
                 eq(institution.getId()),
@@ -253,7 +257,7 @@ class InstitutionServiceTest {
                 eq(10L * 1024 * 1024 * 1024),
                 isNull()
         );
-        
+
         verify(emailService, times(1)).sendApplicationApprovedEmail(anyString(), anyString(), anyString());
     }
 
@@ -326,7 +330,7 @@ class InstitutionServiceTest {
 
         // Act & Assert
         assertThrows(RuntimeException.class, () -> institutionService.approveApplication(1L, "admin"));
-        
+
         // 验证事务回滚
         verify(emailService, never()).sendApplicationApprovedEmail(anyString(), anyString(), anyString());
     }
@@ -335,12 +339,12 @@ class InstitutionServiceTest {
     void isInstitutionAdmin_WhenUserNotExists_ThrowsException() {
         // Arrange
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
-        
+
         // Act & Assert
-        assertThrows(BusinessException.class, () -> 
+        assertThrows(BusinessException.class, () ->
                 institutionService.isInstitutionAdmin("nonexistent", 1L));
     }
-    
+
     @Test
     void isInstitutionAdmin_WhenUserNotAssociatedWithInstitution_ReturnsFalse() {
         // Arrange
@@ -350,16 +354,16 @@ class InstitutionServiceTest {
                 .email("user2@example.com")
                 .institutionId(2L) // 不同的机构
                 .build();
-                
+
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(differentInstitutionUser));
-        
+
         // Act
         boolean result = institutionService.isInstitutionAdmin("user2", 1L);
-        
+
         // Assert
         assertFalse(result);
     }
-    
+
     @Test
     void isInstitutionAdmin_WhenUserEmailEmpty_ReturnsFalse() {
         // Arrange
@@ -369,16 +373,16 @@ class InstitutionServiceTest {
                 .email(null) // 没有邮箱
                 .institutionId(1L)
                 .build();
-                
+
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(userWithoutEmail));
-        
+
         // Act
         boolean result = institutionService.isInstitutionAdmin("user3", 1L);
-        
+
         // Assert
         assertFalse(result);
     }
-    
+
     @Test
     void isInstitutionAdmin_WhenInstitutionNotExists_ThrowsException() {
         // Arrange
@@ -388,15 +392,15 @@ class InstitutionServiceTest {
                 .email("admin@example.com")
                 .institutionId(999L) // 确保用户关联到机构
                 .build();
-                
+
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(userWithInstitution));
         when(institutionRepository.findById(anyLong())).thenReturn(Optional.empty());
-        
+
         // Act & Assert
-        assertThrows(BusinessException.class, () -> 
+        assertThrows(BusinessException.class, () ->
                 institutionService.isInstitutionAdmin("admin", 999L));
     }
-    
+
     @Test
     void isInstitutionAdmin_WhenInstitutionContactEmailEmpty_ReturnsFalse() {
         // Arrange
@@ -405,17 +409,17 @@ class InstitutionServiceTest {
                 .name("测试机构")
                 .contactEmail(null) // 没有联系邮箱
                 .build();
-                
+
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(user));
         when(institutionRepository.findById(anyLong())).thenReturn(Optional.of(institutionWithoutEmail));
-        
+
         // Act
         boolean result = institutionService.isInstitutionAdmin("admin", 1L);
-        
+
         // Assert
         assertFalse(result);
     }
-    
+
     @Test
     void isInstitutionAdmin_WhenEmailsMatch_ReturnsTrue() {
         // Arrange
@@ -425,23 +429,23 @@ class InstitutionServiceTest {
                 .email("admin@example.com") // 邮箱与机构联系邮箱相同
                 .institutionId(1L)
                 .build();
-                
+
         Institution institutionWithEmail = Institution.builder()
                 .id(1L)
                 .name("测试机构")
                 .contactEmail("admin@example.com") // 联系邮箱
                 .build();
-                
+
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(adminUser));
         when(institutionRepository.findById(anyLong())).thenReturn(Optional.of(institutionWithEmail));
-        
+
         // Act
         boolean result = institutionService.isInstitutionAdmin("admin", 1L);
-        
+
         // Assert
         assertTrue(result);
     }
-    
+
     @Test
     void isInstitutionAdmin_WhenEmailsDontMatch_ReturnsFalse() {
         // Arrange
@@ -451,53 +455,53 @@ class InstitutionServiceTest {
                 .email("user@example.com") // 邮箱与机构联系邮箱不同
                 .institutionId(1L)
                 .build();
-                
+
         Institution institutionWithEmail = Institution.builder()
                 .id(1L)
                 .name("测试机构")
                 .contactEmail("admin@example.com") // 联系邮箱
                 .build();
-                
+
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(normalUser));
         when(institutionRepository.findById(anyLong())).thenReturn(Optional.of(institutionWithEmail));
-        
+
         // Act
         boolean result = institutionService.isInstitutionAdmin("user", 1L);
-        
+
         // Assert
         assertFalse(result);
     }
-    
+
     @Test
     void getInstitutionDetail_Success() {
         // Arrange
         when(institutionRepository.findById(anyLong())).thenReturn(Optional.of(institution));
-        
+
         // Act
         InstitutionVO result = institutionService.getInstitutionDetail(1L);
-        
+
         // Assert
         assertNotNull(result);
         assertEquals(institution.getId(), result.getId());
         assertEquals(institution.getName(), result.getName());
         assertEquals(institution.getDescription(), result.getDescription());
     }
-    
+
     @Test
     void getInstitutionDetail_NotFound() {
         // Arrange
         when(institutionRepository.findById(anyLong())).thenReturn(Optional.empty());
-        
+
         // Act & Assert
         assertThrows(BusinessException.class, () -> institutionService.getInstitutionDetail(999L));
     }
-    
+
     @Test
     void updateInstitution_Success() {
         // Arrange
         when(institutionRepository.findById(anyLong())).thenReturn(Optional.of(institution));
         when(institutionRepository.save(any(Institution.class))).thenReturn(institution);
-        
+
         // 模拟用户是机构管理员
         User adminUser = User.builder()
                 .id(1L)
@@ -505,13 +509,13 @@ class InstitutionServiceTest {
                 .email("admin@example.com")
                 .institutionId(1L)
                 .build();
-        
+
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(adminUser));
-        
+
         // 直接模拟isInstitutionAdmin方法返回true
         InstitutionServiceImpl spyService = spy(institutionService);
         doReturn(true).when(spyService).isInstitutionAdmin(anyString(), anyLong());
-        
+
         // 创建更新DTO
         InstitutionUpdateDTO updateDTO = new InstitutionUpdateDTO();
         updateDTO.setName("更新后的机构名称");
@@ -519,17 +523,17 @@ class InstitutionServiceTest {
         updateDTO.setContactPerson("李四");
         updateDTO.setContactPhone("13900139000");
         updateDTO.setAddress("北京市朝阳区");
-        
+
         // Act
         InstitutionVO result = spyService.updateInstitution(1L, updateDTO, "admin");
-        
+
         // Assert
         assertNotNull(result);
-        
+
         // 验证机构更新
         ArgumentCaptor<Institution> institutionCaptor = ArgumentCaptor.forClass(Institution.class);
         verify(institutionRepository).save(institutionCaptor.capture());
-        
+
         Institution savedInstitution = institutionCaptor.getValue();
         assertEquals(updateDTO.getName(), savedInstitution.getName());
         assertEquals(updateDTO.getDescription(), savedInstitution.getDescription());
@@ -537,7 +541,7 @@ class InstitutionServiceTest {
         assertEquals(updateDTO.getContactPhone(), savedInstitution.getContactPhone());
         assertEquals(updateDTO.getAddress(), savedInstitution.getAddress());
     }
-    
+
     @Test
     void updateInstitution_NotAdmin_ThrowsException() {
         // Arrange
@@ -545,27 +549,27 @@ class InstitutionServiceTest {
         User normalUser = User.builder()
                 .id(5L)
                 .username("user")
-                .email("user@example.com") 
+                .email("user@example.com")
                 .institutionId(1L)
                 .build();
-                
+
         Institution institutionWithEmail = Institution.builder()
                 .id(1L)
                 .name("测试机构")
                 .contactEmail("admin@example.com")
                 .build();
-        
+
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(normalUser));
         when(institutionRepository.findById(anyLong())).thenReturn(Optional.of(institutionWithEmail));
-        
+
         InstitutionUpdateDTO updateDTO = new InstitutionUpdateDTO();
         updateDTO.setName("更新后的机构名称");
-        
+
         // Act & Assert
-        assertThrows(BusinessException.class, () -> 
+        assertThrows(BusinessException.class, () ->
                 institutionService.updateInstitution(1L, updateDTO, "user"));
     }
-    
+
     @Test
     void resetInstitutionRegisterCode_Success() {
         // Arrange
@@ -576,34 +580,34 @@ class InstitutionServiceTest {
                 .email("admin@example.com")
                 .institutionId(1L)
                 .build();
-        
+
         Institution institutionWithEmail = Institution.builder()
                 .id(1L)
                 .name("测试机构")
                 .contactEmail("admin@example.com")
                 .registerCode("OLDCODE1")
                 .build();
-                
+
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(adminUser));
         when(institutionRepository.findById(anyLong())).thenReturn(Optional.of(institutionWithEmail));
         when(institutionRepository.save(any(Institution.class))).thenReturn(institutionWithEmail);
         when(institutionRepository.existsByRegisterCode(anyString())).thenReturn(false);
-        
+
         // Act
         String newCode = institutionService.resetInstitutionRegisterCode(1L, "admin");
-        
+
         // Assert
         assertNotNull(newCode);
         assertNotEquals("OLDCODE1", newCode);
-        
+
         // 验证保存调用
         ArgumentCaptor<Institution> institutionCaptor = ArgumentCaptor.forClass(Institution.class);
         verify(institutionRepository).save(institutionCaptor.capture());
-        
+
         Institution savedInstitution = institutionCaptor.getValue();
         assertEquals(newCode, savedInstitution.getRegisterCode());
     }
-    
+
     @Test
     void resetInstitutionRegisterCode_NotAdmin_ThrowsException() {
         // Arrange
@@ -611,21 +615,21 @@ class InstitutionServiceTest {
         User normalUser = User.builder()
                 .id(5L)
                 .username("user")
-                .email("user@example.com") 
+                .email("user@example.com")
                 .institutionId(1L)
                 .build();
-                
+
         Institution institutionWithEmail = Institution.builder()
                 .id(1L)
                 .name("测试机构")
                 .contactEmail("admin@example.com")
                 .build();
-        
+
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(normalUser));
         when(institutionRepository.findById(anyLong())).thenReturn(Optional.of(institutionWithEmail));
-        
+
         // Act & Assert
-        assertThrows(BusinessException.class, () -> 
+        assertThrows(BusinessException.class, () ->
                 institutionService.resetInstitutionRegisterCode(1L, "user"));
     }
 
@@ -639,47 +643,47 @@ class InstitutionServiceTest {
                 .email("admin@example.com")
                 .institutionId(1L)
                 .build();
-        
+
         Institution institutionWithEmail = Institution.builder()
                 .id(1L)
                 .name("测试机构")
                 .contactEmail("admin@example.com")
                 .logo("old-logo-url.jpg")
                 .build();
-                
+
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(adminUser));
         when(institutionRepository.findById(anyLong())).thenReturn(Optional.of(institutionWithEmail));
         when(institutionRepository.save(any(Institution.class))).thenReturn(institutionWithEmail);
-        
+
         // 模拟文件上传
         MockMultipartFile logoFile = new MockMultipartFile(
-            "logo", 
-            "logo.jpg", 
-            "image/jpeg", 
+            "logo",
+            "logo.jpg",
+            "image/jpeg",
             "test image content".getBytes()
         );
-        
+
         String newLogoUrl = "http://example.com/storage/institutions/1/logo.jpg";
         when(minioService.uploadFile(anyString(), any(InputStream.class), anyString())).thenReturn(newLogoUrl);
-        
+
         // Act
         InstitutionVO result = institutionService.updateInstitutionLogo(1L, logoFile, "admin");
-        
+
         // Assert
         assertNotNull(result);
         assertEquals(newLogoUrl, result.getLogo());
-        
+
         // 验证存储服务调用
         verify(minioService).uploadFile(anyString(), any(InputStream.class), anyString());
-        
+
         // 验证更新机构Logo
         ArgumentCaptor<Institution> institutionCaptor = ArgumentCaptor.forClass(Institution.class);
         verify(institutionRepository).save(institutionCaptor.capture());
-        
+
         Institution savedInstitution = institutionCaptor.getValue();
         assertEquals(newLogoUrl, savedInstitution.getLogo());
     }
-    
+
     @Test
     void updateInstitutionLogo_NotAdmin_ThrowsException() throws IOException {
         // Arrange
@@ -687,31 +691,31 @@ class InstitutionServiceTest {
         User normalUser = User.builder()
                 .id(5L)
                 .username("user")
-                .email("user@example.com") 
+                .email("user@example.com")
                 .institutionId(1L)
                 .build();
-                
+
         Institution institutionWithEmail = Institution.builder()
                 .id(1L)
                 .name("测试机构")
                 .contactEmail("admin@example.com")
                 .build();
-        
+
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(normalUser));
         when(institutionRepository.findById(anyLong())).thenReturn(Optional.of(institutionWithEmail));
-        
+
         MockMultipartFile logoFile = new MockMultipartFile(
-            "logo", 
-            "logo.jpg", 
-            "image/jpeg", 
+            "logo",
+            "logo.jpg",
+            "image/jpeg",
             "test image content".getBytes()
         );
-        
+
         // Act & Assert
-        assertThrows(BusinessException.class, () -> 
+        assertThrows(BusinessException.class, () ->
                 institutionService.updateInstitutionLogo(1L, logoFile, "user"));
     }
-    
+
     @Test
     void updateInstitutionLogo_InvalidFileType_ThrowsException() throws IOException {
         // Arrange
@@ -722,26 +726,26 @@ class InstitutionServiceTest {
                 .email("admin@example.com")
                 .institutionId(1L)
                 .build();
-        
+
         Institution institutionWithEmail = Institution.builder()
                 .id(1L)
                 .name("测试机构")
                 .contactEmail("admin@example.com")
                 .build();
-                
+
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(adminUser));
         when(institutionRepository.findById(anyLong())).thenReturn(Optional.of(institutionWithEmail));
-        
+
         // 创建非图片类型文件
         MockMultipartFile textFile = new MockMultipartFile(
-            "logo", 
-            "document.txt", 
-            "text/plain", 
+            "logo",
+            "document.txt",
+            "text/plain",
             "not an image".getBytes()
         );
-        
+
         // Act & Assert
-        assertThrows(BusinessException.class, () -> 
+        assertThrows(BusinessException.class, () ->
                 institutionService.updateInstitutionLogo(1L, textFile, "admin"));
     }
-} 
+}

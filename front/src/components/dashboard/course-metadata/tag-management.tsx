@@ -1,23 +1,23 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Tag, TagDTO } from '@/types/course';
-import { 
-  Table, 
-  TableHeader, 
-  TableRow, 
-  TableHead, 
-  TableBody, 
-  TableCell 
+import { Tag, TagDTO, Course } from '@/types/course';
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogFooter 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -32,10 +32,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Loader2, Plus, Search, Trash2, Edit } from 'lucide-react';
+import { Loader2, Plus, Search, Trash2, Edit, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import tagService from '@/services/tag';
-import { 
+import courseService from '@/services/course-service';
+import {
   Pagination,
   PaginationContent,
   PaginationItem,
@@ -53,6 +54,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Card, CardContent } from "@/components/ui/card";
+import { CourseListView } from './course-list-view';
+import { useRouter } from 'next/navigation';
 
 // 表单验证模式
 const tagFormSchema = z.object({
@@ -61,6 +65,7 @@ const tagFormSchema = z.object({
 });
 
 export function TagManagement() {
+  const router = useRouter();
   const [tags, setTags] = useState<Tag[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
@@ -71,6 +76,9 @@ export function TagManagement() {
   const [editingTag, setEditingTag] = useState<Tag | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [tagToDelete, setTagToDelete] = useState<Tag | null>(null);
+  const [expandedTag, setExpandedTag] = useState<number | null>(null);
+  const [tagCourses, setTagCourses] = useState<Course[]>([]);
+  const [loadingCourses, setLoadingCourses] = useState(false);
 
   // 表单初始化
   const form = useForm<z.infer<typeof tagFormSchema>>({
@@ -96,6 +104,47 @@ export function TagManagement() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // 加载标签课程
+  const loadTagCourses = async (tagId: number) => {
+    setLoadingCourses(true);
+    try {
+      // 使用现有的课程搜索API
+      const result = await courseService.searchCourses({
+        tagIds: [tagId],
+        page: 0,
+        pageSize: 6
+      });
+      setTagCourses(result.content || []);
+    } catch (error) {
+      console.error('加载标签课程失败:', error);
+      toast.error('加载标签课程失败');
+      setTagCourses([]);
+    } finally {
+      setLoadingCourses(false);
+    }
+  };
+
+  // 切换标签展开/折叠
+  const toggleTag = async (tagId: number, e?: React.MouseEvent) => {
+    // 如果是从操作按钮点击，阻止事件冒泡
+    if (e) {
+      e.stopPropagation();
+    }
+
+    if (expandedTag === tagId) {
+      setExpandedTag(null);
+      setTagCourses([]);
+    } else {
+      setExpandedTag(tagId);
+      await loadTagCourses(tagId);
+    }
+  };
+
+  // 处理课程点击
+  const handleCourseClick = (courseId: number) => {
+    router.push(`/dashboard/courses/${courseId}`);
   };
 
   // 初始加载
@@ -136,7 +185,7 @@ export function TagManagement() {
   // 确认删除标签
   const handleDeleteConfirm = async () => {
     if (!tagToDelete) return;
-    
+
     setIsLoading(true);
     try {
       await tagService.deleteTag(tagToDelete.id);
@@ -155,18 +204,18 @@ export function TagManagement() {
   // 保存标签
   const onSubmit = async (data: z.infer<typeof tagFormSchema>) => {
     setIsLoading(true);
-    
+
     // 转换表单数据为DTO
     const tagDTO: TagDTO = {
       name: data.name,
       description: data.description,
     };
-    
+
     try {
       // 检查名称是否可用
       const excludeId = editingTag?.id;
       const isAvailable = await tagService.isNameAvailable(data.name, excludeId);
-      
+
       if (!isAvailable) {
         form.setError('name', {
           type: 'manual',
@@ -175,10 +224,10 @@ export function TagManagement() {
         setIsLoading(false);
         return;
       }
-      
+
       // 先关闭对话框，避免状态更新冲突
       setIsDialogOpen(false);
-      
+
       if (editingTag) {
         // 更新标签
         await tagService.updateTag(editingTag.id, tagDTO);
@@ -188,7 +237,7 @@ export function TagManagement() {
         await tagService.createTag(tagDTO);
         toast.success('标签创建成功');
       }
-      
+
       // 使用setTimeout延迟加载，避免组件状态更新冲突
       setTimeout(() => {
         if (document.getElementById('tag-management-container')) {
@@ -257,35 +306,72 @@ export function TagManagement() {
               </TableRow>
             )}
             {!isLoading && tags.map((tag) => (
-              <TableRow key={tag.id}>
-                <TableCell>{tag.id}</TableCell>
-                <TableCell>
-                  <Badge variant="outline">{tag.name}</Badge>
-                </TableCell>
-                <TableCell>{tag.description || '-'}</TableCell>
-                <TableCell>{tag.useCount || 0}</TableCell>
-                <TableCell>{tag.courseCount || 0}</TableCell>
-                <TableCell>
-                  {tag.createdAt ? new Date(tag.createdAt).toLocaleString() : '-'}
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end space-x-2">
-                    <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(tag)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="destructive" 
-                      size="sm" 
-                      onClick={() => {
-                        setTagToDelete(tag);
-                        setIsDeleteDialogOpen(true);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
+              <>
+                <TableRow
+                  key={tag.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => toggleTag(tag.id)}
+                >
+                  <TableCell>{tag.id}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center">
+                      <Badge variant="outline">{tag.name}</Badge>
+                      {expandedTag === tag.id ? (
+                        <ChevronUp className="ml-2 h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="ml-2 h-4 w-4" />
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>{tag.description || '-'}</TableCell>
+                  <TableCell>{tag.useCount || 0}</TableCell>
+                  <TableCell>{tag.courseCount || 0}</TableCell>
+                  <TableCell>
+                    {tag.createdAt ? new Date(tag.createdAt).toLocaleString() : '-'}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditDialog(tag);
+                        }}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setTagToDelete(tag);
+                          setIsDeleteDialogOpen(true);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+
+                {/* 展开的课程列表 */}
+                {expandedTag === tag.id && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="p-0 border-t-0">
+                      <div className="bg-muted/20 p-4">
+                        <h4 className="font-medium mb-3">关联课程</h4>
+                        <CourseListView
+                          courses={tagCourses}
+                          loading={loadingCourses}
+                          onCourseClick={handleCourseClick}
+                        />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </>
             ))}
           </TableBody>
         </Table>
@@ -300,7 +386,7 @@ export function TagManagement() {
           <Pagination>
             <PaginationContent>
               <PaginationItem>
-                <PaginationPrevious 
+                <PaginationPrevious
                   href="#"
                   onClick={(e) => {
                     e.preventDefault();
@@ -322,7 +408,7 @@ export function TagManagement() {
                 } else {
                   pageToShow = currentPage - 2 + i;
                 }
-                
+
                 if (pageToShow >= 0 && pageToShow < totalPages) {
                   return (
                     <PaginationItem key={pageToShow}>
@@ -343,7 +429,7 @@ export function TagManagement() {
               })}
 
               <PaginationItem>
-                <PaginationNext 
+                <PaginationNext
                   href="#"
                   onClick={(e) => {
                     e.preventDefault();
@@ -378,7 +464,7 @@ export function TagManagement() {
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="description"
@@ -386,9 +472,9 @@ export function TagManagement() {
                   <FormItem>
                     <FormLabel>标签描述</FormLabel>
                     <FormControl>
-                      <Textarea 
-                        placeholder="输入标签描述" 
-                        {...field} 
+                      <Textarea
+                        placeholder="输入标签描述"
+                        {...field}
                         value={field.value || ''}
                       />
                     </FormControl>
@@ -396,11 +482,11 @@ export function TagManagement() {
                   </FormItem>
                 )}
               />
-              
+
               <DialogFooter>
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => setIsDialogOpen(false)}
                 >
                   取消
@@ -435,4 +521,4 @@ export function TagManagement() {
       </AlertDialog>
     </div>
   );
-} 
+}

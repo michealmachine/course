@@ -12,19 +12,19 @@ export function cn(...inputs: ClassValue[]) {
  */
 export function formatDate(date: string | Date | undefined): string {
   if (!date) return '-';
-  
+
   const d = typeof date === 'string' ? new Date(date) : date;
-  
+
   // 检查日期是否有效
   if (isNaN(d.getTime())) return '-';
-  
+
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   const hours = String(d.getHours()).padStart(2, '0');
   const minutes = String(d.getMinutes()).padStart(2, '0');
   const seconds = String(d.getSeconds()).padStart(2, '0');
-  
+
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 
@@ -42,10 +42,10 @@ export function formatPrice(amount: number) {
  */
 export function formatDuration(seconds: number): string {
   if (!seconds) return '0分钟';
-  
+
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
-  
+
   if (hours > 0) {
     return `${hours}小时${minutes > 0 ? `${minutes}分钟` : ''}`;
   }
@@ -60,13 +60,13 @@ export function formatDuration(seconds: number): string {
  */
 export function formatBytes(bytes: number, decimals: number = 2): string {
   if (bytes === 0) return '0 Bytes';
-  
+
   const k = 1024;
   const dm = decimals < 0 ? 0 : decimals;
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
-  
+
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
+
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
@@ -80,4 +80,23 @@ export function formatPercentage(value: number, decimals: number = 2): string {
   // 判断是否为0-1范围内的小数
   const normalizedValue = value > 1 ? value : value * 100;
   return normalizedValue.toFixed(decimals) + '%';
+}
+
+/**
+ * 格式化数字，大于1000的数字显示为1k+的形式
+ * @param num 数字
+ * @returns 格式化后的字符串
+ */
+export function formatNumber(num: number): string {
+  if (num === undefined || num === null) return '0';
+
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1) + 'M+';
+  } else if (num >= 10000) {
+    return (num / 10000).toFixed(1) + 'W+';
+  } else if (num >= 1000) {
+    return (num / 1000).toFixed(1) + 'K+';
+  }
+
+  return num.toString();
 }

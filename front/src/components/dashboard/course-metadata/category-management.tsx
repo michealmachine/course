@@ -1,24 +1,24 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Category, CategoryDTO, CategoryTree } from '@/types/course';
-import { 
-  Table, 
-  TableHeader, 
-  TableRow, 
-  TableHead, 
-  TableBody, 
-  TableCell 
+import { Category, CategoryDTO, CategoryTree, Course } from '@/types/course';
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogFooter 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -39,10 +39,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Loader2, Plus, Search, Trash2, Edit, Check, X } from 'lucide-react';
+import { Loader2, Plus, Search, Trash2, Edit, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import categoryService from '@/services/category';
-import { 
+import courseService from '@/services/course-service';
+import {
   Pagination,
   PaginationContent,
   PaginationItem,
@@ -61,6 +62,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
+import { CourseListView } from './course-list-view';
+import { useRouter } from 'next/navigation';
 
 // 表单验证模式
 const categoryFormSchema = z.object({
@@ -77,6 +81,7 @@ const categoryFormSchema = z.object({
 });
 
 export function CategoryManagement() {
+  const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
   const [parentCategories, setParentCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -90,6 +95,9 @@ export function CategoryManagement() {
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
   const [categoryTree, setCategoryTree] = useState<CategoryTree[]>([]);
   const [viewMode, setViewMode] = useState<'list' | 'tree'>('list');
+  const [expandedCategory, setExpandedCategory] = useState<number | null>(null);
+  const [categoryCourses, setCategoryCourses] = useState<Course[]>([]);
+  const [loadingCourses, setLoadingCourses] = useState(false);
 
   // 表单初始化
   const form = useForm<z.infer<typeof categoryFormSchema>>({
@@ -144,6 +152,47 @@ export function CategoryManagement() {
     }
   };
 
+  // 加载分类课程
+  const loadCategoryCourses = async (categoryId: number) => {
+    setLoadingCourses(true);
+    try {
+      // 使用现有的课程搜索API
+      const result = await courseService.searchCourses({
+        categoryId,
+        page: 0,
+        pageSize: 6
+      });
+      setCategoryCourses(result.content || []);
+    } catch (error) {
+      console.error('加载分类课程失败:', error);
+      toast.error('加载分类课程失败');
+      setCategoryCourses([]);
+    } finally {
+      setLoadingCourses(false);
+    }
+  };
+
+  // 切换分类展开/折叠
+  const toggleCategory = async (categoryId: number, e?: React.MouseEvent) => {
+    // 如果是从操作按钮点击，阻止事件冒泡
+    if (e) {
+      e.stopPropagation();
+    }
+
+    if (expandedCategory === categoryId) {
+      setExpandedCategory(null);
+      setCategoryCourses([]);
+    } else {
+      setExpandedCategory(categoryId);
+      await loadCategoryCourses(categoryId);
+    }
+  };
+
+  // 处理课程点击
+  const handleCourseClick = (courseId: number) => {
+    router.push(`/dashboard/courses/${courseId}`);
+  };
+
   // 初始加载
   useEffect(() => {
     loadCategories();
@@ -194,7 +243,7 @@ export function CategoryManagement() {
   // 确认删除分类
   const handleDeleteConfirm = async () => {
     if (!categoryToDelete) return;
-    
+
     setIsLoading(true);
     try {
       await categoryService.deleteCategory(categoryToDelete.id);
@@ -213,7 +262,7 @@ export function CategoryManagement() {
   // 保存分类
   const onSubmit = async (data: z.infer<typeof categoryFormSchema>) => {
     setIsLoading(true);
-    
+
     // 转换表单数据为DTO
     const categoryDTO: CategoryDTO = {
       name: data.name,
@@ -224,12 +273,12 @@ export function CategoryManagement() {
       enabled: data.enabled,
       icon: data.icon,
     };
-    
+
     try {
       // 检查编码是否可用
       const excludeId = editingCategory?.id;
       const isAvailable = await categoryService.isCodeAvailable(data.code, excludeId);
-      
+
       if (!isAvailable) {
         form.setError('code', {
           type: 'manual',
@@ -238,7 +287,7 @@ export function CategoryManagement() {
         setIsLoading(false);
         return;
       }
-      
+
       if (editingCategory) {
         // 更新分类
         await categoryService.updateCategory(editingCategory.id, categoryDTO);
@@ -248,7 +297,7 @@ export function CategoryManagement() {
         await categoryService.createCategory(categoryDTO);
         toast.success('分类创建成功');
       }
-      
+
       // 先关闭对话框，再刷新列表，避免组件卸载后状态更新导致DOM错误
       setIsDialogOpen(false);
       // 使用setTimeout确保对话框关闭动画完成后再刷新数据
@@ -272,9 +321,9 @@ export function CategoryManagement() {
     try {
       await categoryService.updateCategoryStatus(category.id, newStatus);
       toast.success(`分类${newStatus ? '启用' : '禁用'}成功`);
-      
+
       // 更新本地状态，避免重新加载整个列表
-      setCategories(categories.map(c => 
+      setCategories(categories.map(c =>
         c.id === category.id ? { ...c, enabled: newStatus } : c
       ));
     } catch (error) {
@@ -333,7 +382,7 @@ export function CategoryManagement() {
           </Button>
         </div>
       </div>
-      
+
       {/* 列表或树形视图 */}
       {viewMode === 'list' ? (
         <>
@@ -368,42 +417,84 @@ export function CategoryManagement() {
                   </TableRow>
                 )}
                 {!isLoading && categories.map((category) => (
-                  <TableRow key={category.id}>
-                    <TableCell>{category.id}</TableCell>
-                    <TableCell>{category.name}</TableCell>
-                    <TableCell>{category.code}</TableCell>
-                    <TableCell>{category.parentName || '-'}</TableCell>
-                    <TableCell>{category.orderIndex || 0}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          checked={category.enabled !== false}
-                          onCheckedChange={() => handleToggleStatus(category)}
-                        />
-                        <span>{category.enabled !== false ? '启用' : '禁用'}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {category.createdAt ? new Date(category.createdAt).toLocaleString() : '-'}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end space-x-2">
-                        <Button variant="outline" size="sm" onClick={() => handleOpenEditDialog(category)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="destructive" 
-                          size="sm" 
-                          onClick={() => {
-                            setCategoryToDelete(category);
-                            setIsDeleteDialogOpen(true);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                  <>
+                    <TableRow
+                      key={category.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => toggleCategory(category.id)}
+                    >
+                      <TableCell>{category.id}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          <span>{category.name}</span>
+                          {expandedCategory === category.id ? (
+                            <ChevronUp className="ml-2 h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="ml-2 h-4 w-4" />
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{category.code}</TableCell>
+                      <TableCell>{category.parentName || '-'}</TableCell>
+                      <TableCell>{category.orderIndex || 0}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            checked={category.enabled !== false}
+                            onCheckedChange={(e) => {
+                              e.stopPropagation();
+                              handleToggleStatus(category);
+                            }}
+                          />
+                          <span>{category.enabled !== false ? '启用' : '禁用'}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {category.createdAt ? new Date(category.createdAt).toLocaleString() : '-'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenEditDialog(category);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCategoryToDelete(category);
+                              setIsDeleteDialogOpen(true);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+
+                    {/* 展开的课程列表 */}
+                    {expandedCategory === category.id && (
+                      <TableRow>
+                        <TableCell colSpan={8} className="p-0 border-t-0">
+                          <div className="bg-muted/20 p-4">
+                            <h4 className="font-medium mb-3">关联课程</h4>
+                            <CourseListView
+                              courses={categoryCourses}
+                              loading={loadingCourses}
+                              onCourseClick={handleCourseClick}
+                            />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
                 ))}
               </TableBody>
             </Table>
@@ -418,7 +509,7 @@ export function CategoryManagement() {
               <Pagination>
                 <PaginationContent>
                   <PaginationItem>
-                    <PaginationPrevious 
+                    <PaginationPrevious
                       href="#"
                       onClick={(e) => {
                         e.preventDefault();
@@ -440,7 +531,7 @@ export function CategoryManagement() {
                     } else {
                       pageToShow = currentPage - 2 + i;
                     }
-                    
+
                     if (pageToShow >= 0 && pageToShow < totalPages) {
                       return (
                         <PaginationItem key={pageToShow}>
@@ -461,7 +552,7 @@ export function CategoryManagement() {
                   })}
 
                   <PaginationItem>
-                    <PaginationNext 
+                    <PaginationNext
                       href="#"
                       onClick={(e) => {
                         e.preventDefault();
@@ -487,8 +578,8 @@ export function CategoryManagement() {
               未找到分类数据
             </div>
           ) : (
-            <CategoryTreeView 
-              categoryTree={categoryTree} 
+            <CategoryTreeView
+              categoryTree={categoryTree}
               onEdit={handleOpenEditDialog}
               onDelete={(category) => {
                 setCategoryToDelete(category);
@@ -521,7 +612,7 @@ export function CategoryManagement() {
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="code"
@@ -529,16 +620,16 @@ export function CategoryManagement() {
                   <FormItem>
                     <FormLabel>分类编码 *</FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="输入分类编码，只能包含字母、数字、下划线和连字符" 
-                        {...field} 
+                      <Input
+                        placeholder="输入分类编码，只能包含字母、数字、下划线和连字符"
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="description"
@@ -546,16 +637,16 @@ export function CategoryManagement() {
                   <FormItem>
                     <FormLabel>分类描述</FormLabel>
                     <FormControl>
-                      <Textarea 
-                        placeholder="输入分类描述" 
-                        {...field} 
+                      <Textarea
+                        placeholder="输入分类描述"
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -563,8 +654,8 @@ export function CategoryManagement() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>父分类</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
+                      <Select
+                        onValueChange={field.onChange}
                         value={field.value}
                       >
                         <FormControl>
@@ -575,8 +666,8 @@ export function CategoryManagement() {
                         <SelectContent>
                           <SelectItem value="none">无父分类</SelectItem>
                           {parentCategories.map((category) => (
-                            <SelectItem 
-                              key={category.id} 
+                            <SelectItem
+                              key={category.id}
                               value={String(category.id)}
                               disabled={editingCategory?.id === category.id}
                             >
@@ -589,7 +680,7 @@ export function CategoryManagement() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={form.control}
                   name="orderIndex"
@@ -597,9 +688,9 @@ export function CategoryManagement() {
                     <FormItem>
                       <FormLabel>排序索引</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          placeholder="输入排序索引" 
+                        <Input
+                          type="number"
+                          placeholder="输入排序索引"
                           {...field}
                         />
                       </FormControl>
@@ -608,7 +699,7 @@ export function CategoryManagement() {
                   )}
                 />
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -627,7 +718,7 @@ export function CategoryManagement() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={form.control}
                   name="icon"
@@ -642,11 +733,11 @@ export function CategoryManagement() {
                   )}
                 />
               </div>
-              
+
               <DialogFooter>
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => setIsDialogOpen(false)}
                 >
                   取消
@@ -684,21 +775,75 @@ export function CategoryManagement() {
 }
 
 // 分类树视图组件
-function CategoryTreeView({ 
-  categoryTree, 
-  onEdit, 
+function CategoryTreeView({
+  categoryTree,
+  onEdit,
   onDelete,
   onUpdateOrder
-}: { 
-  categoryTree: CategoryTree[], 
+}: {
+  categoryTree: CategoryTree[],
   onEdit: (category: Category) => void,
   onDelete: (category: Category) => void,
   onUpdateOrder: (id: number, orderIndex: number) => void
 }) {
-  
+  const [expandedNodes, setExpandedNodes] = useState<Record<number, boolean>>({});
+  const [expandedCourses, setExpandedCourses] = useState<number | null>(null);
+  const [nodeCourses, setNodeCourses] = useState<Course[]>([]);
+  const [loadingCourses, setLoadingCourses] = useState(false);
+  const router = useRouter();
+
+  // 切换节点展开/折叠
+  const toggleNode = (nodeId: number) => {
+    setExpandedNodes(prev => ({
+      ...prev,
+      [nodeId]: !prev[nodeId]
+    }));
+  };
+
+  // 加载分类课程
+  const loadNodeCourses = async (categoryId: number) => {
+    setLoadingCourses(true);
+    try {
+      // 使用现有的课程搜索API
+      const result = await courseService.searchCourses({
+        categoryId,
+        page: 0,
+        pageSize: 6
+      });
+      setNodeCourses(result.content || []);
+    } catch (error) {
+      console.error('加载分类课程失败:', error);
+      toast.error('加载分类课程失败');
+      setNodeCourses([]);
+    } finally {
+      setLoadingCourses(false);
+    }
+  };
+
+  // 切换课程展开/折叠
+  const toggleCourses = async (nodeId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (expandedCourses === nodeId) {
+      setExpandedCourses(null);
+      setNodeCourses([]);
+    } else {
+      setExpandedCourses(nodeId);
+      await loadNodeCourses(nodeId);
+    }
+  };
+
+  // 处理课程点击
+  const handleCourseClick = (courseId: number) => {
+    router.push(`/dashboard/courses/${courseId}`);
+  };
+
   const renderTreeNode = (node: CategoryTree, level = 0) => (
     <div key={node.id} className={`border-l-2 ${level > 0 ? 'ml-6 pl-2 border-gray-200' : ''}`}>
-      <div className="flex items-center justify-between py-2 hover:bg-muted/20 px-2 rounded-sm">
+      <div
+        className="flex items-center justify-between py-2 hover:bg-muted/20 px-2 rounded-sm cursor-pointer"
+        onClick={() => toggleNode(node.id)}
+      >
         <div className="flex items-center">
           <div className={`w-3 h-3 rounded-full mr-2 ${node.enabled ? 'bg-green-500' : 'bg-red-500'}`} />
           <span className="font-medium">{node.name}</span>
@@ -709,13 +854,17 @@ function CategoryTreeView({
             </span>
           )}
           {node.courseCount && node.courseCount > 0 && (
-            <span className="ml-2 text-xs text-muted-foreground">
-              {node.courseCount} 个课程
+            <span
+              className="ml-2 text-xs text-blue-500 hover:underline cursor-pointer"
+              onClick={(e) => toggleCourses(node.id, e)}
+            >
+              {node.courseCount} 个课程 {expandedCourses === node.id ? <ChevronUp className="inline h-3 w-3" /> : <ChevronDown className="inline h-3 w-3" />}
             </span>
           )}
         </div>
         <div className="flex space-x-2">
-          <Button variant="ghost" size="sm" onClick={() => {
+          <Button variant="ghost" size="sm" onClick={(e) => {
+            e.stopPropagation();
             const newIndex = (node.orderIndex || 0) - 1;
             if (newIndex >= 0) {
               onUpdateOrder(node.id, newIndex);
@@ -723,30 +872,51 @@ function CategoryTreeView({
           }} disabled={(node.orderIndex || 0) <= 0}>
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-arrow-up"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => {
+          <Button variant="ghost" size="sm" onClick={(e) => {
+            e.stopPropagation();
             onUpdateOrder(node.id, (node.orderIndex || 0) + 1);
           }}>
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-arrow-down"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
           </Button>
-          <Button variant="outline" size="sm" onClick={() => onEdit(node)}>
+          <Button variant="outline" size="sm" onClick={(e) => {
+            e.stopPropagation();
+            onEdit(node);
+          }}>
             <Edit className="h-4 w-4" />
           </Button>
-          <Button variant="destructive" size="sm" onClick={() => onDelete(node)}>
+          <Button variant="destructive" size="sm" onClick={(e) => {
+            e.stopPropagation();
+            onDelete(node);
+          }}>
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       </div>
-      {node.children && node.children.length > 0 && (
+
+      {/* 展开的课程列表 */}
+      {expandedCourses === node.id && (
+        <div className="ml-6 mt-2 mb-4 bg-muted/20 p-4 rounded-md">
+          <h4 className="font-medium mb-3">关联课程</h4>
+          <CourseListView
+            courses={nodeCourses}
+            loading={loadingCourses}
+            onCourseClick={handleCourseClick}
+          />
+        </div>
+      )}
+
+      {/* 子节点 */}
+      {expandedNodes[node.id] && node.children && node.children.length > 0 && (
         <div>
           {node.children.map((child: CategoryTree) => renderTreeNode(child, level + 1))}
         </div>
       )}
     </div>
   );
-  
+
   return (
     <div className="space-y-2">
       {categoryTree.map(item => renderTreeNode(item))}
     </div>
   );
-} 
+}
