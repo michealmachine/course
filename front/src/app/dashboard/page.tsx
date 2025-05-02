@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { UserRole } from '@/types/auth';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { BookOpen, Users, ShoppingCart, Activity, ShieldCheck, FileText, BarChart2 } from 'lucide-react';
+import { ClearCacheButton } from '@/components/dashboard/admin/clear-cache-button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function DashboardPage() {
@@ -15,7 +16,7 @@ export default function DashboardPage() {
   // 确保只在客户端运行
   useEffect(() => {
     setMounted(true);
-    
+
     // 根据时间设置问候语
     const hours = new Date().getHours();
     let greet = '';
@@ -42,10 +43,10 @@ export default function DashboardPage() {
   // 根据用户角色获取角色名称
   const getRoleName = () => {
     if (!user || !user.roles || user.roles.length === 0) return '用户';
-    
+
     // 获取第一个角色代码（通常是最高权限的角色）
     const primaryRoleCode = user.roles[0].code?.replace('ROLE_', '');
-    
+
     switch (primaryRoleCode) {
       case UserRole.ADMIN:
         return '管理员';
@@ -64,13 +65,13 @@ export default function DashboardPage() {
     if (!user || !user.roles || user.roles.length === 0) return false;
     return user.roles.some(userRole => userRole.code?.replace('ROLE_', '') === role);
   };
-  
+
   // 判断是否为管理员
   const isAdmin = hasRole(UserRole.ADMIN);
-  
+
   // 判断是否为审核员
   const isReviewer = hasRole(UserRole.REVIEWER);
-  
+
   // 判断是否为机构用户
   const isInstitution = hasRole(UserRole.INSTITUTION);
 
@@ -96,7 +97,7 @@ export default function DashboardPage() {
           </AlertDescription>
         </Alert>
       )}
-      
+
       {isReviewer && (
         <Alert>
           <FileText className="h-4 w-4" />
@@ -106,7 +107,7 @@ export default function DashboardPage() {
           </AlertDescription>
         </Alert>
       )}
-      
+
       {isInstitution && (
         <Alert>
           <BookOpen className="h-4 w-4" />
@@ -132,7 +133,7 @@ export default function DashboardPage() {
             </p>
           </CardContent>
         </Card>
-        
+
         {/* 普通用户和所有角色都可见 */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -146,7 +147,7 @@ export default function DashboardPage() {
             </p>
           </CardContent>
         </Card>
-        
+
         {/* 普通用户和所有角色都可见 */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -160,7 +161,7 @@ export default function DashboardPage() {
             </p>
           </CardContent>
         </Card>
-        
+
         {/* 根据角色显示不同的第四个卡片 */}
         {isAdmin ? (
           <Card>
@@ -229,8 +230,8 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-primary rounded-full" 
+                  <div
+                    className="h-full bg-primary rounded-full"
                     style={{ width: `${30 * i}%` }}
                   />
                 </div>
@@ -242,7 +243,7 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
-      
+
       {/* 管理员专属内容 */}
       {isAdmin && (
         <div>
@@ -272,10 +273,13 @@ export default function DashboardPage() {
                 </div>
               </div>
             </CardContent>
+            <CardFooter className="flex justify-end">
+              <ClearCacheButton />
+            </CardFooter>
           </Card>
         </div>
       )}
-      
+
       {/* 审核员专属内容 */}
       {isReviewer && (
         <div>
@@ -304,7 +308,7 @@ export default function DashboardPage() {
           </Card>
         </div>
       )}
-      
+
       {/* 机构用户专属内容 */}
       {isInstitution && (
         <div>
@@ -339,4 +343,4 @@ export default function DashboardPage() {
       )}
     </div>
   );
-} 
+}

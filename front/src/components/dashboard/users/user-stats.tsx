@@ -9,7 +9,7 @@ import { RefreshCw, Users, UserPlus, UserCheck, UserX, TrendingUp } from 'lucide
 
 // 导入 recharts 基础组件
 import {
-  PieChart, Pie, Cell, LabelList, 
+  PieChart, Pie, Cell, LabelList,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   LineChart, Line,
   ResponsiveContainer
@@ -50,7 +50,7 @@ const getRoleDistributionConfig = (roleDistributions: any[]): ChartConfig => {
     const key = item.roleCode ? item.roleCode.toLowerCase().replace('role_','') : `role_${index}`;
     const colorIndex = index % GRAYSCALE_PALETTE.light.length;
     config[key] = {
-      label: item.roleName, 
+      label: item.roleName,
       theme: {
         light: GRAYSCALE_PALETTE.light[colorIndex],
         dark: GRAYSCALE_PALETTE.dark[colorIndex]
@@ -63,8 +63,8 @@ const getRoleDistributionConfig = (roleDistributions: any[]): ChartConfig => {
 // 用户增长图表配置 (单数据系列，移除特定颜色，使用默认主题色)
 const getGrowthStatsConfig = (): ChartConfig => {
   return {
-    count: { 
-      label: '注册用户', 
+    count: {
+      label: '注册用户',
       // color: `hsl(var(--foreground))` // 或者不设置，使用默认
     },
   };
@@ -73,8 +73,8 @@ const getGrowthStatsConfig = (): ChartConfig => {
 // 用户活跃度图表配置 (单数据系列，移除特定颜色，使用默认主题色)
 const getActivityStatsConfig = (): ChartConfig => {
   return {
-    count: { 
-      label: '活跃用户', 
+    count: {
+      label: '活跃用户',
       // color: `hsl(var(--foreground))` // 或者不设置，使用默认
     },
   };
@@ -95,36 +95,67 @@ const formatGrowthRate = (value: number) => {
   return `${value > 0 ? '+' : ''}${value.toFixed(2)}%`;
 };
 
+// 处理用户增长数据，确保30天内每天都有数据点
+const processGrowthData = (dailyRegistrations: any[]) => {
+  if (!dailyRegistrations || dailyRegistrations.length === 0) return [];
+
+  // 创建最近30天的日期数组
+  const last30Days = Array.from({ length: 30 }, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() - 29 + i);
+    return date.toISOString().split('T')[0]; // YYYY-MM-DD格式
+  });
+
+  // 创建日期到数据的映射
+  const dateMap = new Map();
+
+  // 将现有数据放入映射中
+  dailyRegistrations.forEach(day => {
+    dateMap.set(day.date, {
+      date: day.date,
+      count: day.count
+    });
+  });
+
+  // 确保所有日期都有数据，如果没有则填充零值
+  return last30Days.map(date =>
+    dateMap.get(date) || {
+      date,
+      count: 0
+    }
+  );
+};
+
 export function UserStats() {
-  const { 
+  const {
     stats, roleDistribution, growthStats, statusStats, activityStats,
     isLoading, isLoadingRole, isLoadingGrowth, isLoadingStatus, isLoadingActivity,
     fetchAllStats, fetchRoleDistribution, fetchGrowthStats, fetchStatusStats, fetchActivityStats
   } = useUserStatsStore();
-  
+
   // 初始加载
   useEffect(() => {
     fetchAllStats();
   }, [fetchAllStats]);
-  
+
   // 手动刷新数据
   const handleRefresh = () => {
     fetchAllStats();
   };
-  
+
   // 动态生成 chartConfig
   const roleChartConfig = stats?.roleDistribution ? getRoleDistributionConfig(stats.roleDistribution.roleDistributions) : {};
   const growthChartConfig = getGrowthStatsConfig();
   const activityChartConfig = getActivityStatsConfig();
-  
+
   return (
     <div className="space-y-6">
       {/* 顶部操作栏 */}
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">用户统计</h2>
-        <Button 
-          variant="outline" 
-          size="sm" 
+        <Button
+          variant="outline"
+          size="sm"
           onClick={handleRefresh}
           disabled={isLoading}
         >
@@ -132,7 +163,7 @@ export function UserStats() {
           刷新数据
         </Button>
       </div>
-      
+
       {/* 统计卡片区域 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* 总用户数 */}
@@ -161,7 +192,7 @@ export function UserStats() {
             )}
           </CardContent>
         </Card>
-        
+
         {/* 今日新增 */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
@@ -188,7 +219,7 @@ export function UserStats() {
             )}
           </CardContent>
         </Card>
-        
+
         {/* 活跃用户 */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
@@ -214,7 +245,7 @@ export function UserStats() {
             )}
           </CardContent>
         </Card>
-        
+
         {/* 禁用用户 */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
@@ -241,7 +272,7 @@ export function UserStats() {
           </CardContent>
         </Card>
       </div>
-      
+
       {/* 图表区域 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 用户角色分布 - 改回实心饼图 + ChartLegend */}
@@ -256,8 +287,8 @@ export function UserStats() {
                 <Skeleton className="h-[300px] w-full rounded-md" />
               </div>
             ) : stats?.roleDistribution?.roleDistributions?.length ? (
-              <ChartContainer 
-                config={roleChartConfig} 
+              <ChartContainer
+                config={roleChartConfig}
                 className="mx-auto aspect-square max-h-[300px]"
               >
                 <PieChart>
@@ -267,10 +298,10 @@ export function UserStats() {
                   <Pie
                     data={stats.roleDistribution.roleDistributions}
                     dataKey="userCount"
-                    nameKey="roleName" 
+                    nameKey="roleName"
                     cx="50%"
                     cy="50%"
-                    outerRadius={100} 
+                    outerRadius={100}
                     // innerRadius={60} // 移除内半径，变为实心饼图
                     labelLine={false}
                     // 移除自定义 label
@@ -299,7 +330,7 @@ export function UserStats() {
             </div>
           </CardFooter>
         </Card>
-        
+
         {/* 用户增长趋势 - 使用默认主题色 */}
         <Card className="col-span-1 flex flex-col">
           <CardHeader>
@@ -312,54 +343,65 @@ export function UserStats() {
                 <Skeleton className="h-[300px] w-full rounded-md" />
               </div>
             ) : stats?.growthStats?.dailyRegistrations?.length ? (
-              <ChartContainer 
-                config={growthChartConfig} 
+              <ChartContainer
+                config={growthChartConfig}
                 className="h-[300px] w-full"
               >
                 <LineChart
                   accessibilityLayer
-                  data={stats.growthStats.dailyRegistrations}
+                  data={processGrowthData(stats.growthStats.dailyRegistrations)}
                   margin={{
-                    top: 30, 
+                    top: 30,
                     left: 12,
-                    right: 30, 
-                    bottom: 10
+                    right: 30,
+                    bottom: 25
                   }}
                 >
                   <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="date" 
+                  <XAxis
+                    dataKey="date"
                     tickLine={false}
                     axisLine={false}
                     tickMargin={8}
-                    tickFormatter={(value) => value.split('-').slice(1).join('/')}
-                    interval="preserveStartEnd" 
-                    minTickGap={30} 
+                    tickFormatter={(value) => {
+                      const parts = value.split('-');
+                      return `${parts[1]}/${parts[2]}`; // 显示为 MM/DD 格式
+                    }}
+                    interval="preserveStartEnd"
+                    minTickGap={5}
+                    ticks={[
+                      // 显示第1天、第10天、第20天和第30天的刻度
+                      processGrowthData(stats.growthStats.dailyRegistrations)[0]?.date,
+                      processGrowthData(stats.growthStats.dailyRegistrations)[9]?.date,
+                      processGrowthData(stats.growthStats.dailyRegistrations)[19]?.date,
+                      processGrowthData(stats.growthStats.dailyRegistrations)[29]?.date
+                    ]}
                   />
-                  <YAxis 
-                    tickLine={false} 
-                    axisLine={false} 
-                    tickMargin={8} 
-                    width={30} 
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    width={30}
                   />
                   <ChartTooltip
                     cursor={false}
-                    content={<ChartTooltipContent indicator="line" />} 
+                    content={<ChartTooltipContent indicator="line" />}
                   />
                   <Line
                     dataKey="count"
-                    type="monotone" 
+                    type="monotone"
                     stroke="#000000" // 设置折线颜色为黑色
-                    strokeWidth={2} 
-                    dot={true} 
-                    activeDot={{ r: 6 }} 
-                    connectNulls={true} 
+                    strokeWidth={2}
+                    dot={{ r: 3 }} // 小圆点
+                    activeDot={{ r: 6 }}
+                    connectNulls={true}
                   >
+                    {/* 只在有值的点上显示标签 */}
                     <LabelList
                       position="top"
-                      offset={10} 
+                      offset={10}
                       className="fill-foreground text-xs"
-                      formatter={(value: number) => formatUserCount(value)} 
+                      formatter={(value: number) => value > 0 ? formatUserCount(value) : ''}
                     />
                   </Line>
                 </LineChart>
@@ -376,7 +418,7 @@ export function UserStats() {
             </div>
           </CardFooter>
         </Card>
-        
+
         {/* 用户活跃时间分布 - 使用默认主题色 + maxBarSize */}
         <Card className="col-span-1 lg:col-span-2 flex flex-col">
           <CardHeader>
@@ -389,8 +431,8 @@ export function UserStats() {
                 <Skeleton className="h-[300px] w-full rounded-md" />
               </div>
             ) : stats?.activityStats?.hourlyActiveDistribution ? (
-              <ChartContainer 
-                config={activityChartConfig} 
+              <ChartContainer
+                config={activityChartConfig}
                 className="h-[300px] w-full"
               >
                 <BarChart
@@ -398,11 +440,11 @@ export function UserStats() {
                   data={Object.entries(stats.activityStats.hourlyActiveDistribution)
                     .map(([hour, count]) => ({ hour: parseInt(hour), count }))
                     .sort((a, b) => a.hour - b.hour)}
-                  margin={{ top: 10, right: 20, left: 0, bottom: 0 }} 
+                  margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
                 >
                   <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="hour" 
+                  <XAxis
+                    dataKey="hour"
                     tickLine={false}
                     axisLine={false}
                     tickMargin={8}
@@ -410,19 +452,19 @@ export function UserStats() {
                     interval="preserveStartEnd"
                     minTickGap={15}
                   />
-                  <YAxis 
-                    tickLine={false} 
-                    axisLine={false} 
-                    tickMargin={8} 
-                    width={30} 
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    width={30}
                   />
                   <ChartTooltip
                     cursor={false}
                     content={
-                      <ChartTooltipContent 
-                        indicator="line" 
-                        nameKey="hour" 
-                        labelFormatter={(value) => `${value}:00 - ${value}:59`} 
+                      <ChartTooltipContent
+                        indicator="line"
+                        nameKey="hour"
+                        labelFormatter={(value) => `${value}:00 - ${value}:59`}
                       />
                     }
                   />
@@ -449,4 +491,4 @@ export function UserStats() {
       </div>
     </div>
   );
-} 
+}
