@@ -14,58 +14,58 @@ const wrongQuestionService = {
    */
   getWrongQuestions: async (params: WrongQuestionQueryParams = {}): Promise<WrongQuestionPageResult> => {
     try {
-      const { page = 0, size = 10, sortBy = 'lastWrongTime', direction = 'desc' } = params;
-      
-      const response: AxiosResponse<ApiResponse<WrongQuestionPageResult>> = 
+      const { page = 0, size = 10, sortBy = 'updatedAt', direction = 'desc' } = params;
+
+      const response: AxiosResponse<ApiResponse<WrongQuestionPageResult>> =
         await request.get('/learning/wrong-questions', {
           params: { page, size, sortBy, direction }
         });
-      
+
       return response.data.data;
     } catch (error) {
       console.error('获取用户错题列表失败:', error);
       throw error;
     }
   },
-  
+
   /**
    * 获取特定课程的错题列表(分页)
    */
   getCourseWrongQuestions: async (courseId: number, params: WrongQuestionQueryParams = {}): Promise<WrongQuestionPageResult> => {
     try {
-      const { page = 0, size = 10, sortBy = 'lastWrongTime', direction = 'desc' } = params;
-      
-      const response: AxiosResponse<ApiResponse<WrongQuestionPageResult>> = 
+      const { page = 0, size = 10, sortBy = 'updatedAt', direction = 'desc' } = params;
+
+      const response: AxiosResponse<ApiResponse<WrongQuestionPageResult>> =
         await request.get(`/learning/courses/${courseId}/wrong-questions`, {
           params: { page, size, sortBy, direction }
         });
-      
+
       return response.data.data;
     } catch (error) {
       console.error(`获取课程错题列表失败, 课程ID: ${courseId}:`, error);
       throw error;
     }
   },
-  
+
   /**
    * 获取未解决的错题列表(分页)
    */
   getUnresolvedWrongQuestions: async (params: WrongQuestionQueryParams = {}): Promise<WrongQuestionPageResult> => {
     try {
-      const { page = 0, size = 10, sortBy = 'lastWrongTime', direction = 'desc' } = params;
-      
-      const response: AxiosResponse<ApiResponse<WrongQuestionPageResult>> = 
+      const { page = 0, size = 10, sortBy = 'updatedAt', direction = 'desc' } = params;
+
+      const response: AxiosResponse<ApiResponse<WrongQuestionPageResult>> =
         await request.get('/learning/wrong-questions/unresolved', {
           params: { page, size, sortBy, direction }
         });
-      
+
       return response.data.data;
     } catch (error) {
       console.error('获取未解决错题列表失败:', error);
       throw error;
     }
   },
-  
+
   /**
    * 将错题标记为已解决
    */
@@ -77,7 +77,7 @@ const wrongQuestionService = {
       throw error;
     }
   },
-  
+
   /**
    * 删除单个错题
    */
@@ -89,7 +89,7 @@ const wrongQuestionService = {
       throw error;
     }
   },
-  
+
   /**
    * 删除用户所有错题
    */
@@ -101,7 +101,7 @@ const wrongQuestionService = {
       throw error;
     }
   },
-  
+
   /**
    * 删除用户特定课程的所有错题
    */
@@ -115,4 +115,4 @@ const wrongQuestionService = {
   }
 };
 
-export default wrongQuestionService; 
+export default wrongQuestionService;

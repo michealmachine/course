@@ -160,14 +160,15 @@ public class InstitutionLearningStatisticsController {
         log.info("获取机构学习时长统计, 用户名: {}, 机构ID: {}", username, institutionId);
 
         Long todayDuration = statisticsService.getInstitutionTodayLearningDuration(institutionId);
-        Long totalDuration = statisticsService.getInstitutionTotalLearningDuration(institutionId);
-        Long learnerCount = statisticsService.getInstitutionLearnerCount(institutionId);
+        Number totalDurationNum = statisticsService.getInstitutionTotalLearningDuration(institutionId);
+        Long totalDuration = totalDurationNum != null ? totalDurationNum.longValue() : 0L;
+        Number learnerCount = statisticsService.getInstitutionLearnerCount(institutionId);
 
         // 构建响应
         return Result.success(new Object() {
             public final Long todayLearningDuration = todayDuration;
             public final Long totalLearningDuration = totalDuration;
-            public final Long totalLearners = learnerCount;
+            public final Number totalLearners = learnerCount;
         });
     }
 

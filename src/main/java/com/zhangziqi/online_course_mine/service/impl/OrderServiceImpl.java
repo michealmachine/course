@@ -1228,7 +1228,7 @@ public class OrderServiceImpl implements OrderService {
             OrderStatusDistributionVO vo = OrderStatusDistributionVO.builder()
                     .status(statusValue)
                     .statusName(status.getDesc())
-                    .count(count.intValue())
+                    .count(count)
                     .percentage(Math.round(percentage * 100) / 100.0) // 保留两位小数
                     .build();
 
@@ -1424,7 +1424,7 @@ public class OrderServiceImpl implements OrderService {
             OrderStatusDistributionVO vo = OrderStatusDistributionVO.builder()
                     .status(statusValue)
                     .statusName(status.getDesc())
-                    .count(count.intValue())
+                    .count(count)
                     .percentage(Math.round(percentage * 100) / 100.0) // 保留两位小数
                     .build();
 
@@ -1500,6 +1500,64 @@ public class OrderServiceImpl implements OrderService {
     /**
      * 获取平台收入统计
      */
+    /**
+     * 获取机构总收入（分）
+     *
+     * @param institutionId 机构ID
+     * @return 总收入（分）
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Long getInstitutionTotalIncome(Long institutionId) {
+        log.info("获取机构总收入, 机构ID: {}", institutionId);
+
+        try {
+            // 获取机构总收入（元）
+            BigDecimal totalIncome = calculateInstitutionNetIncome(institutionId);
+            if (totalIncome == null) {
+                return 0L;
+            }
+
+            // 转换为分
+            long amountInCents = totalIncome.multiply(new BigDecimal("100")).longValue();
+            return amountInCents;
+        } catch (Exception e) {
+            log.error("计算机构总收入时发生错误, 机构ID: {}, 错误: {}", institutionId, e.getMessage());
+            return 0L;
+        }
+    }
+
+    /**
+     * 获取机构本月收入（分）
+     *
+     * @param institutionId 机构ID
+     * @return 本月收入（分）
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Long getInstitutionMonthIncome(Long institutionId) {
+        log.info("获取机构本月收入, 机构ID: {}", institutionId);
+
+        try {
+            // 获取本月开始时间和结束时间
+            LocalDateTime startOfMonth = LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0);
+            LocalDateTime endOfMonth = startOfMonth.plusMonths(1);
+
+            // 获取本月收入（元）
+            BigDecimal monthIncome = calculateInstitutionNetIncome(institutionId, startOfMonth, endOfMonth);
+            if (monthIncome == null) {
+                return 0L;
+            }
+
+            // 转换为分
+            long amountInCents = monthIncome.multiply(new BigDecimal("100")).longValue();
+            return amountInCents;
+        } catch (Exception e) {
+            log.error("计算机构本月收入时发生错误, 机构ID: {}, 错误: {}", institutionId, e.getMessage());
+            return 0L;
+        }
+    }
+
     @Override
     @Transactional(readOnly = true)
     public PlatformIncomeStatsVO getPlatformIncomeStats(LocalDateTime startDate, LocalDateTime endDate) {

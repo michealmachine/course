@@ -594,7 +594,7 @@ public class LearningController {
     public Result<Page<UserWrongQuestionVO>> getWrongQuestions(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "lastWrongTime") String sortBy,
+            @RequestParam(defaultValue = "updatedAt") String sortBy,
             @RequestParam(defaultValue = "desc") String direction) {
         Long userId = SecurityUtil.getCurrentUserId();
         log.info("获取用户错题列表(分页), 用户ID: {}, 页码: {}, 每页数量: {}", userId, page, size);
@@ -617,7 +617,7 @@ public class LearningController {
             @PathVariable Long courseId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "lastWrongTime") String sortBy,
+            @RequestParam(defaultValue = "updatedAt") String sortBy,
             @RequestParam(defaultValue = "desc") String direction) {
         Long userId = SecurityUtil.getCurrentUserId();
         log.info("获取用户课程错题列表(分页), 用户ID: {}, 课程ID: {}, 页码: {}, 每页数量: {}",
@@ -641,7 +641,7 @@ public class LearningController {
     public Result<Page<UserWrongQuestionVO>> getUnresolvedWrongQuestions(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "lastWrongTime") String sortBy,
+            @RequestParam(defaultValue = "updatedAt") String sortBy,
             @RequestParam(defaultValue = "desc") String direction) {
         Long userId = SecurityUtil.getCurrentUserId();
         log.info("获取用户未解决错题列表(分页), 用户ID: {}, 页码: {}, 每页数量: {}", userId, page, size);

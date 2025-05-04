@@ -45,6 +45,42 @@ export interface InstitutionResponse {
 }
 
 /**
+ * 机构信息VO
+ */
+export interface InstitutionVO {
+  id: number;                    // ID
+  name: string;                  // 机构名称
+  logo?: string;                 // 机构Logo
+  description?: string;          // 机构描述
+  status: number;                // 状态：0-禁用，1-正常
+  contactPerson?: string;        // 联系人
+  contactPhone?: string;         // 联系电话
+  contactEmail?: string;         // 联系邮箱
+  address?: string;              // 地址
+  website?: string;              // 网站
+  registerCode?: string;         // 注册码
+  createdAt: string;             // 创建时间
+  updatedAt: string;             // 更新时间
+  userCount?: number;            // 用户数量
+  courseCount?: number;          // 课程数量
+  publishedCourseCount?: number; // 已发布课程数量
+  totalLearners?: number;        // 学习人数
+}
+
+/**
+ * 机构统计数据VO
+ */
+export interface InstitutionStatsVO {
+  userCount: number;             // 用户数量
+  courseCount: number;           // 课程数量
+  publishedCourseCount: number;  // 已发布课程数量
+  totalLearners: number;         // 总学习人数
+  totalLearningDuration: number; // 总学习时长
+  totalIncome: number;           // 总收入
+  monthIncome: number;           // 本月收入
+}
+
+/**
  * 机构申请信息响应
  */
 export interface InstitutionApplicationResponse {
@@ -92,4 +128,4 @@ export interface Page<T> {
   first: boolean;                // 是否第一页
   last: boolean;                 // 是否最后一页
   empty: boolean;                // 是否为空
-} 
+}

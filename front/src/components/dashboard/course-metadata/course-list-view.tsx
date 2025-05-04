@@ -1,17 +1,18 @@
 'use client';
 
 import { Course } from "@/types/course";
-import { 
-  Table, 
-  TableHeader, 
-  TableRow, 
-  TableHead, 
-  TableBody, 
-  TableCell 
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell
 } from '@/components/ui/table';
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Star } from "lucide-react";
 import { formatNumber } from "@/lib/utils";
+import { CourseStatus } from "@/types/enums";
 
 interface CourseListViewProps {
   courses: Course[];
@@ -42,6 +43,7 @@ export function CourseListView({ courses, loading, onCourseClick }: CourseListVi
         <TableHeader>
           <TableRow>
             <TableHead>课程名称</TableHead>
+            <TableHead>状态</TableHead>
             <TableHead>价格</TableHead>
             <TableHead>难度</TableHead>
             <TableHead>学习人数</TableHead>
@@ -51,7 +53,7 @@ export function CourseListView({ courses, loading, onCourseClick }: CourseListVi
         </TableHeader>
         <TableBody>
           {courses.map((course) => (
-            <TableRow 
+            <TableRow
               key={course.id}
               className="cursor-pointer hover:bg-muted/50"
               onClick={() => onCourseClick && onCourseClick(course.id)}
@@ -60,15 +62,22 @@ export function CourseListView({ courses, loading, onCourseClick }: CourseListVi
                 <div className="flex items-center gap-2">
                   {course.coverUrl && (
                     <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
-                      <img 
-                        src={course.coverUrl} 
-                        alt={course.title} 
+                      <img
+                        src={course.coverUrl}
+                        alt={course.title}
                         className="w-full h-full object-cover"
                       />
                     </div>
                   )}
                   <span className="line-clamp-1">{course.title}</span>
                 </div>
+              </TableCell>
+              <TableCell>
+                {course.status === CourseStatus.PUBLISHED ? (
+                  <Badge variant="success" className="bg-green-100 text-green-800 hover:bg-green-200">已发布</Badge>
+                ) : (
+                  <Badge variant="outline" className="bg-gray-100 text-gray-800 hover:bg-gray-200">未发布</Badge>
+                )}
               </TableCell>
               <TableCell>
                 {course.paymentType === 0 ? (
@@ -78,8 +87,8 @@ export function CourseListView({ courses, loading, onCourseClick }: CourseListVi
                 )}
               </TableCell>
               <TableCell>
-                {course.difficulty === 1 ? '初级' : 
-                 course.difficulty === 2 ? '中级' : 
+                {course.difficulty === 1 ? '初级' :
+                 course.difficulty === 2 ? '中级' :
                  course.difficulty === 3 ? '高级' : '未知'}
               </TableCell>
               <TableCell>{formatNumber(course.studentCount || 0)}</TableCell>

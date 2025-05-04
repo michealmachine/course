@@ -7,7 +7,8 @@ import { DailyLearningStatVO, ActivityTypeStatVO } from './learning-service';
 import {
   CourseStatisticsVO,
   StudentLearningVO,
-  LearningDurationResponse
+  LearningDurationResponse,
+  InstitutionLearningStatisticsVO
 } from '@/types/institution-stats';
 import { LearningHeatmapVO, LearningProgressTrendVO } from '@/types/learning-stats';
 
@@ -101,6 +102,13 @@ export interface AdminLearningStatsService {
    * @returns 学习进度趋势数据
    */
   getCourseLearningProgressTrend(courseId: number | string, startDate?: string, endDate?: string): Promise<LearningProgressTrendVO>;
+
+  /**
+   * 获取机构学习统计概览
+   * @param institutionId 机构ID
+   * @returns 机构学习统计概览
+   */
+  getInstitutionStatisticsOverview(institutionId: number): Promise<InstitutionLearningStatisticsVO>;
 }
 
 /**
@@ -356,6 +364,56 @@ class AdminLearningStatsServiceImpl implements AdminLearningStatsService {
       return response.data.data;
     } catch (error) {
       console.error(`获取课程学习进度趋势失败, 课程ID: ${courseId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取机构学习统计概览
+   * @param institutionId 机构ID
+   * @returns 机构学习统计概览
+   */
+  async getInstitutionStatisticsOverview(institutionId: number): Promise<InstitutionLearningStatisticsVO> {
+    try {
+      console.log(`开始获取机构学习统计概览, 机构ID: ${institutionId}`);
+      const response: AxiosResponse<ApiResponse<InstitutionLearningStatisticsVO>> =
+        await request.get(`/admin/learning-statistics/institutions/${institutionId}/overview`);
+
+      console.log('获取机构学习统计概览成功:', response.data);
+      return response.data.data;
+    } catch (error) {
+      console.error(`获取机构学习统计概览失败, 机构ID: ${institutionId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取课程学习统计排行
+   * @param sortBy 排序字段(learnerCount/totalDuration/activityCount/completionCount)
+   * @param institutionId 机构ID（可选）
+   * @param limit 数量限制
+   * @returns 课程学习统计排行列表
+   */
+  async getCourseRanking(
+    sortBy: string = 'learnerCount',
+    institutionId?: number,
+    limit: number = 10
+  ): Promise<CourseStatisticsVO[]> {
+    try {
+      console.log(`开始获取课程学习统计排行, 排序字段: ${sortBy}, 机构ID: ${institutionId}, 数量限制: ${limit}`);
+
+      const params: Record<string, string | number> = { sortBy, limit };
+      if (institutionId !== undefined) {
+        params.institutionId = institutionId;
+      }
+
+      const response: AxiosResponse<ApiResponse<CourseStatisticsVO[]>> =
+        await request.get('/admin/learning-statistics/courses/ranking', { params });
+
+      console.log('获取课程学习统计排行成功:', response.data);
+      return response.data.data;
+    } catch (error) {
+      console.error(`获取课程学习统计排行失败, 排序字段: ${sortBy}, 机构ID: ${institutionId}:`, error);
       throw error;
     }
   }

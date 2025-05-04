@@ -331,4 +331,20 @@ public interface OrderService {
      * @return 平台收入统计数据
      */
     PlatformIncomeStatsVO getPlatformIncomeStats(LocalDateTime startDate, LocalDateTime endDate);
+
+    /**
+     * 获取机构总收入（分）
+     *
+     * @param institutionId 机构ID
+     * @return 总收入（分）
+     */
+    Long getInstitutionTotalIncome(Long institutionId);
+
+    /**
+     * 获取机构本月收入（分）
+     *
+     * @param institutionId 机构ID
+     * @return 本月收入（分）
+     */
+    Long getInstitutionMonthIncome(Long institutionId);
 }

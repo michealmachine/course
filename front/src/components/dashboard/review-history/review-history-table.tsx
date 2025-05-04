@@ -85,81 +85,37 @@ export default function ReviewHistoryTable({ isAdmin = false, reviewType, target
         }
       } else {
         // 加载所有审核记录或当前审核员的记录
-        if (reviewType === ReviewType.INSTITUTION) {
-          // 对于机构审核历史，使用机构申请表中的数据
+        if (isAdmin && userIsAdmin) {
           try {
-            // 这里应该调用获取机构申请列表的API，包括已审核的申请
-            // 注意：这里需要修改为使用reviewerInstitutionService获取机构申请列表
-            const params = {
-              page: currentPage,
-              size: pageSize,
-              // 不传递 status 参数，让后端使用默认值
-            };
-
-            // 调用机构申请列表API
-            const result = await reviewerInstitutionService.getApplications(params);
-
-            // 过滤出已审核的申请（状态为1-已通过或2-已拒绝）
-            const reviewedApplications = result.content.filter(app => app.status === 1 || app.status === 2);
-
-            // 将机构申请转换为审核记录格式
-            const mappedRecords = reviewedApplications.map(app => ({
-              id: app.id,
-              reviewType: ReviewType.INSTITUTION,
-              targetId: app.id,
-              targetName: app.name,
-              result: app.status === 1 ? ReviewResult.APPROVED : ReviewResult.REJECTED,
-              reviewerId: app.reviewerId,
-              reviewerName: app.reviewerName || '未知审核员',
-              reviewedAt: app.reviewedAt,
-              comment: app.reviewComment || '',
-              institutionId: app.institutionId,
-            }));
-
-            setRecords(mappedRecords);
-            setTotalItems(result.totalElements);
-            setTotalPages(result.totalPages);
+            // 管理员可以查看所有审核记录
+            const data = await reviewRecordService.getAllReviewRecords(
+              reviewType,
+              currentPage,
+              pageSize
+            );
+            setRecords(data.content);
+            setTotalItems(data.totalElements);
+            setTotalPages(data.totalPages);
           } catch (error) {
-            console.error('获取机构申请列表失败:', error);
-            toast.error('获取机构审核历史失败');
+            console.error('管理员获取审核记录失败:', error);
+            toast.error('获取审核记录失败');
             setRecords([]);
             setTotalItems(0);
             setTotalPages(1);
           }
         } else {
-          // 对于其他类型的审核记录，使用review_records表中的数据
-          if (isAdmin && userIsAdmin) {
-            try {
-              // 管理员可以查看所有审核记录
-              const data = await reviewRecordService.getAllReviewRecords(
-                reviewType,
-                currentPage,
-                pageSize
-              );
-              setRecords(data.content);
-              setTotalItems(data.totalElements);
-              setTotalPages(data.totalPages);
-            } catch (error) {
-              console.error('管理员获取审核记录失败:', error);
-              toast.error('获取审核记录失败');
-              setRecords([]);
-              setTotalItems(0);
-              setTotalPages(1);
-            }
-          } else {
-            try {
-              // 审核员只能查看自己的审核记录，但可以按类型过滤
-              const data = await reviewRecordService.getReviewerRecords(currentPage, pageSize, reviewType);
-              setRecords(data.content);
-              setTotalItems(data.totalElements);
-              setTotalPages(data.totalPages);
-            } catch (error) {
-              console.error('审核员获取审核记录失败:', error);
-              toast.error('获取审核记录失败');
-              setRecords([]);
-              setTotalItems(0);
-              setTotalPages(1);
-            }
+          try {
+            // 审核员只能查看自己的审核记录，但可以按类型过滤
+            const data = await reviewRecordService.getReviewerRecords(currentPage, pageSize, reviewType);
+            setRecords(data.content);
+            setTotalItems(data.totalElements);
+            setTotalPages(data.totalPages);
+          } catch (error) {
+            console.error('审核员获取审核记录失败:', error);
+            toast.error('获取审核记录失败');
+            setRecords([]);
+            setTotalItems(0);
+            setTotalPages(1);
           }
         }
       }

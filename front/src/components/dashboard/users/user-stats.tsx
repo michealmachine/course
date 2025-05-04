@@ -97,7 +97,7 @@ const formatGrowthRate = (value: number) => {
 
 // 处理用户增长数据，确保30天内每天都有数据点
 const processGrowthData = (dailyRegistrations: any[]) => {
-  if (!dailyRegistrations || dailyRegistrations.length === 0) return [];
+  console.log('处理用户增长数据:', dailyRegistrations);
 
   // 创建最近30天的日期数组
   const last30Days = Array.from({ length: 30 }, (_, i) => {
@@ -109,21 +109,26 @@ const processGrowthData = (dailyRegistrations: any[]) => {
   // 创建日期到数据的映射
   const dateMap = new Map();
 
-  // 将现有数据放入映射中
-  dailyRegistrations.forEach(day => {
-    dateMap.set(day.date, {
-      date: day.date,
-      count: day.count
+  // 将现有数据放入映射中（如果有）
+  if (dailyRegistrations && dailyRegistrations.length > 0) {
+    dailyRegistrations.forEach(day => {
+      dateMap.set(day.date, {
+        date: day.date,
+        count: day.count
+      });
     });
-  });
+  }
 
   // 确保所有日期都有数据，如果没有则填充零值
-  return last30Days.map(date =>
+  const result = last30Days.map(date =>
     dateMap.get(date) || {
       date,
       count: 0
     }
   );
+
+  console.log('处理后的数据:', result);
+  return result;
 };
 
 export function UserStats() {
@@ -342,7 +347,7 @@ export function UserStats() {
               <div className="flex items-center justify-center h-[300px]">
                 <Skeleton className="h-[300px] w-full rounded-md" />
               </div>
-            ) : stats?.growthStats?.dailyRegistrations?.length ? (
+            ) : stats?.growthStats ? (
               <ChartContainer
                 config={growthChartConfig}
                 className="h-[300px] w-full"

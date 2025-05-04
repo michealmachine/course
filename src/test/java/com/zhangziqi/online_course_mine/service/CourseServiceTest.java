@@ -511,6 +511,88 @@ public class CourseServiceTest {
     }
 
     @Test
+    @DisplayName("获取标签关联的所有课程 - 成功")
+    void getCoursesByTagId_Success() {
+        // 准备测试数据
+        Long tagId = 1L;
+        Pageable pageable = PageRequest.of(0, 10);
+
+        when(tagRepository.findById(tagId)).thenReturn(Optional.of(testTag));
+        when(courseRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(testCourse), pageable, 1));
+
+        // 执行测试
+        Page<CourseVO> result = courseService.getCoursesByTagId(tagId, pageable);
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals("测试课程", result.getContent().get(0).getTitle());
+
+        // 验证交互
+        verify(tagRepository).findById(tagId);
+        verify(courseRepository).findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("获取标签关联的所有课程 - 标签不存在")
+    void getCoursesByTagId_TagNotFound() {
+        // 准备测试数据
+        Long tagId = 1L;
+        Pageable pageable = PageRequest.of(0, 10);
+
+        when(tagRepository.findById(tagId)).thenReturn(Optional.empty());
+
+        // 执行测试并验证异常
+        assertThrows(ResourceNotFoundException.class, () -> courseService.getCoursesByTagId(tagId, pageable));
+
+        // 验证交互
+        verify(tagRepository).findById(tagId);
+        verify(courseRepository, never()).findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("获取分类关联的所有课程 - 成功")
+    void getCoursesByCategoryId_Success() {
+        // 准备测试数据
+        Long categoryId = 1L;
+        Pageable pageable = PageRequest.of(0, 10);
+
+        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(testCategory));
+        when(courseRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(testCourse), pageable, 1));
+
+        // 执行测试
+        Page<CourseVO> result = courseService.getCoursesByCategoryId(categoryId, pageable);
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals("测试课程", result.getContent().get(0).getTitle());
+
+        // 验证交互
+        verify(categoryRepository).findById(categoryId);
+        verify(courseRepository).findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("获取分类关联的所有课程 - 分类不存在")
+    void getCoursesByCategoryId_CategoryNotFound() {
+        // 准备测试数据
+        Long categoryId = 1L;
+        Pageable pageable = PageRequest.of(0, 10);
+
+        when(categoryRepository.findById(categoryId)).thenReturn(Optional.empty());
+
+        // 执行测试并验证异常
+        assertThrows(ResourceNotFoundException.class, () -> courseService.getCoursesByCategoryId(categoryId, pageable));
+
+        // 验证交互
+        verify(categoryRepository).findById(categoryId);
+        verify(courseRepository, never()).findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    @Test
     @DisplayName("更新课程封面 - 文件大小超限")
     void updateCourseCover_FileTooLarge() throws IOException {
         // 准备测试数据

@@ -18,10 +18,16 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  ResponsiveContainer,
-  Legend,
-  Tooltip
+  ResponsiveContainer
 } from 'recharts';
+
+// 导入 shadcn 图表组件
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+} from "@/components/ui/chart";
 
 interface InstitutionIncomeTrendProps {
   isAdmin?: boolean;
@@ -107,18 +113,45 @@ export function InstitutionIncomeTrend({ isAdmin = false }: InstitutionIncomeTre
           </div>
         ) : trendData.length > 0 ? (
           <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ChartContainer
+              config={{
+                income: {
+                  label: "收入",
+                  theme: {
+                    light: "hsl(0, 0%, 15%)",
+                    dark: "hsl(0, 0%, 95%)",
+                  },
+                },
+                refund: {
+                  label: "退款",
+                  theme: {
+                    light: "hsl(0, 0%, 35%)",
+                    dark: "hsl(0, 0%, 75%)",
+                  },
+                },
+                netIncome: {
+                  label: "净收入",
+                  theme: {
+                    light: "hsl(0, 0%, 55%)",
+                    dark: "hsl(0, 0%, 55%)",
+                  },
+                },
+              }}
+              className="h-full w-full"
+            >
               <LineChart
-                data={trendData}
-                margin={{ top: 10, right: 20, left: 20, bottom: 30 }}
+                accessibilityLayer
+                data={trendData.map(item => ({
+                  name: item.date,
+                  收入: item.income,
+                  退款: item.refund,
+                  净收入: item.netIncome
+                }))}
+                margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
-                  dataKey="date"
-                  tickLine={false}
-                  axisLine={{ stroke: 'hsl(var(--border))' }}
-                  tickMargin={8}
-                  minTickGap={30}
+                  dataKey="name"
                   tickFormatter={(value) => {
                     if (groupBy === 'month') {
                       return value; // yyyy-MM
@@ -129,51 +162,20 @@ export function InstitutionIncomeTrend({ isAdmin = false }: InstitutionIncomeTre
                     }
                   }}
                 />
-                <YAxis
-                  tickLine={false}
-                  axisLine={{ stroke: 'hsl(var(--border))' }}
-                  tickMargin={8}
-                  tickFormatter={(value) => formatPrice(value)}
+                <YAxis />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      formatter={(value) => formatPrice(Number(value))}
+                    />
+                  }
                 />
-                <Tooltip
-                  formatter={(value, name) => {
-                    const nameMap = {
-                      income: '收入',
-                      refund: '退款',
-                      netIncome: '净收入'
-                    };
-                    return [formatPrice(Number(value)), nameMap[name as keyof typeof nameMap] || name];
-                  }}
-                  labelFormatter={(label) => {
-                    if (groupBy === 'month') {
-                      return `${label.split('-')[0]}年${label.split('-')[1]}月`;
-                    } else if (groupBy === 'week') {
-                      return `${label.split('-')[0]}年第${label.split('-')[1]}周`;
-                    } else {
-                      const parts = label.split('-');
-                      return `${parts[0]}年${parts[1]}月${parts[2]}日`;
-                    }
-                  }}
-                  separator=": "
-                  itemSorter={(item) => {
-                    // 确保收入、退款、净收入的顺序
-                    const order = {income: 0, refund: 1, netIncome: 2};
-                    return order[item.dataKey as keyof typeof order] || 0;
-                  }}
-                />
+                <ChartLegend />
                 <Line
                   type="monotone"
-                  dataKey="income"
-                  stroke={incomeColor}
-                  strokeWidth={2}
-                  dot={{ r: 2 }}
-                  activeDot={{ r: 4 }}
-                  connectNulls={true}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="refund"
-                  stroke={refundColor}
+                  dataKey="收入"
+                  name="收入"
+                  stroke="var(--color-income)"
                   strokeWidth={2}
                   dot={{ r: 4 }}
                   activeDot={{ r: 6 }}
@@ -181,16 +183,26 @@ export function InstitutionIncomeTrend({ isAdmin = false }: InstitutionIncomeTre
                 />
                 <Line
                   type="monotone"
-                  dataKey="netIncome"
-                  stroke={netIncomeColor}
+                  dataKey="退款"
+                  name="退款"
+                  stroke="var(--color-refund)"
                   strokeWidth={2}
                   dot={{ r: 4 }}
                   activeDot={{ r: 6 }}
                   connectNulls={true}
                 />
-                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="净收入"
+                  name="净收入"
+                  stroke="var(--color-netIncome)"
+                  strokeWidth={2}
+                  dot={{ r: 4 }}
+                  activeDot={{ r: 6 }}
+                  connectNulls={true}
+                />
               </LineChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </div>
         ) : (
           <div className="w-full h-[300px] flex items-center justify-center">

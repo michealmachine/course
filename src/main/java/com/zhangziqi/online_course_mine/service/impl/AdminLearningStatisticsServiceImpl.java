@@ -11,15 +11,19 @@ import com.zhangziqi.online_course_mine.model.vo.InstitutionLearningStatisticsVO
 import com.zhangziqi.online_course_mine.model.vo.LearningHeatmapVO;
 import com.zhangziqi.online_course_mine.model.vo.LearningProgressTrendVO;
 import com.zhangziqi.online_course_mine.repository.CourseRepository;
+import com.zhangziqi.online_course_mine.repository.InstitutionRepository;
 import com.zhangziqi.online_course_mine.repository.LearningRecordRepository;
 import com.zhangziqi.online_course_mine.repository.UserCourseRepository;
 import com.zhangziqi.online_course_mine.repository.UserRepository;
 import com.zhangziqi.online_course_mine.service.AdminLearningStatisticsService;
+import com.zhangziqi.online_course_mine.service.InstitutionLearningStatisticsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +50,8 @@ public class AdminLearningStatisticsServiceImpl implements AdminLearningStatisti
     private final LearningRecordRepository learningRecordRepository;
     private final UserCourseRepository userCourseRepository;
     private final UserRepository userRepository;
+    private final InstitutionRepository institutionRepository;
+    private final InstitutionLearningStatisticsService institutionLearningStatisticsService;
 
     @Override
     @Transactional(readOnly = true)
@@ -126,8 +132,9 @@ public class AdminLearningStatisticsServiceImpl implements AdminLearningStatisti
             return Page.empty(pageable);
         }
 
+        // 使用 new ArrayList<> 创建一个新的列表，而不是使用 subList
         List<InstitutionLearningStatisticsVO.CourseStatisticsVO> pagedResults =
-                allCourseStats.subList(start, end);
+                new ArrayList<>(allCourseStats.subList(start, end));
 
         return new PageImpl<>(pagedResults, pageable, allCourseStats.size());
     }
@@ -206,8 +213,9 @@ public class AdminLearningStatisticsServiceImpl implements AdminLearningStatisti
             return Page.empty(pageable);
         }
 
+        // 使用 new ArrayList<> 创建一个新的列表，而不是使用 subList
         List<InstitutionLearningStatisticsVO.CourseStatisticsVO> pagedResults =
-                allCourseStats.subList(start, end);
+                new ArrayList<>(allCourseStats.subList(start, end));
 
         return new PageImpl<>(pagedResults, pageable, allCourseStats.size());
     }
@@ -588,7 +596,8 @@ public class AdminLearningStatisticsServiceImpl implements AdminLearningStatisti
 
     @Override
     @Transactional(readOnly = true)
-    @Cacheable(value = CacheConfig.ADMIN_STATS_CACHE, key = "'institution_ranking_' + #sortBy + '_' + #limit")
+    // 暂时禁用缓存，以解决 ArrayList$SubList 序列化问题
+    // @Cacheable(value = CacheConfig.ADMIN_STATS_CACHE, key = "'institution_ranking_' + #sortBy + '_' + #limit")
     public List<InstitutionLearningStatisticsVO.InstitutionStatisticsVO> getInstitutionRanking(String sortBy, Integer limit) {
         log.info("获取机构学习统计排行, 排序字段: {}, 数量限制: {}", sortBy, limit);
 
@@ -636,7 +645,9 @@ public class AdminLearningStatisticsServiceImpl implements AdminLearningStatisti
 
         // 限制数量
         if (institutionStats.size() > limit) {
-            institutionStats = institutionStats.subList(0, limit);
+            // 使用 new ArrayList<> 创建一个新的列表，而不是使用 subList
+            // 这样可以避免 ArrayList$SubList 序列化问题
+            return new ArrayList<>(institutionStats.subList(0, limit));
         }
 
         return institutionStats;
@@ -644,7 +655,8 @@ public class AdminLearningStatisticsServiceImpl implements AdminLearningStatisti
 
     @Override
     @Transactional(readOnly = true)
-    @Cacheable(value = CacheConfig.ADMIN_STATS_CACHE, key = "'course_ranking_' + #sortBy + '_' + #institutionId + '_' + #limit")
+    // 暂时禁用缓存，以解决 ArrayList$SubList 序列化问题
+    // @Cacheable(value = CacheConfig.ADMIN_STATS_CACHE, key = "'course_ranking_' + #sortBy + '_' + #institutionId + '_' + #limit")
     public List<InstitutionLearningStatisticsVO.CourseStatisticsVO> getCourseRanking(String sortBy, Long institutionId, Integer limit) {
         log.info("获取课程学习统计排行, 排序字段: {}, 机构ID: {}, 数量限制: {}", sortBy, institutionId, limit);
 
@@ -727,7 +739,9 @@ public class AdminLearningStatisticsServiceImpl implements AdminLearningStatisti
 
         // 限制数量
         if (courseStats.size() > limit) {
-            courseStats = courseStats.subList(0, limit);
+            // 使用 new ArrayList<> 创建一个新的列表，而不是使用 subList
+            // 这样可以避免 ArrayList$SubList 序列化问题
+            return new ArrayList<>(courseStats.subList(0, limit));
         }
 
         return courseStats;
@@ -821,6 +835,83 @@ public class AdminLearningStatisticsServiceImpl implements AdminLearningStatisti
                 .build();
     }
 
+    /**
+     * 获取机构每日学习统计
+     */
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.ADMIN_STATS_CACHE, key = "'institution_daily_stats_' + #institutionId + '_' + #startDate + '_' + #endDate")
+    public List<DailyLearningStatVO> getInstitutionDailyLearningStats(Long institutionId, LocalDate startDate, LocalDate endDate) {
+        log.info("获取机构每日学习统计, 机构ID: {}, 开始日期: {}, 结束日期: {}",
+                institutionId, startDate, endDate);
+
+        // 验证机构存在
+        institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new ResourceNotFoundException("机构不存在"));
+
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+
+        List<Object[]> results = learningRecordRepository.findDailyLearningStatsByInstitutionId(
+                institutionId, startDateTime, endDateTime);
+
+        List<DailyLearningStatVO> stats = new ArrayList<>();
+        for (Object[] result : results) {
+            String date = (String) result[0];
+            Long duration = result[1] != null ? ((Number) result[1]).longValue() : 0L;
+            Integer count = result[2] != null ? ((Number) result[2]).intValue() : 0;
+
+            stats.add(DailyLearningStatVO.builder()
+                    .date(date)
+                    .durationSeconds(duration)
+                    .activityCount(count)
+                    .build());
+        }
+
+        return stats;
+    }
+
+    /**
+     * 获取机构活动类型统计
+     */
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.ADMIN_STATS_CACHE, key = "'institution_activity_type_stats_' + #institutionId")
+    public List<ActivityTypeStatVO> getInstitutionActivityTypeStats(Long institutionId) {
+        log.info("获取机构活动类型统计, 机构ID: {}", institutionId);
+
+        // 验证机构存在
+        institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new ResourceNotFoundException("机构不存在"));
+
+        List<Object[]> results = learningRecordRepository.findLearningStatsByActivityTypeForInstitution(institutionId);
+
+        // 计算总学习时长（用于计算百分比）
+        Number totalDurationNum = learningRecordRepository.findTotalLearningDurationByInstitution(institutionId);
+        Long totalDuration = totalDurationNum != null ? totalDurationNum.longValue() : 0L;
+
+        List<ActivityTypeStatVO> stats = new ArrayList<>();
+        for (Object[] result : results) {
+            String activityType = (String) result[0];
+            Long duration = result[1] != null ? ((Number) result[1]).longValue() : 0L;
+            Integer count = result[2] != null ? ((Number) result[2]).intValue() : 0;
+
+            // 计算百分比
+            Double percentage = totalDuration > 0 ? (double) duration / totalDuration : 0.0;
+
+            LearningActivityType type = LearningActivityType.getByCode(activityType);
+            String description = type != null ? type.getDescription() : activityType;
+
+            stats.add(ActivityTypeStatVO.builder()
+                    .activityType(activityType)
+                    .activityTypeDescription(description)
+                    .totalDurationSeconds(duration)
+                    .activityCount(count)
+                    .percentage(percentage)
+                    .build());
+        }
+
+        return stats;
+    }
+
     @Override
     @Transactional(readOnly = true)
     @Cacheable(value = CacheConfig.ADMIN_STATS_CACHE, key = "'user_course_progress_trend_' + #courseId + '_' + #userId + '_' + #startDate + '_' + #endDate")
@@ -865,5 +956,30 @@ public class AdminLearningStatisticsServiceImpl implements AdminLearningStatisti
                 .courseId(courseId)
                 .progressData(progressData)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheConfig.ADMIN_STATS_CACHE, key = "'institution_statistics_' + #institutionId")
+    public InstitutionLearningStatisticsVO getInstitutionLearningStatistics(Long institutionId) {
+        log.info("管理员获取机构学习统计, 机构ID: {}", institutionId);
+
+        // 验证机构存在
+        institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new ResourceNotFoundException("机构不存在"));
+
+        // 直接调用机构学习统计服务
+        InstitutionLearningStatisticsVO statisticsVO = institutionLearningStatisticsService.getInstitutionLearningStatistics(institutionId);
+
+        log.info("管理员成功获取机构学习统计, 机构ID: {}, 学习人数: {}, 学习时长: {}秒",
+                institutionId, statisticsVO.getTotalLearners(), statisticsVO.getTotalLearningDuration());
+
+        return statisticsVO;
+    }
+
+    @Override
+    @CacheEvict(value = CacheConfig.ADMIN_STATS_CACHE, allEntries = true)
+    public void clearStatisticsCache() {
+        log.info("清除所有统计缓存");
     }
 }

@@ -802,9 +802,22 @@ public class CourseServiceImpl implements CourseService {
      * @return 用户名
      */
     private String getUsernameById(Long userId) {
-        return userRepository.findById(userId)
-                .map(User::getUsername)
-                .orElse("未知用户");
+        User user = userRepository.findById(userId)
+                .orElse(null);
+
+        if (user == null) {
+            return "未知用户";
+        }
+
+        // 检查用户是否有机构ID，如果有，则是机构审核员
+        if (user.getInstitutionId() != null) {
+            // 获取机构名称
+            return institutionRepository.findById(user.getInstitutionId())
+                    .map(institution -> user.getUsername() + " (" + institution.getName() + ")")
+                    .orElse(user.getUsername() + " (机构审核员)");
+        }
+
+        return user.getUsername();
     }
 
     /**
@@ -1355,5 +1368,95 @@ public class CourseServiceImpl implements CourseService {
         courseRepository.save(course);
         log.info("课程{}评分修改，从{}修改为{}，当前评分: {}，评分人数: {}",
             courseId, oldRating, newRating, course.getAverageRating(), course.getRatingCount());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<CourseVO> getCoursesByTagId(Long tagId, Pageable pageable) {
+        log.info("获取标签关联的所有课程，标签ID: {}, 分页: {}", tagId, pageable);
+
+        // 验证标签是否存在
+        Tag tag = tagRepository.findById(tagId)
+                .orElseThrow(() -> new ResourceNotFoundException("标签不存在，ID: " + tagId));
+
+        // 使用Specification构建查询条件
+        Specification<Course> spec = (root, query, cb) -> {
+            // 使用JOIN连接标签表
+            Join<Course, Tag> tagJoin = root.join("tags", JoinType.INNER);
+
+            // 添加标签ID条件
+            Predicate tagPredicate = cb.equal(tagJoin.get("id"), tagId);
+
+            // 去除重复结果
+            query.distinct(true);
+
+            return tagPredicate;
+        };
+
+        // 执行查询
+        Page<Course> coursePage = courseRepository.findAll(spec, pageable);
+
+        log.info("标签{}关联的课程数量: {}", tagId, coursePage.getTotalElements());
+
+        // 转换为VO并返回
+        return coursePage.map(course -> {
+            CourseVO vo = CourseVO.fromEntity(course);
+            // 设置机构名称
+            if (course.getInstitution() != null) {
+                vo.getInstitution().setName(course.getInstitution().getName());
+            }
+            return vo;
+        });
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<CourseVO> getCoursesByCategoryId(Long categoryId, Pageable pageable) {
+        log.info("获取分类关联的所有课程，分类ID: {}, 分页: {}", categoryId, pageable);
+
+        // 验证分类是否存在
+        Category category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new ResourceNotFoundException("分类不存在，ID: " + categoryId));
+
+        // 使用Specification构建查询条件
+        Specification<Course> spec = (root, query, cb) -> {
+            // 添加分类ID条件
+            return cb.equal(root.get("category").get("id"), categoryId);
+        };
+
+        // 执行查询
+        Page<Course> coursePage = courseRepository.findAll(spec, pageable);
+
+        log.info("分类{}关联的课程数量: {}", categoryId, coursePage.getTotalElements());
+
+        // 转换为VO并返回
+        return coursePage.map(course -> {
+            CourseVO vo = CourseVO.fromEntity(course);
+            // 设置机构名称
+            if (course.getInstitution() != null) {
+                vo.getInstitution().setName(course.getInstitution().getName());
+            }
+            return vo;
+        });
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<CourseVO> getAllCourses(Pageable pageable) {
+        log.info("获取所有课程, 页码: {}, 每页数量: {}",
+                pageable.getPageNumber(), pageable.getPageSize());
+
+        // 查询所有课程
+        Page<Course> coursePage = courseRepository.findAll(pageable);
+
+        // 转换为VO并返回
+        return coursePage.map(course -> {
+            CourseVO vo = CourseVO.fromEntity(course);
+            // 设置机构名称
+            if (course.getInstitution() != null) {
+                vo.getInstitution().setName(course.getInstitution().getName());
+            }
+            return vo;
+        });
     }
 }

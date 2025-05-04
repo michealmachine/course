@@ -11,6 +11,7 @@ import com.zhangziqi.online_course_mine.model.vo.InstitutionLearningStatisticsVO
 import com.zhangziqi.online_course_mine.model.vo.LearningHeatmapVO;
 import com.zhangziqi.online_course_mine.model.vo.LearningProgressTrendVO;
 import com.zhangziqi.online_course_mine.repository.CourseRepository;
+import com.zhangziqi.online_course_mine.repository.InstitutionRepository;
 import com.zhangziqi.online_course_mine.repository.LearningRecordRepository;
 import com.zhangziqi.online_course_mine.repository.UserCourseRepository;
 import com.zhangziqi.online_course_mine.repository.UserRepository;
@@ -54,6 +55,9 @@ public class AdminLearningStatisticsServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private InstitutionRepository institutionRepository;
 
     @InjectMocks
     private AdminLearningStatisticsServiceImpl statisticsService;
@@ -457,6 +461,44 @@ public class AdminLearningStatisticsServiceTest {
         assertEquals(2, result2.size());
         assertEquals(2L, result2.get(0).getInstitutionId()); // 机构B学生数量最多
         assertEquals(1L, result2.get(1).getInstitutionId()); // 机构A学生数量第二
+    }
+
+    @Test
+    @DisplayName("获取机构学习统计概览")
+    void testGetInstitutionLearningStatistics() {
+        // 模拟机构数据
+        when(institutionRepository.findById(1L)).thenReturn(Optional.of(institution));
+
+        // 模拟学习人数数据
+        when(learningRecordRepository.countUniqueUsersByInstitution(1L)).thenReturn(2L);
+
+        // 模拟学习时长数据
+        when(learningRecordRepository.findTotalLearningDurationByInstitution(1L)).thenReturn(7200L);
+        when(learningRecordRepository.findTodayLearningDurationByInstitution(1L)).thenReturn(3600L);
+
+        // 模拟周学习记录
+        List<LearningRecord> weekRecords = Arrays.asList(record1, record2);
+        when(learningRecordRepository.findByInstitutionIdAndTimeRange(
+                eq(1L), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(weekRecords);
+
+        // 模拟课程统计数据
+        List<Object[]> courseStats = new ArrayList<>();
+        courseStats.add(new Object[]{1L, "课程1", 10L, 5000L, 500});
+        courseStats.add(new Object[]{2L, "课程2", 5L, 3000L, 300});
+        when(learningRecordRepository.findLearningStatsByCourseForInstitution(1L)).thenReturn(courseStats);
+
+        // 执行方法
+        InstitutionLearningStatisticsVO result = statisticsService.getInstitutionLearningStatistics(1L);
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1L, result.getInstitutionId());
+        assertEquals("测试机构", result.getInstitutionName());
+        assertEquals(2L, result.getTotalLearners());
+        assertEquals(7200L, result.getTotalLearningDuration());
+        assertEquals(3600L, result.getTodayLearningDuration());
+        assertEquals(2, result.getTotalActiveCourses());
     }
 
     @Test

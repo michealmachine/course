@@ -277,9 +277,9 @@ export default function WrongQuestionList({
   }
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>错题本</CardTitle>
+    <div className="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm">
+      <div className="flex flex-row items-center justify-between px-6">
+        <div className="leading-none font-semibold">错题本</div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">排序:</span>
@@ -317,8 +317,8 @@ export default function WrongQuestionList({
             清空错题
           </Button>
         </div>
-      </CardHeader>
-      <CardContent>
+      </div>
+      <div className="px-6">
         <Tabs
           defaultValue="all"
           className="w-full"
@@ -703,7 +703,7 @@ export default function WrongQuestionList({
             )}
           </TabsContent>
         </Tabs>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

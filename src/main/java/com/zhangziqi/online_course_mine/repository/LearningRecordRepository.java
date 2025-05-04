@@ -247,7 +247,7 @@ public interface LearningRecordRepository extends JpaRepository<LearningRecord, 
            "WHERE lr.course.institution.id = :institutionId " +
            "AND uc.status = 0 " + // 0 = NORMAL，只计算正常状态的课程
            "AND lr.durationSeconds IS NOT NULL")
-    Long findTotalLearningDurationByInstitution(@Param("institutionId") Long institutionId);
+    Number findTotalLearningDurationByInstitution(@Param("institutionId") Long institutionId);
 
     /**
      * 获取机构今日总学习时长

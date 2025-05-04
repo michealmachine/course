@@ -35,6 +35,7 @@ import { User } from '@/types/auth';
 import { UserQueryParams } from '@/types/user';
 import { MoreHorizontal, Plus, Search, RefreshCw } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
+import { getUserRoleDisplayNames, getRoleDisplayName } from '@/utils/roleUtils';
 
 export function UserList() {
   const {
@@ -42,6 +43,7 @@ export function UserList() {
     pagination,
     queryParams,
     fetchUsers,
+    fetchUserById,
     setQueryParams,
     setCurrentUser,
     setFormVisible,
@@ -61,6 +63,14 @@ export function UserList() {
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  // 调试输出用户数据
+  useEffect(() => {
+    if (users.length > 0) {
+      console.log('用户列表数据:', users);
+      console.log('第一个用户的角色数据:', users[0].roles);
+    }
+  }, [users]);
 
   // 处理搜索
   const handleSearch = () => {
@@ -99,8 +109,10 @@ export function UserList() {
 
   // 处理编辑用户
   const handleEdit = (user: User) => {
-    setCurrentUser(user);
-    setFormVisible(true);
+    // 先获取用户详情，确保有完整的角色信息
+    fetchUserById(user.id).then(() => {
+      setFormVisible(true);
+    });
   };
 
   // 处理删除用户
@@ -111,8 +123,10 @@ export function UserList() {
 
   // 处理分配角色
   const handleAssignRoles = (user: User) => {
-    setCurrentUser(user);
-    setRoleDialogVisible(true);
+    // 先获取用户详情，确保有完整的角色信息
+    fetchUserById(user.id).then(() => {
+      setRoleDialogVisible(true);
+    });
   };
 
   // 处理批量删除
@@ -152,7 +166,7 @@ export function UserList() {
           <PaginationLink onClick={() => handlePageChange(1)}>1</PaginationLink>
         </PaginationItem>
       );
-      
+
       if (currentPage > 4) {
         items.push(
           <PaginationItem key="ellipsis-start">
@@ -166,7 +180,7 @@ export function UserList() {
     for (let i = Math.max(1, currentPage - 2); i <= Math.min(totalPages, currentPage + 2); i++) {
       items.push(
         <PaginationItem key={i}>
-          <PaginationLink 
+          <PaginationLink
             isActive={currentPage === i}
             onClick={() => handlePageChange(i)}
           >
@@ -185,7 +199,7 @@ export function UserList() {
           </PaginationItem>
         );
       }
-      
+
       items.push(
         <PaginationItem key="last">
           <PaginationLink onClick={() => handlePageChange(totalPages)}>
@@ -212,9 +226,9 @@ export function UserList() {
           <Button variant="outline" size="icon" onClick={handleSearch}>
             <Search className="h-4 w-4" />
           </Button>
-          <Button 
-            variant="outline" 
-            size="icon" 
+          <Button
+            variant="outline"
+            size="icon"
             onClick={() => {
               setSearchKeyword('');
               fetchUsers({
@@ -230,8 +244,8 @@ export function UserList() {
         </div>
         <div className="flex items-center gap-2">
           {selectedIds.length > 0 && (
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               size="sm"
               onClick={handleBatchDelete}
               disabled={isLoading}
@@ -239,7 +253,7 @@ export function UserList() {
               删除选中 ({selectedIds.length})
             </Button>
           )}
-          <Button 
+          <Button
             onClick={() => {
               setCurrentUser(null);
               setFormVisible(true);
@@ -256,7 +270,7 @@ export function UserList() {
           <TableHeader>
             <TableRow>
               <TableHead className="w-[50px]">
-                <Checkbox 
+                <Checkbox
                   checked={isAllSelected}
                   onCheckedChange={handleSelectAll}
                   disabled={users.length === 0}
@@ -266,7 +280,6 @@ export function UserList() {
               <TableHead>昵称</TableHead>
               <TableHead>邮箱</TableHead>
               <TableHead>手机号</TableHead>
-              <TableHead>角色</TableHead>
               <TableHead>状态</TableHead>
               <TableHead>创建时间</TableHead>
               <TableHead className="text-right">操作</TableHead>
@@ -283,7 +296,7 @@ export function UserList() {
               users.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell>
-                    <Checkbox 
+                    <Checkbox
                       checked={selectedIds.includes(user.id)}
                       onCheckedChange={() => toggleSelectedId(user.id)}
                     />
@@ -292,15 +305,6 @@ export function UserList() {
                   <TableCell>{user.nickname}</TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>{user.phone || '-'}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {user.roles?.map((role) => (
-                        <Badge key={role.id} variant="outline">
-                          {role.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
                   <TableCell>
                     <Badge variant={user.status === 1 ? "success" : "destructive"}>
                       {user.status === 1 ? '启用' : '禁用'}
@@ -328,7 +332,7 @@ export function UserList() {
                           {user.status === 1 ? '禁用' : '启用'}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           className="text-destructive focus:text-destructive"
                           onClick={() => handleDelete(user)}
                         >
@@ -361,20 +365,20 @@ export function UserList() {
             </select>
             条
           </div>
-          
+
           <Pagination>
             <PaginationContent>
               <PaginationItem>
-                <PaginationPrevious 
+                <PaginationPrevious
                   onClick={() => !pagination.first && handlePageChange(pagination.number)}
                   className={pagination.first ? "pointer-events-none opacity-50" : ""}
                 />
               </PaginationItem>
-              
+
               {renderPaginationItems()}
-              
+
               <PaginationItem>
-                <PaginationNext 
+                <PaginationNext
                   onClick={() => !pagination.last && handlePageChange(pagination.number + 2)}
                   className={pagination.last ? "pointer-events-none opacity-50" : ""}
                 />
@@ -385,4 +389,4 @@ export function UserList() {
       )}
     </div>
   );
-} 
+}

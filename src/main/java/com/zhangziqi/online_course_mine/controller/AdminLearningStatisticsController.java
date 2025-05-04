@@ -129,6 +129,23 @@ public class AdminLearningStatisticsController {
     }
 
     /**
+     * 获取机构学习统计概览
+     */
+    @GetMapping("/institutions/{institutionId}/overview")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "获取机构学习统计概览", description = "管理员获取指定机构的学习统计概览数据")
+    public Result<InstitutionLearningStatisticsVO> getInstitutionStatisticsOverview(
+            @Parameter(description = "机构ID") @PathVariable Long institutionId) {
+        String username = SecurityUtil.getCurrentUsername();
+
+        log.info("管理员获取机构学习统计概览, 用户名: {}, 机构ID: {}", username, institutionId);
+
+        InstitutionLearningStatisticsVO statistics = statisticsService.getInstitutionLearningStatistics(institutionId);
+        return Result.success(statistics);
+    }
+
+    /**
      * 获取机构课程学习统计
      */
     @GetMapping("/institutions/{institutionId}/courses")
@@ -424,5 +441,20 @@ public class AdminLearningStatisticsController {
 
         LearningProgressTrendVO trend = statisticsService.getUserCourseLearningProgressTrend(courseId, userId, startDate, endDate);
         return Result.success(trend);
+    }
+
+    /**
+     * 清除统计缓存
+     */
+    @PostMapping("/cache/clear")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "清除统计缓存", description = "清除所有统计数据的缓存")
+    public Result<Void> clearStatisticsCache() {
+        String username = SecurityUtil.getCurrentUsername();
+        log.info("清除统计缓存, 用户名: {}", username);
+
+        statisticsService.clearStatisticsCache();
+        return Result.success();
     }
 }

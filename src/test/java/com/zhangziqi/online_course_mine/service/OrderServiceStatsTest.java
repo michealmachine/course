@@ -145,7 +145,7 @@ class OrderServiceStatsTest {
                 .orElse(null);
 
         assertNotNull(paidStatus);
-        assertEquals(2, paidStatus.getCount());
+        assertEquals(2L, paidStatus.getCount());
         assertEquals(50.0, paidStatus.getPercentage()); // 2/4 = 50%
 
         // 验证已退款订单的统计
@@ -155,7 +155,7 @@ class OrderServiceStatsTest {
                 .orElse(null);
 
         assertNotNull(refundedStatus);
-        assertEquals(1, refundedStatus.getCount());
+        assertEquals(1L, refundedStatus.getCount());
         assertEquals(25.0, refundedStatus.getPercentage()); // 1/4 = 25%
 
         // 验证待支付订单的统计
@@ -165,7 +165,7 @@ class OrderServiceStatsTest {
                 .orElse(null);
 
         assertNotNull(pendingStatus);
-        assertEquals(1, pendingStatus.getCount());
+        assertEquals(1L, pendingStatus.getCount());
         assertEquals(25.0, pendingStatus.getPercentage()); // 1/4 = 25%
     }
 
@@ -285,7 +285,7 @@ class OrderServiceStatsTest {
                 .orElse(null);
 
         assertNotNull(paidStatus);
-        assertEquals(2, paidStatus.getCount());
+        assertEquals(2L, paidStatus.getCount());
         assertEquals(50.0, paidStatus.getPercentage()); // 2/4 = 50%
 
         // 验证已退款订单的统计
@@ -295,7 +295,7 @@ class OrderServiceStatsTest {
                 .orElse(null);
 
         assertNotNull(refundedStatus);
-        assertEquals(1, refundedStatus.getCount());
+        assertEquals(1L, refundedStatus.getCount());
         assertEquals(25.0, refundedStatus.getPercentage()); // 1/4 = 25%
     }
 

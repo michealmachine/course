@@ -205,4 +205,23 @@ public interface CourseRepository extends JpaRepository<Course, Long>, JpaSpecif
            "LEFT JOIN ch.sections s " +
            "WHERE c.id = :courseId")
     Object[] findCourseStructureInfo(@Param("courseId") Long courseId);
+
+    /**
+     * 统计机构的课程数量
+     *
+     * @param institutionId 机构ID
+     * @return 课程数量
+     */
+    @Query("SELECT COUNT(c) FROM Course c WHERE c.institution.id = :institutionId")
+    int countByInstitutionId(@Param("institutionId") Long institutionId);
+
+    /**
+     * 统计机构的特定状态课程数量
+     *
+     * @param institutionId 机构ID
+     * @param status 课程状态
+     * @return 课程数量
+     */
+    @Query("SELECT COUNT(c) FROM Course c WHERE c.institution.id = :institutionId AND c.status = :status")
+    int countByInstitutionIdAndStatus(@Param("institutionId") Long institutionId, @Param("status") Integer status);
 }

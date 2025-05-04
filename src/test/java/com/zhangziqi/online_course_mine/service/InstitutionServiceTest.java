@@ -20,12 +20,22 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.data.jpa.domain.Specification;
+import com.zhangziqi.online_course_mine.model.dto.InstitutionQueryDTO;
+import com.zhangziqi.online_course_mine.repository.CourseRepository;
+import com.zhangziqi.online_course_mine.service.InstitutionLearningStatisticsService;
+import com.zhangziqi.online_course_mine.service.OrderService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import com.zhangziqi.online_course_mine.model.vo.UserVO;
+import java.util.ArrayList;
+import java.util.List;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
@@ -75,16 +85,28 @@ class InstitutionServiceTest {
     private User user;
     private Institution institution;
 
+    @Mock
+    private CourseRepository courseRepository;
+
+    @Mock
+    private InstitutionLearningStatisticsService learningStatisticsService;
+
+    @Mock
+    private OrderService orderService;
+
     @BeforeEach
     void setUp() {
         institutionService = new InstitutionServiceImpl(
                 institutionRepository,
                 applicationRepository,
                 userRepository,
+                courseRepository,
                 emailService,
                 storageQuotaService,
                 minioService,
-                reviewRecordService
+                reviewRecordService,
+                learningStatisticsService,
+                orderService
         );
 
         // 设置申请DTO
@@ -717,35 +739,121 @@ class InstitutionServiceTest {
     }
 
     @Test
-    void updateInstitutionLogo_InvalidFileType_ThrowsException() throws IOException {
+    void getInstitutions_Success() {
         // Arrange
-        // 模拟用户是机构管理员
-        User adminUser = User.builder()
-                .id(1L)
-                .username("admin")
-                .email("admin@example.com")
-                .institutionId(1L)
-                .build();
+        InstitutionQueryDTO queryDTO = new InstitutionQueryDTO();
+        queryDTO.setName("测试");
+        queryDTO.setStatus(1);
 
-        Institution institutionWithEmail = Institution.builder()
-                .id(1L)
-                .name("测试机构")
-                .contactEmail("admin@example.com")
-                .build();
+        Pageable pageable = PageRequest.of(0, 10);
 
-        when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(adminUser));
-        when(institutionRepository.findById(anyLong())).thenReturn(Optional.of(institutionWithEmail));
+        List<Institution> institutions = new ArrayList<>();
+        institutions.add(institution);
 
-        // 创建非图片类型文件
-        MockMultipartFile textFile = new MockMultipartFile(
-            "logo",
-            "document.txt",
-            "text/plain",
-            "not an image".getBytes()
-        );
+        Page<Institution> institutionPage = new PageImpl<>(institutions, pageable, 1);
+
+        // 使用 any() 匹配器，因为 Specification 是函数式接口，难以精确匹配
+        when(institutionRepository.findAll(any(Specification.class), eq(pageable)))
+                .thenReturn(institutionPage);
+
+        // Act
+        Page<InstitutionVO> result = institutionService.getInstitutions(queryDTO, pageable);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        verify(institutionRepository, times(1)).findAll(any(Specification.class), eq(pageable));
+    }
+
+    @Test
+    void getAdminInstitutionDetail_Success() {
+        // Arrange
+        when(institutionRepository.findById(eq(1L))).thenReturn(Optional.of(institution));
+
+        // Act
+        InstitutionVO result = institutionService.getAdminInstitutionDetail(1L);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(institution.getName(), result.getName());
+        verify(institutionRepository, times(1)).findById(eq(1L));
+    }
+
+    @Test
+    void getInstitutionUsers_Success() {
+        // Arrange
+        Long institutionId = 1L;
+        String keyword = "test";
+        Pageable pageable = PageRequest.of(0, 10);
+
+        List<User> users = new ArrayList<>();
+        users.add(user);
+
+        Page<User> userPage = new PageImpl<>(users, pageable, 1);
+
+        when(institutionRepository.existsById(eq(1L))).thenReturn(true);
+        when(userRepository.findByInstitutionIdAndUsernameContainingIgnoreCaseOrInstitutionIdAndEmailContainingIgnoreCase(
+                eq(1L), eq("test"), eq(1L), eq("test"), eq(pageable)))
+                .thenReturn(userPage);
+
+        // Act
+        Page<UserVO> result = institutionService.getInstitutionUsers(institutionId, keyword, pageable);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        verify(institutionRepository, times(1)).existsById(anyLong());
+        verify(userRepository, times(1)).findByInstitutionIdAndUsernameContainingIgnoreCaseOrInstitutionIdAndEmailContainingIgnoreCase(
+                anyLong(), anyString(), anyLong(), anyString(), any(Pageable.class));
+    }
+
+    @Test
+    void getInstitutionStats_Success() {
+        // Arrange
+        Long institutionId = 1L;
+
+        // 明确指定 institutionId = 1L 时返回 true
+        when(institutionRepository.existsById(eq(1L))).thenReturn(true);
+        when(userRepository.countByInstitutionId(eq(1L))).thenReturn(10L);
+        when(courseRepository.countByInstitutionId(eq(1L))).thenReturn(5);
+        when(courseRepository.countByInstitutionIdAndStatus(eq(1L), eq(4))).thenReturn(3);
+        when(learningStatisticsService.getInstitutionLearnerCount(eq(1L))).thenReturn(Long.valueOf(20L));
+        when(learningStatisticsService.getInstitutionTotalLearningDuration(eq(1L))).thenReturn(3600L);
+        when(orderService.getInstitutionTotalIncome(eq(1L))).thenReturn(10000L);
+        when(orderService.getInstitutionMonthIncome(eq(1L))).thenReturn(5000L);
+
+        // Act
+        InstitutionVO.InstitutionStatsVO result = institutionService.getInstitutionStats(institutionId);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(10L, result.getUserCount());
+        assertEquals(5, result.getCourseCount());
+        assertEquals(3, result.getPublishedCourseCount());
+        assertEquals(20L, result.getTotalLearners());
+        assertEquals(3600L, result.getTotalLearningDuration());
+        assertEquals(10000L, result.getTotalIncome());
+        assertEquals(5000L, result.getMonthIncome());
+
+        verify(institutionRepository, times(1)).existsById(anyLong());
+        verify(userRepository, times(1)).countByInstitutionId(anyLong());
+        verify(courseRepository, times(1)).countByInstitutionId(anyLong());
+        verify(courseRepository, times(1)).countByInstitutionIdAndStatus(anyLong(), anyInt());
+        verify(learningStatisticsService, times(1)).getInstitutionLearnerCount(anyLong());
+        verify(learningStatisticsService, times(1)).getInstitutionTotalLearningDuration(anyLong());
+        verify(orderService, times(1)).getInstitutionTotalIncome(anyLong());
+        verify(orderService, times(1)).getInstitutionMonthIncome(anyLong());
+    }
+
+    @Test
+    void getInstitutionStats_InstitutionNotFound() {
+        // Arrange
+        Long institutionId = 999L;
+        // 明确指定 institutionId = 999L 时返回 false
+        when(institutionRepository.existsById(eq(999L))).thenReturn(false);
 
         // Act & Assert
-        assertThrows(BusinessException.class, () ->
-                institutionService.updateInstitutionLogo(1L, textFile, "admin"));
+        assertThrows(BusinessException.class, () -> institutionService.getInstitutionStats(institutionId));
+        verify(institutionRepository, times(1)).existsById(eq(999L));
     }
 }

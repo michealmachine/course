@@ -153,6 +153,14 @@ public interface AdminLearningStatisticsService {
     List<InstitutionLearningStatisticsVO.InstitutionCourseDistributionVO> getInstitutionCourseDistribution();
 
     /**
+     * 获取机构学习统计概览
+     *
+     * @param institutionId 机构ID
+     * @return 机构学习统计概览
+     */
+    InstitutionLearningStatisticsVO getInstitutionLearningStatistics(Long institutionId);
+
+    /**
      * 获取特定用户在特定课程的学习热力图数据
      *
      * @param courseId 课程ID
@@ -173,4 +181,9 @@ public interface AdminLearningStatisticsService {
      * @return 学习进度趋势数据
      */
     LearningProgressTrendVO getUserCourseLearningProgressTrend(Long courseId, Long userId, LocalDate startDate, LocalDate endDate);
+
+    /**
+     * 清除统计缓存
+     */
+    void clearStatisticsCache();
 }

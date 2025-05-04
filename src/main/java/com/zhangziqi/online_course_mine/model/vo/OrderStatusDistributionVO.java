@@ -13,22 +13,22 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class OrderStatusDistributionVO {
-    
+
     /**
      * 订单状态值
      */
     private Integer status;
-    
+
     /**
      * 订单状态名称
      */
     private String statusName;
-    
+
     /**
      * 订单数量
      */
-    private Integer count;
-    
+    private Long count;
+
     /**
      * 百分比（0-100）
      */

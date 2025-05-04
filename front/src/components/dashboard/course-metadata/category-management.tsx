@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Category, CategoryDTO, CategoryTree, Course } from '@/types/course';
 import {
   Table,
@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -43,6 +44,7 @@ import { Loader2, Plus, Search, Trash2, Edit, ChevronDown, ChevronUp } from 'luc
 import { toast } from 'sonner';
 import categoryService from '@/services/category';
 import courseService from '@/services/course-service';
+import metadataService from '@/services/metadata-service';
 import {
   Pagination,
   PaginationContent,
@@ -98,6 +100,19 @@ export function CategoryManagement() {
   const [expandedCategory, setExpandedCategory] = useState<number | null>(null);
   const [categoryCourses, setCategoryCourses] = useState<Course[]>([]);
   const [loadingCourses, setLoadingCourses] = useState(false);
+  const [totalCourseCount, setTotalCourseCount] = useState(0);
+
+  // 计算进度条的值（0-100）
+  const calculateProgressValue = (count: number): number => {
+    if (count === 0) return 0;
+
+    // 使用当前页面的课程总数作为基底
+    // 如果总数为0，返回100%（避免除以0）
+    if (totalCourseCount === 0) return 100;
+
+    // 计算百分比，最小为5%（确保即使很小的值也能看到一点进度）
+    return Math.max(5, Math.min(100, (count / totalCourseCount) * 100));
+  };
 
   // 表单初始化
   const form = useForm<z.infer<typeof categoryFormSchema>>({
@@ -118,10 +133,18 @@ export function CategoryManagement() {
     setIsLoading(true);
     try {
       const result = await categoryService.getCategoryList(searchKeyword, page);
-      setCategories(result.content);
+      const categoryList = result.content || [];
+      setCategories(categoryList);
       setTotalPages(result.totalPages);
       setTotalItems(result.totalElements);
       setCurrentPage(result.number);
+
+      // 计算当前页面的课程总数，用于进度条
+      if (categoryList.length > 0) {
+        // 计算当前页面所有分类关联的课程总数
+        const totalCourses = categoryList.reduce((sum, category) => sum + (category.courseCount || 0), 0);
+        setTotalCourseCount(totalCourses);
+      }
     } catch (error) {
       toast.error('加载分类列表失败');
       console.error('加载分类列表失败:', error);
@@ -156,12 +179,8 @@ export function CategoryManagement() {
   const loadCategoryCourses = async (categoryId: number) => {
     setLoadingCourses(true);
     try {
-      // 使用现有的课程搜索API
-      const result = await courseService.searchCourses({
-        categoryId,
-        page: 0,
-        pageSize: 6
-      });
+      // 使用新的元数据API获取所有状态的课程
+      const result = await metadataService.getCategoryCourses(categoryId, 0, 6);
       setCategoryCourses(result.content || []);
     } catch (error) {
       console.error('加载分类课程失败:', error);
@@ -396,6 +415,7 @@ export function CategoryManagement() {
                   <TableHead>编码</TableHead>
                   <TableHead>父分类</TableHead>
                   <TableHead>排序</TableHead>
+                  <TableHead>课程数量</TableHead>
                   <TableHead>状态</TableHead>
                   <TableHead>创建时间</TableHead>
                   <TableHead className="text-right">操作</TableHead>
@@ -417,34 +437,54 @@ export function CategoryManagement() {
                   </TableRow>
                 )}
                 {!isLoading && categories.map((category) => (
-                  <>
+                  <React.Fragment key={category.id}>
                     <TableRow
-                      key={category.id}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => toggleCategory(category.id)}
+                      className="hover:bg-muted/50"
                     >
                       <TableCell>{category.id}</TableCell>
                       <TableCell>
                         <div className="flex items-center">
                           <span>{category.name}</span>
-                          {expandedCategory === category.id ? (
-                            <ChevronUp className="ml-2 h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="ml-2 h-4 w-4" />
-                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="ml-2 p-0 h-6 w-6"
+                            onClick={(e) => toggleCategory(category.id, e)}
+                          >
+                            {expandedCategory === category.id ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </Button>
                         </div>
                       </TableCell>
                       <TableCell>{category.code}</TableCell>
                       <TableCell>{category.parentName || '-'}</TableCell>
-                      <TableCell>{category.orderIndex || 0}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <span>{category.orderIndex || 0}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex justify-between">
+                            <span>{category.courseCount || 0}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {totalCourseCount > 0 ? Math.round((category.courseCount || 0) / totalCourseCount * 100) : 0}%
+                            </span>
+                          </div>
+                          <Progress
+                            value={calculateProgressValue(category.courseCount || 0)}
+                            className="h-1.5"
+                          />
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           <Switch
                             checked={category.enabled !== false}
-                            onCheckedChange={(e) => {
-                              e.stopPropagation();
-                              handleToggleStatus(category);
-                            }}
+                            onCheckedChange={() => handleToggleStatus(category)}
                           />
                           <span>{category.enabled !== false ? '启用' : '禁用'}</span>
                         </div>
@@ -457,18 +497,14 @@ export function CategoryManagement() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenEditDialog(category);
-                            }}
+                            onClick={() => handleOpenEditDialog(category)}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="destructive"
                             size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
+                            onClick={() => {
                               setCategoryToDelete(category);
                               setIsDeleteDialogOpen(true);
                             }}
@@ -494,7 +530,7 @@ export function CategoryManagement() {
                         </TableCell>
                       </TableRow>
                     )}
-                  </>
+                  </React.Fragment>
                 ))}
               </TableBody>
             </Table>
@@ -804,12 +840,8 @@ function CategoryTreeView({
   const loadNodeCourses = async (categoryId: number) => {
     setLoadingCourses(true);
     try {
-      // 使用现有的课程搜索API
-      const result = await courseService.searchCourses({
-        categoryId,
-        page: 0,
-        pageSize: 6
-      });
+      // 使用新的元数据API获取所有状态的课程
+      const result = await metadataService.getCategoryCourses(categoryId, 0, 6);
       setNodeCourses(result.content || []);
     } catch (error) {
       console.error('加载分类课程失败:', error);

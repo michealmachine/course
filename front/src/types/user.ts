@@ -31,13 +31,13 @@ export interface UserDTO {
   id?: number;
   username: string;
   email: string;
-  institutionId: number;
+  institutionId?: number;
   password?: string;
   role?: string;
   phone?: string;
   nickname?: string;
   status?: number;
-  name: string;
+  roleIds?: number[];
 }
 
 // 用户状态更新DTO
@@ -58,4 +58,23 @@ export interface User {
   role: string;
   createdAt: string;
   updatedAt: string;
-} 
+}
+
+/**
+ * 用户视图对象 (用于管理员机构用户管理)
+ */
+export interface UserVO {
+  id: number;
+  username: string;
+  email: string;
+  avatar?: string;
+  nickname?: string;
+  phone?: string;
+  status: number;
+  role: string;
+  institutionId?: number;
+  institutionName?: string;
+  lastLoginTime?: string;
+  createdAt: string;
+  updatedAt: string;
+}

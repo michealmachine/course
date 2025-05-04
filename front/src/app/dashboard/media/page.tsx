@@ -3,14 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { 
-  Upload, 
-  FileVideo, 
-  FileImage, 
-  FileAudio, 
-  File, 
-  FileText, 
-  Trash2, 
+import {
+  Upload,
+  FileVideo,
+  FileImage,
+  FileAudio,
+  File,
+  FileText,
+  Trash2,
   RefreshCw,
   Plus,
   Video,
@@ -73,10 +73,10 @@ const MEDIA_TYPES = {
 
 // 媒体状态
 const MEDIA_STATUS = {
-  UPLOADING: 'UPLOADING', 
+  UPLOADING: 'UPLOADING',
   PROCESSING: 'PROCESSING',
-  READY: 'READY',
-  ERROR: 'ERROR'
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED'
 };
 
 // 分页参数
@@ -128,11 +128,11 @@ interface Media {
 // 格式化文件大小
 const formatFileSize = (bytes: number): string => {
   if (bytes === 0) return '0 B';
-  
+
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
+
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
@@ -165,9 +165,9 @@ const formatDate = (dateStr: string): string => {
 // 热图颜色计算
 const getHeatColor = (count: number, maxCount: number): string => {
   if (count === 0) return 'bg-gray-100';
-  
+
   const intensity = Math.min(Math.ceil((count / maxCount) * 5), 5);
-  
+
   switch (intensity) {
     case 1: return 'bg-blue-100';
     case 2: return 'bg-blue-200';
@@ -179,9 +179,9 @@ const getHeatColor = (count: number, maxCount: number): string => {
 };
 
 // 活动热图组件
-const ActivityHeatmap = ({ 
-  calendarData, 
-  startDate, 
+const ActivityHeatmap = ({
+  calendarData,
+  startDate,
   endDate,
   selectedDate,
   onDateSelect
@@ -229,15 +229,15 @@ const ActivityHeatmap = ({
         <p className="text-sm text-muted-foreground mb-2">活跃程度</p>
         <div className="flex items-center gap-1">
           {[0, 1, 2, 3, 4, 5].map(level => (
-            <div 
-              key={level} 
-              className={`w-4 h-4 rounded ${level === 0 ? 'bg-gray-100' : `bg-blue-${level * 100}`}`} 
+            <div
+              key={level}
+              className={`w-4 h-4 rounded ${level === 0 ? 'bg-gray-100' : `bg-blue-${level * 100}`}`}
               title={level === 0 ? '无活动' : `活动等级 ${level}`}
             />
           ))}
         </div>
       </div>
-      
+
       <div className="grid gap-1">
         {rows.map((week, weekIndex) => (
           <div key={weekIndex} className="flex gap-1">
@@ -247,7 +247,7 @@ const ActivityHeatmap = ({
               const count = activity?.count || 0;
               const isSelectedDate = selectedDate && isSameDay(date, selectedDate);
               const dayColor = getHeatColor(count, calendarData.peakCount);
-              
+
               return (
                 <HoverCard key={dateStr} openDelay={200}>
                   <HoverCardTrigger asChild>
@@ -280,7 +280,7 @@ const ActivityHeatmap = ({
           </div>
         ))}
       </div>
-      
+
       {/* 如果有最活跃日期，显示信息但不自动选择 */}
       {calendarData.mostActiveDate && (
         <div className="mt-4 text-sm text-muted-foreground">
@@ -293,9 +293,9 @@ const ActivityHeatmap = ({
       {/* 如果已经选择了日期，提供清除选择的按钮 */}
       {selectedDate && (
         <div className="mt-4">
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             className="w-full"
             onClick={() => onDateSelect(undefined)}
           >
@@ -308,9 +308,9 @@ const ActivityHeatmap = ({
 };
 
 // 媒体卡片组件
-const MediaCard = ({ item, onView, onDelete }: { 
-  item: MediaItem, 
-  onView: () => void, 
+const MediaCard = ({ item, onView, onDelete }: {
+  item: MediaItem,
+  onView: () => void,
   onDelete: () => void
 }) => {
   return (
@@ -336,10 +336,10 @@ const MediaCard = ({ item, onView, onDelete }: {
             <FileText className="h-12 w-12 text-muted-foreground/50" />
           </div>
         )}
-        <Button 
-          variant="secondary" 
-          size="icon" 
-          className="absolute top-2 right-2" 
+        <Button
+          variant="secondary"
+          size="icon"
+          className="absolute top-2 right-2"
           onClick={(e) => {
             e.stopPropagation();
             onView();
@@ -360,9 +360,9 @@ const MediaCard = ({ item, onView, onDelete }: {
       </CardContent>
       <CardFooter className="p-4 pt-0 flex justify-between">
         <span className="text-xs text-muted-foreground">{formatDate(item.uploadTime)}</span>
-        <Button 
-          variant="ghost" 
-          size="icon" 
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={(e) => {
             e.stopPropagation();
             onDelete();
@@ -378,12 +378,12 @@ const MediaCard = ({ item, onView, onDelete }: {
 // 添加状态徽章获取函数
 const getStatusBadge = (status: string) => {
   switch (status) {
-    case 'READY':
+    case 'COMPLETED':
       return <Badge variant="outline" className="bg-green-50 text-green-700 hover:bg-green-100 dark:bg-green-950/20 dark:text-green-400">可用</Badge>;
     case 'PROCESSING':
       return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 hover:bg-yellow-100 dark:bg-yellow-950/20 dark:text-yellow-400">处理中</Badge>;
-    case 'ERROR':
-      return <Badge variant="outline" className="bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400">错误</Badge>;
+    case 'FAILED':
+      return <Badge variant="outline" className="bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-950/20 dark:text-red-400">失败</Badge>;
     case 'UPLOADING':
       return <Badge variant="outline" className="bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/20 dark:text-blue-400">上传中</Badge>;
     default:
@@ -413,18 +413,18 @@ export default function MediaPage() {
   const [uploadTitle, setUploadTitle] = useState('');
   const [uploadDescription, setUploadDescription] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  
+
   // 活动热图相关状态
   const [startDate, setStartDate] = useState<Date | undefined>(subDays(new Date(), 30));
   const [endDate, setEndDate] = useState<Date | undefined>(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [calendarData, setCalendarData] = useState<MediaActivityCalendarVO | null>(null);
   const [isActivityLoading, setIsActivityLoading] = useState<boolean>(false);
-  
+
   // 搜索相关状态
   const [searchKeyword, setSearchKeyword] = useState<string>('');
   const [isSearching, setIsSearching] = useState(false);
-  
+
   // 加载媒体列表
   const fetchMediaList = async () => {
     try {
@@ -434,46 +434,46 @@ export default function MediaPage() {
         page: pagination.page,
         size: pagination.size
       };
-      
+
       // 如果不是"全部"，则添加类型筛选条件
       if (activeTab !== 'all') {
         // 确保类型参数正确设置
         queryParams.type = activeTab as MediaType;
         console.log(`筛选媒体类型: ${activeTab}`);
       }
-      
+
       // 如果有搜索关键词，添加文件名筛选条件
       if (searchKeyword && searchKeyword.trim() !== '') {
         queryParams.filename = searchKeyword.trim();
         console.log(`搜索文件名: ${searchKeyword}`);
       }
-      
+
       console.log('发送到后端的查询参数:', JSON.stringify(queryParams));
-      
+
       // 调用API获取媒体列表
       const response = await mediaService.getMediaList(queryParams);
-      
+
       // 检查响应数据
       if (response && response.data) {
         const items = response.data.content;
         const total = response.data.totalElements;
-        
+
         console.log(`获取到 ${items.length} 条媒体项，总计 ${total} 项`);
-        
+
         // 检查响应数据是否符合筛选条件
         if (items.length > 0) {
           const typeSet = new Set(items.map(item => item.type));
           console.log('返回的媒体类型:', Array.from(typeSet));
-          
+
           // 如果指定了特定类型，验证响应数据是否符合筛选条件
           if (activeTab !== 'all') {
             const matchingItems = items.filter(item => item.type === activeTab);
             console.log(`筛选类型 ${activeTab} 的匹配项: ${matchingItems.length}/${items.length}`);
-            
+
             // 如果有数据但没有匹配项，说明后端筛选可能有问题
             if (matchingItems.length === 0 && items.length > 0) {
               console.warn('警告: 后端返回的数据可能未正确筛选');
-              
+
               // 在前端手动筛选
               console.log(`手动筛选 ${activeTab} 类型的媒体`);
               setMediaList(matchingItems);
@@ -481,11 +481,11 @@ export default function MediaPage() {
               setIsLoading(false);
               return;
             }
-            
+
             // 如果存在非匹配项，在控制台警告
             if (matchingItems.length < items.length) {
               console.warn(`警告: 后端返回了 ${items.length - matchingItems.length} 个不匹配的项目`);
-              
+
               // 在前端手动筛选
               console.log(`手动筛选 ${activeTab} 类型的媒体`);
               setMediaList(matchingItems);
@@ -495,11 +495,11 @@ export default function MediaPage() {
             }
           }
         }
-        
+
         // 更新UI
         setMediaList(items);
         setTotalItems(total);
-        
+
         // 计算各类型的数量
         const stats: Record<string, number> = {
           'all': total,
@@ -508,16 +508,16 @@ export default function MediaPage() {
           [MediaType.IMAGE]: 0,
           [MediaType.DOCUMENT]: 0
         };
-        
+
         items.forEach(item => {
           const type = item.type as MediaType;
           if (stats[type] !== undefined) {
             stats[type]++;
           }
         });
-        
+
         setTypeStats(stats);
-        
+
         // 为媒体类型预加载访问URL
         items.forEach(item => {
           if (!item.accessUrl) {
@@ -528,7 +528,7 @@ export default function MediaPage() {
         console.warn('获取媒体列表返回无数据');
         setMediaList([]);
         setTotalItems(0);
-        
+
         // 重置类型统计
         setTypeStats({
           'all': 0,
@@ -547,28 +547,28 @@ export default function MediaPage() {
       setIsLoading(false);
     }
   };
-  
+
   // 获取媒体活动数据
   const fetchActivityData = async () => {
     try {
       if (!startDate || !endDate) return;
-      
+
       setIsActivityLoading(true);
       const formatDate = (date: Date) => {
         return format(date, 'yyyy-MM-dd');
       };
-      
+
       const data = await mediaActivityService.getMediaActivityCalendar(
         formatDate(startDate),
         formatDate(endDate)
       );
-      
+
       setCalendarData(data);
-      
+
       // 移除自动选择最活跃日期的逻辑
       // 如果手动清除了选择，则不应该自动选择回来
       // 只有在用户明确点击热力图上的日期时才选择日期
-      
+
     } catch (error) {
       console.error('加载媒体活动数据失败:', error);
       toast.error('加载媒体活动数据失败');
@@ -576,7 +576,7 @@ export default function MediaPage() {
       setIsActivityLoading(false);
     }
   };
-  
+
   // 根据日期加载媒体列表
   const loadMediaByDate = async (date: Date) => {
     try {
@@ -584,19 +584,19 @@ export default function MediaPage() {
       const formatDate = (date: Date) => {
         return format(date, 'yyyy-MM-dd');
       };
-      
+
       const page = pagination.page !== undefined ? pagination.page + 1 : 1; // MediaActivity API 使用1-based索引
       const size = pagination.size || 10;
-      
+
       const data = await mediaActivityService.getMediaListByDate(
         formatDate(date),
         page,
         size
       );
-      
+
       setMediaList(data.content);
       setTotalItems(data.totalElements);
-      
+
       // 添加：预加载媒体访问URL
       if (data.content && data.content.length > 0) {
         data.content.forEach(item => {
@@ -617,7 +617,7 @@ export default function MediaPage() {
   const handleDateSelect = (date: Date | undefined) => {
     // 更新选中的日期状态
     setSelectedDate(date);
-    
+
     if (date) {
       // 如果选择了日期，则加载该日期的媒体列表
       loadMediaByDate(date);
@@ -631,7 +631,7 @@ export default function MediaPage() {
   useEffect(() => {
     // 首先获取一般的媒体列表，不按日期筛选
     fetchMediaList();
-    
+
     // 然后再获取热力图数据，但不自动选择日期
     fetchActivityData();
   }, [pagination, activeTab]);
@@ -642,7 +642,7 @@ export default function MediaPage() {
       fetchActivityData();
     }
   }, [startDate, endDate]);
-  
+
   // 删除媒体
   const handleDeleteMedia = (id: number) => {
     if (confirm('确定要删除这个文件吗？此操作无法撤销。')) {
@@ -659,7 +659,7 @@ export default function MediaPage() {
       });
     }
   };
-  
+
   // 处理搜索
   const handleSearch = () => {
     console.log(`执行搜索，关键词: ${searchKeyword}`);
@@ -682,7 +682,7 @@ export default function MediaPage() {
       handleSearch();
     }
   };
-  
+
   // 处理标签切换
   const handleTabChange = (value: string) => {
     // 清除可能的搜索条件
@@ -690,10 +690,10 @@ export default function MediaPage() {
       setSearchKeyword('');
       setIsSearching(false);
     }
-    
+
     setActiveTab(value);
     setPagination({...pagination, page: 0});
-    
+
     if (value !== activeTab) {
       console.log(`切换标签到: ${value}`);
     }
@@ -703,7 +703,7 @@ export default function MediaPage() {
   const handlePageChange = (newPage: number) => {
     const currentPage = pagination.page ?? 0;
     const totalPages = Math.ceil(totalItems / (pagination.size ?? 10));
-    
+
     if (newPage >= 0 && newPage < totalPages) {
       setPagination({ ...pagination, page: newPage });
     }
@@ -712,7 +712,7 @@ export default function MediaPage() {
   // 查看媒体详情
   const viewMediaDetail = (media: MediaItem) => {
     if (!media || !media.id) return;
-    
+
     router.push(`/dashboard/media/${media.id}`);
   };
 
@@ -723,8 +723,8 @@ export default function MediaPage() {
       if (response && response.data && response.data.accessUrl) {
         console.log(`预加载媒体(ID:${mediaId})访问URL成功`);
         // 更新mediaList中对应项的accessUrl
-        setMediaList(prev => 
-          prev.map(item => 
+        setMediaList(prev =>
+          prev.map(item =>
             item.id === mediaId ? { ...item, accessUrl: response.data.accessUrl } : item
           )
         );
@@ -736,22 +736,22 @@ export default function MediaPage() {
       return null;
     }
   };
-  
+
   // 处理上传
   const handleUpload = async () => {
     if (!selectedFile) {
       toast.error('请选择需要上传的文件');
       return;
     }
-    
+
     if (!uploadTitle.trim()) {
       toast.error('请输入资源标题');
       return;
     }
-    
+
     setIsUploading(true);
     setUploadProgress(0);
-    
+
     try {
       // 初始化上传
       const initResponse = await mediaService.initiateUpload({
@@ -761,10 +761,10 @@ export default function MediaPage() {
         fileSize: selectedFile.size,
         contentType: selectedFile.type,
       });
-      
+
       if (initResponse.data) {
         setUploadingMediaId(initResponse.data.mediaId);
-        
+
         // 开始上传分片
         await uploadParts(
           initResponse.data.mediaId,
@@ -778,7 +778,7 @@ export default function MediaPage() {
     } catch (error: any) {
       console.error('初始化上传失败:', error);
       setIsUploading(false);
-      
+
       if (error.response?.status === 413) {
         toast.error('文件大小超出限制，请选择较小的文件');
       } else if (error.response?.status === 415) {
@@ -804,17 +804,17 @@ export default function MediaPage() {
   ) => {
     try {
       console.log(`开始分片上传 - 总分片数: ${totalParts}, 文件大小: ${file.size}`);
-      
+
       // 用于保存已完成分片的信息
       const completedParts: Array<{partNumber: number, etag: string}> = [];
-      
+
       // 依次上传分片，使用for循环而非并发，避免并发上传可能导致的问题
       for (let i = 0; i < presignedUrls.length; i++) {
         const { partNumber, url } = presignedUrls[i];
         const start = (partNumber - 1) * chunkSize;
         const end = Math.min(start + chunkSize, file.size);
         const chunk = file.slice(start, end);
-        
+
         try {
           // 上传分片到预签名URL
           const response = await fetch(url, {
@@ -824,21 +824,21 @@ export default function MediaPage() {
               'Content-Type': 'application/octet-stream'
             }
           });
-          
+
           if (!response.ok) {
             throw new Error(`分片 ${partNumber} 上传失败: ${response.status} ${response.statusText}`);
           }
-          
+
           // 获取ETag并处理
           let eTag = response.headers.get('ETag') || response.headers.get('etag') || '';
           const cleanETag = eTag.replace(/^"|"$/g, '');
-          
+
           // 记录分片信息
           completedParts.push({
             partNumber,
             etag: cleanETag
           });
-          
+
           // 更新进度
           setUploadProgress(Math.floor((partNumber / totalParts) * 90));
         } catch (error) {
@@ -846,33 +846,33 @@ export default function MediaPage() {
           throw error;
         }
       }
-      
+
       // 按分片编号排序
       completedParts.sort((a, b) => a.partNumber - b.partNumber);
-      
+
       // 构建请求对象
       const completeRequest = {
         uploadId,
         completedParts
       };
-      
+
       // 完成上传，合并分片
       console.log('所有分片上传完成，发送合并请求...');
       const completeResult = await mediaService.completeUpload(mediaId, completeRequest);
-      
+
       if (!completeResult.data) {
         throw new Error(completeResult.message || '完成上传失败');
       }
-      
+
       console.log('合并上传成功');
-      
+
       // 刷新媒体列表
       fetchMediaList();
       setUploadProgress(100);
       toast.success('上传成功', {
         description: '文件已成功上传到服务器'
       });
-      
+
       // 重置表单和对话框
       resetUploadState();
       setUploadDialogOpen(false);
@@ -881,7 +881,7 @@ export default function MediaPage() {
       toast.error('上传失败', {
         description: error instanceof Error ? error.message : String(error)
       });
-      
+
       // 取消上传
       await cancelUpload();
     } finally {
@@ -900,12 +900,12 @@ export default function MediaPage() {
         toast.error('取消上传失败，请刷新页面后重试');
       }
     }
-    
+
     setIsUploading(false);
     setUploadDialogOpen(false);
     resetUploadState();
   };
-  
+
   // 重置上传状态
   const resetUploadState = () => {
     setIsUploading(false);
@@ -914,7 +914,7 @@ export default function MediaPage() {
     setUploadTitle('');
     setUploadDescription('');
     setSelectedFile(null);
-    
+
     // 重置文件输入
     const fileInput = document.getElementById('mediaFile') as HTMLInputElement;
     if (fileInput) {
@@ -932,7 +932,7 @@ export default function MediaPage() {
               管理和查看您的媒体文件
             </p>
           </div>
-          
+
           <div className="flex items-center space-x-2">
             <div className="relative">
               <Input
@@ -953,16 +953,16 @@ export default function MediaPage() {
                   <X className="h-4 w-4" />
                 </Button>
               )}
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                variant="ghost"
+                size="icon"
                 className="absolute right-0 top-0 h-full"
                 onClick={handleSearch}
               >
                 <Search className="h-4 w-4" />
               </Button>
             </div>
-            
+
             <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
               <DialogTrigger asChild>
                 <Button>
@@ -977,7 +977,7 @@ export default function MediaPage() {
                     上传媒体文件到您的机构。支持视频、音频、图片和文档等多种格式。
                   </DialogDescription>
                 </DialogHeader>
-                
+
                 <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
                     <Label htmlFor="title">标题</Label>
@@ -988,7 +988,7 @@ export default function MediaPage() {
                       placeholder="请输入媒体标题"
                     />
                   </div>
-                  
+
                   <div className="grid gap-2">
                     <Label htmlFor="description">描述</Label>
                     <Textarea
@@ -998,7 +998,7 @@ export default function MediaPage() {
                       placeholder="请输入媒体描述（可选）"
                     />
                   </div>
-                  
+
                   <div className="grid gap-2">
                     <Label htmlFor="mediaFile">选择文件</Label>
                     <Input
@@ -1015,7 +1015,7 @@ export default function MediaPage() {
                       }}
                     />
                   </div>
-                  
+
                   {isUploading && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
@@ -1026,10 +1026,10 @@ export default function MediaPage() {
                     </div>
                   )}
                 </div>
-                
+
                 <DialogFooter>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => {
                       if (isUploading && uploadingMediaId) {
                         cancelUpload();
@@ -1045,8 +1045,8 @@ export default function MediaPage() {
                   >
                     {isUploading ? '取消上传' : '取消'}
                   </Button>
-                  <Button 
-                    onClick={handleUpload} 
+                  <Button
+                    onClick={handleUpload}
                     disabled={!selectedFile || isUploading}
                   >
                     {isUploading ? '上传中...' : '上传'}
@@ -1105,7 +1105,7 @@ export default function MediaPage() {
                   />
                 </div>
               </div>
-              
+
               {isActivityLoading ? (
                 <div className="p-4">
                   <Skeleton className="h-[200px] w-full" />
@@ -1130,14 +1130,14 @@ export default function MediaPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>
-                    {selectedDate 
-                      ? `${format(selectedDate, 'yyyy年MM月dd日')}的上传文件` 
-                      : activeTab === 'all' 
-                        ? '全部媒体文件' 
+                    {selectedDate
+                      ? `${format(selectedDate, 'yyyy年MM月dd日')}的上传文件`
+                      : activeTab === 'all'
+                        ? '全部媒体文件'
                         : `${getMediaTypeName(activeTab as MediaType)}文件`}
                   </CardTitle>
                   <CardDescription>
-                    {selectedDate 
+                    {selectedDate
                       ? `当日上传: ${totalItems > 0 ? `共 ${totalItems} 个文件` : '暂无文件'}`
                       : `${totalItems > 0 ? `共 ${totalItems} 个文件` : '暂无文件'}`}
                   </CardDescription>
@@ -1195,7 +1195,7 @@ export default function MediaPage() {
                     ) : (
                       // 媒体列表
                       mediaList.map((item) => (
-                        <TableRow 
+                        <TableRow
                           key={item.id}
                           className="cursor-pointer hover:bg-accent/50"
                           onClick={() => viewMediaDetail(item)}
@@ -1220,9 +1220,9 @@ export default function MediaPage() {
                                 <HoverCardContent className="w-80 p-0">
                                   {item.type === MediaType.IMAGE && item.accessUrl ? (
                                     <div className="relative">
-                                      <img 
-                                        src={item.accessUrl} 
-                                        alt={item.title} 
+                                      <img
+                                        src={item.accessUrl}
+                                        alt={item.title}
                                         className="w-full h-40 object-cover rounded-t-md"
                                         onError={(e) => {
                                           const target = e.target as HTMLImageElement;
@@ -1294,8 +1294,8 @@ export default function MediaPage() {
                                   ) : item.type === MediaType.DOCUMENT && item.accessUrl ? (
                                     <div className="relative">
                                       <div className="w-full h-40 bg-orange-50 dark:bg-orange-950/20 overflow-hidden rounded-t-md">
-                                        <iframe 
-                                          src={item.accessUrl} 
+                                        <iframe
+                                          src={item.accessUrl}
                                           className="w-full h-full border-0 scale-[0.6] origin-top-left"
                                           title={item.title}
                                           sandbox="allow-scripts allow-same-origin"
@@ -1305,19 +1305,19 @@ export default function MediaPage() {
                                             const target = e.target as HTMLIFrameElement;
                                             if (target.parentElement) {
                                               target.style.display = "none";
-                                              
+
                                               // 清空父元素内容
                                               while (target.parentElement.firstChild) {
                                                 target.parentElement.removeChild(target.parentElement.firstChild);
                                               }
-                                              
+
                                               // 创建错误提示元素
                                               const errorContainer = document.createElement('div');
                                               errorContainer.className = "w-full h-full flex items-center justify-center";
-                                              
+
                                               const errorContent = document.createElement('div');
                                               errorContent.className = "flex flex-col items-center text-center";
-                                              
+
                                               // 创建SVG图标
                                               const iconSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
                                               iconSvg.setAttribute("width", "40");
@@ -1329,45 +1329,45 @@ export default function MediaPage() {
                                               iconSvg.setAttribute("stroke-linecap", "round");
                                               iconSvg.setAttribute("stroke-linejoin", "round");
                                               iconSvg.classList.add("text-orange-500", "mb-2");
-                                              
+
                                               // 添加SVG路径
                                               const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
                                               path.setAttribute("d", "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z");
                                               iconSvg.appendChild(path);
-                                              
+
                                               const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
                                               polyline.setAttribute("points", "14 2 14 8 20 8");
                                               iconSvg.appendChild(polyline);
-                                              
+
                                               const line1 = document.createElementNS("http://www.w3.org/2000/svg", "line");
                                               line1.setAttribute("x1", "16");
                                               line1.setAttribute("y1", "13");
                                               line1.setAttribute("x2", "8");
                                               line1.setAttribute("y2", "13");
                                               iconSvg.appendChild(line1);
-                                              
+
                                               const line2 = document.createElementNS("http://www.w3.org/2000/svg", "line");
                                               line2.setAttribute("x1", "16");
                                               line2.setAttribute("y1", "17");
                                               line2.setAttribute("x2", "8");
                                               line2.setAttribute("y2", "17");
                                               iconSvg.appendChild(line2);
-                                              
+
                                               const line3 = document.createElementNS("http://www.w3.org/2000/svg", "line");
                                               line3.setAttribute("x1", "10");
                                               line3.setAttribute("y1", "9");
                                               line3.setAttribute("x2", "8");
                                               line3.setAttribute("y2", "9");
                                               iconSvg.appendChild(line3);
-                                              
+
                                               errorContent.appendChild(iconSvg);
-                                              
+
                                               // 创建错误文本
                                               const errorText = document.createElement('p');
                                               errorText.className = "text-sm text-muted-foreground";
                                               errorText.textContent = "文档加载失败";
                                               errorContent.appendChild(errorText);
-                                              
+
                                               errorContainer.appendChild(errorContent);
                                               target.parentElement.appendChild(errorContainer);
                                             }
@@ -1414,7 +1414,7 @@ export default function MediaPage() {
                                         <div className="text-sm">{getStatusBadge(item.status)}</div>
                                       </div>
                                     </div>
-                                    <Button 
+                                    <Button
                                       className="w-full mt-2"
                                       onClick={(e) => {
                                         e.stopPropagation();
@@ -1448,8 +1448,8 @@ export default function MediaPage() {
                           <TableCell>{formatDate(item.uploadTime)}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end space-x-1">
-                              <Button 
-                                variant="ghost" 
+                              <Button
+                                variant="ghost"
                                 size="icon"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1458,8 +1458,8 @@ export default function MediaPage() {
                               >
                                 <Play className="h-4 w-4" />
                               </Button>
-                              <Button 
-                                variant="ghost" 
+                              <Button
+                                variant="ghost"
                                 size="icon"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1476,13 +1476,13 @@ export default function MediaPage() {
                   </TableBody>
                 </Table>
               </div>
-              
+
               {mediaList.length > 0 && (
                 <div className="mt-4 flex items-center justify-center">
                   <Pagination>
                     <PaginationContent>
                       <PaginationItem>
-                        <PaginationPrevious 
+                        <PaginationPrevious
                           aria-disabled={(pagination.page ?? 0) === 0}
                           tabIndex={(pagination.page ?? 0) === 0 ? -1 : 0}
                           className={(pagination.page ?? 0) === 0 ? 'pointer-events-none opacity-50' : ''}
@@ -1493,7 +1493,7 @@ export default function MediaPage() {
                         const page = pagination.page ?? 0;
                         const size = pagination.size ?? 10;
                         let pageNum = i;
-                        
+
                         if (Math.ceil(totalItems / size) > 5) {
                           if (page > 1) {
                             pageNum = page - 2 + i;
@@ -1502,7 +1502,7 @@ export default function MediaPage() {
                             pageNum = Math.ceil(totalItems / size) - 5 + i;
                           }
                         }
-                        
+
                         if (pageNum >= 0 && pageNum < Math.ceil(totalItems / size)) {
                           return (
                             <PaginationItem key={pageNum}>
@@ -1518,7 +1518,7 @@ export default function MediaPage() {
                         return null;
                       })}
                       <PaginationItem>
-                        <PaginationNext 
+                        <PaginationNext
                           aria-disabled={(pagination.page ?? 0) >= Math.ceil(totalItems / (pagination.size ?? 10)) - 1}
                           tabIndex={(pagination.page ?? 0) >= Math.ceil(totalItems / (pagination.size ?? 10)) - 1 ? -1 : 0}
                           className={(pagination.page ?? 0) >= Math.ceil(totalItems / (pagination.size ?? 10)) - 1 ? 'pointer-events-none opacity-50' : ''}
@@ -1535,4 +1535,4 @@ export default function MediaPage() {
       </div>
     </div>
   );
-} 
+}

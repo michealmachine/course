@@ -3,8 +3,10 @@ package com.zhangziqi.online_course_mine.service.impl;
 import com.zhangziqi.online_course_mine.exception.BusinessException;
 import com.zhangziqi.online_course_mine.model.converter.InstitutionApplicationConverter;
 import com.zhangziqi.online_course_mine.model.converter.InstitutionConverter;
+import com.zhangziqi.online_course_mine.model.converter.UserConverter;
 import com.zhangziqi.online_course_mine.model.dto.InstitutionApplyDTO;
 import com.zhangziqi.online_course_mine.model.dto.InstitutionApplicationQueryDTO;
+import com.zhangziqi.online_course_mine.model.dto.InstitutionQueryDTO;
 import com.zhangziqi.online_course_mine.model.dto.InstitutionUpdateDTO;
 import com.zhangziqi.online_course_mine.model.entity.Institution;
 import com.zhangziqi.online_course_mine.model.entity.InstitutionApplication;
@@ -12,12 +14,17 @@ import com.zhangziqi.online_course_mine.model.entity.User;
 import com.zhangziqi.online_course_mine.model.enums.QuotaType;
 import com.zhangziqi.online_course_mine.model.vo.InstitutionApplicationVO;
 import com.zhangziqi.online_course_mine.model.vo.InstitutionVO;
+import com.zhangziqi.online_course_mine.model.vo.UserVO;
+import com.zhangziqi.online_course_mine.repository.CourseRepository;
 import com.zhangziqi.online_course_mine.repository.InstitutionApplicationRepository;
 import com.zhangziqi.online_course_mine.repository.InstitutionRepository;
 import com.zhangziqi.online_course_mine.repository.UserRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import com.zhangziqi.online_course_mine.service.EmailService;
+import com.zhangziqi.online_course_mine.service.InstitutionLearningStatisticsService;
 import com.zhangziqi.online_course_mine.service.InstitutionService;
 import com.zhangziqi.online_course_mine.service.MinioService;
+import com.zhangziqi.online_course_mine.service.OrderService;
 import com.zhangziqi.online_course_mine.service.ReviewRecordService;
 import com.zhangziqi.online_course_mine.service.StorageQuotaService;
 import com.zhangziqi.online_course_mine.model.enums.ReviewResult;
@@ -35,7 +42,13 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.net.URI;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+
+import jakarta.persistence.criteria.Predicate;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.util.StringUtils;
 
 /**
  * 机构服务实现
@@ -48,10 +61,13 @@ public class InstitutionServiceImpl implements InstitutionService {
     private final InstitutionRepository institutionRepository;
     private final InstitutionApplicationRepository applicationRepository;
     private final UserRepository userRepository;
+    private final CourseRepository courseRepository;
     private final EmailService emailService;
     private final StorageQuotaService storageQuotaService;
     private final MinioService minioService;
     private final ReviewRecordService reviewRecordService;
+    private final InstitutionLearningStatisticsService learningStatisticsService;
+    private final OrderService orderService;
 
     @Override
     @Transactional
@@ -527,5 +543,176 @@ public class InstitutionServiceImpl implements InstitutionService {
         log.info("机构注册码重置成功: {}", institutionId);
 
         return newRegisterCode;
+    }
+
+    /**
+     * 管理员获取机构列表
+     *
+     * @param queryDTO 查询参数
+     * @param pageable 分页参数
+     * @return 机构分页
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Page<InstitutionVO> getInstitutions(InstitutionQueryDTO queryDTO, Pageable pageable) {
+        log.info("管理员获取机构列表: queryDTO={}, pageable={}", queryDTO, pageable);
+
+        // 构建查询条件
+        Specification<Institution> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            // 按名称模糊查询
+            if (StringUtils.hasText(queryDTO.getName())) {
+                predicates.add(cb.like(cb.lower(root.get("name")),
+                        "%" + queryDTO.getName().toLowerCase() + "%"));
+            }
+
+            // 按状态查询
+            if (queryDTO.getStatus() != null) {
+                predicates.add(cb.equal(root.get("status"), queryDTO.getStatus()));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        // 执行查询
+        Page<Institution> institutions = institutionRepository.findAll(spec, pageable);
+
+        // 转换为VO
+        return institutions.map(institution -> InstitutionConverter.toVO(institution, true));
+    }
+
+    /**
+     * 管理员获取机构详情（包含注册码）
+     *
+     * @param institutionId 机构ID
+     * @return 机构详情
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public InstitutionVO getAdminInstitutionDetail(Long institutionId) {
+        log.info("管理员获取机构详情: institutionId={}", institutionId);
+
+        Institution institution = institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new BusinessException("机构不存在"));
+
+        // 管理员可以看到注册码
+        return InstitutionConverter.toVO(institution, true);
+    }
+
+    /**
+     * 获取机构用户列表
+     *
+     * @param institutionId 机构ID
+     * @param keyword 关键词（用户名或邮箱）
+     * @param pageable 分页参数
+     * @return 用户分页
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Page<UserVO> getInstitutionUsers(Long institutionId, String keyword, Pageable pageable) {
+        log.info("获取机构用户列表: institutionId={}, keyword={}, pageable={}",
+                institutionId, keyword, pageable);
+
+        // 检查机构是否存在
+        if (!institutionRepository.existsById(institutionId)) {
+            throw new BusinessException("机构不存在");
+        }
+
+        // 构建查询条件
+        Page<User> users;
+        if (StringUtils.hasText(keyword)) {
+            // 按用户名或邮箱模糊查询
+            users = userRepository.findByInstitutionIdAndUsernameContainingIgnoreCaseOrInstitutionIdAndEmailContainingIgnoreCase(
+                    institutionId, keyword, institutionId, keyword, pageable);
+        } else {
+            // 查询所有机构用户
+            users = userRepository.findByInstitutionId(institutionId, pageable);
+        }
+
+        // 转换为VO
+        return users.map(UserConverter::toVO);
+    }
+
+    /**
+     * 获取机构统计数据
+     *
+     * @param institutionId 机构ID
+     * @return 机构统计数据
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public InstitutionVO.InstitutionStatsVO getInstitutionStats(Long institutionId) {
+        log.info("获取机构统计数据: institutionId={}", institutionId);
+
+        // 检查机构是否存在
+        if (!institutionRepository.existsById(institutionId)) {
+            throw new BusinessException("机构不存在");
+        }
+
+        // 获取用户数量
+        long userCount = userRepository.countByInstitutionId(institutionId);
+
+        // 获取课程数量
+        int courseCount = courseRepository.countByInstitutionId(institutionId);
+
+        // 获取已发布课程数量
+        int publishedCourseCount = courseRepository.countByInstitutionIdAndStatus(institutionId, 4); // 4-已发布
+
+        // 获取总学习人数
+        Long totalLearners = 0L;
+        try {
+            Number learnerCount = learningStatisticsService.getInstitutionLearnerCount(institutionId);
+            if (learnerCount != null) {
+                totalLearners = learnerCount.longValue();
+            }
+        } catch (Exception e) {
+            log.error("获取机构学习人数失败", e);
+        }
+
+        // 获取总学习时长
+        Long totalLearningDuration = 0L;
+        try {
+            Number totalDurationNum = learningStatisticsService.getInstitutionTotalLearningDuration(institutionId);
+            if (totalDurationNum != null) {
+                totalLearningDuration = totalDurationNum.longValue();
+            }
+            log.info("获取机构总学习时长成功: institutionId={}, totalLearningDuration={}", institutionId, totalLearningDuration);
+        } catch (Exception e) {
+            log.error("获取机构总学习时长失败: institutionId={}, error={}", institutionId, e.getMessage());
+        }
+
+        // 获取总收入
+        Long totalIncome = 0L;
+        try {
+            totalIncome = orderService.getInstitutionTotalIncome(institutionId);
+            if (totalIncome == null) {
+                totalIncome = 0L;
+            }
+        } catch (Exception e) {
+            log.error("获取机构总收入失败", e);
+        }
+
+        // 获取本月收入
+        Long monthIncome = 0L;
+        try {
+            monthIncome = orderService.getInstitutionMonthIncome(institutionId);
+            if (monthIncome == null) {
+                monthIncome = 0L;
+            }
+        } catch (Exception e) {
+            log.error("获取机构本月收入失败", e);
+        }
+
+        // 构建统计数据VO
+        return InstitutionVO.InstitutionStatsVO.builder()
+                .userCount(userCount)
+                .courseCount(courseCount)
+                .publishedCourseCount(publishedCourseCount)
+                .totalLearners(totalLearners)
+                .totalLearningDuration(totalLearningDuration)
+                .totalIncome(totalIncome)
+                .monthIncome(monthIncome)
+                .build();
     }
 }

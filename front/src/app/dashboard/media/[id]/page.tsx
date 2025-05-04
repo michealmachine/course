@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import React from 'react';
-import { 
+import {
   ArrowLeft,
   FileVideo,
   FileImage,
@@ -13,7 +13,6 @@ import {
   FileText,
   Trash2,
   Download,
-  Share2,
   Edit,
   Save,
   X,
@@ -70,7 +69,7 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
   // 使用React.use()解包params - 按照Next.js建议处理
   const unwrappedParams = React.use(params as any) as { id: string };
   const id = unwrappedParams.id;
-  
+
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [media, setMedia] = useState<MediaDetail | null>(null);
@@ -78,19 +77,19 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  
+
   // 加载媒体详情
   useEffect(() => {
     fetchMediaDetail();
   }, [id]); // 使用解包后的id
-  
+
   // 获取媒体详情
   const fetchMediaDetail = async () => {
     setIsLoading(true);
     try {
       // 使用解包后的id参数
       const response = await mediaService.getMediaInfo(parseInt(id));
-      
+
       if (response && response.data) {
         // 扩展服务器返回的MediaVO，添加我们需要的其他字段
         const mediaData: MediaDetail = {
@@ -98,17 +97,17 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
           format: getFileFormat(response.data.originalFilename),
           // 后端可能会提供以下信息，如果没有则保持为undefined
           customDuration: response.data.type === MEDIA_TYPES.VIDEO ? 0 : undefined,
-          customResolution: response.data.type === MEDIA_TYPES.VIDEO || response.data.type === MEDIA_TYPES.IMAGE 
+          customResolution: response.data.type === MEDIA_TYPES.VIDEO || response.data.type === MEDIA_TYPES.IMAGE
             ? '未知' : undefined,
           customThumbnail: undefined
         };
-        
+
         setMedia(mediaData);
         setEditTitle(mediaData.title);
         setEditDescription(mediaData.description || '');
-        
+
         // 如果是视频、音频或文档，尝试获取访问URL
-        if (mediaData.type === MEDIA_TYPES.VIDEO || 
+        if (mediaData.type === MEDIA_TYPES.VIDEO ||
             mediaData.type === MEDIA_TYPES.AUDIO ||
             mediaData.type === MEDIA_TYPES.DOCUMENT) {
           fetchMediaAccessUrl(mediaData.id);
@@ -116,7 +115,7 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
       } else {
         toast.error('获取媒体详情失败：没有返回数据');
       }
-      
+
       setIsLoading(false);
     } catch (error) {
       console.error('获取媒体详情失败:', error);
@@ -124,14 +123,14 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
       setIsLoading(false);
     }
   };
-  
+
   // 获取媒体访问URL
   const fetchMediaAccessUrl = async (mediaId: number) => {
     try {
       console.log('尝试获取媒体访问URL，mediaId:', mediaId);
       const response = await mediaService.getMediaAccessUrl(mediaId);
       console.log('获取媒体访问URL响应:', response);
-      
+
       if (response && response.data && response.data.accessUrl) {
         console.log('获取到媒体访问URL:', response.data.accessUrl);
         // 更新媒体对象的访问URL
@@ -155,13 +154,13 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
     }
     return null;
   };
-  
+
   // 获取文件格式
   const getFileFormat = (filename: string): string => {
     const ext = filename.split('.').pop()?.toUpperCase() || 'UNKNOWN';
     return ext;
   };
-  
+
   // 获取媒体图标
   const getMediaIcon = (type: string) => {
     switch (type) {
@@ -172,7 +171,7 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
       default: return <File className="h-10 w-10 text-gray-500" />;
     }
   };
-  
+
   // 格式化文件大小
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B';
@@ -180,19 +179,19 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
     if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
     return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
   };
-  
+
   // 格式化时长
   const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const remainingSeconds = seconds % 60;
-    
+
     if (hours > 0) {
       return `${hours}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
     }
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
-  
+
   // 获取状态文本
   const getStatusText = (status: string): string => {
     switch (status) {
@@ -203,7 +202,7 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
       default: return '未知';
     }
   };
-  
+
   // 获取状态样式
   const getStatusStyle = (status: string): string => {
     switch (status) {
@@ -214,12 +213,12 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
       default: return 'text-gray-500';
     }
   };
-  
+
   // 获取状态徽章
   const getStatusBadge = (status: string) => {
     let variant: 'default' | 'secondary' | 'destructive' | 'outline' = 'outline';
     let label = '未知';
-    
+
     switch (status) {
       case MEDIA_STATUS.UPLOADING:
         variant = 'secondary';
@@ -238,10 +237,10 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
         label = '失败';
         break;
     }
-    
+
     return <Badge variant={variant}>{label}</Badge>;
   };
-  
+
   // 处理保存编辑
   const handleSaveEdit = async () => {
     try {
@@ -250,25 +249,25 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
       //   title: editTitle,
       //   description: editDescription
       // });
-      
+
       // 模拟更新
       setMedia(prev => prev ? {
         ...prev,
         title: editTitle,
         description: editDescription
       } : null);
-      
+
       setIsEditing(false);
       toast.success('更新成功');
     } catch (error) {
       toast.error('更新失败');
     }
   };
-  
+
   // 处理删除
   const handleDelete = async () => {
     if (!media) return;
-    
+
     try {
       await mediaService.deleteMedia(media.id);
       setDeleteDialogOpen(false);
@@ -279,7 +278,7 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
       toast.error('删除失败');
     }
   };
-  
+
   if (isLoading) {
     return (
       <div className="p-6 space-y-6">
@@ -293,7 +292,7 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
           </Button>
           <Skeleton className="h-8 w-48" />
         </div>
-        
+
         <Card>
           <CardHeader>
             <Skeleton className="h-6 w-32" />
@@ -310,7 +309,7 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
       </div>
     );
   }
-  
+
   if (!media) {
     return (
       <div className="p-6">
@@ -333,7 +332,7 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
       </div>
     );
   }
-  
+
   return (
     <div className="p-6 space-y-6">
       {/* 顶部导航 */}
@@ -392,7 +391,7 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
           </Dialog>
         </div>
       </div>
-      
+
       {/* 资源信息 */}
       <div className="grid gap-6 md:grid-cols-3">
         {/* 主要信息 */}
@@ -456,7 +455,7 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
               </div>
             </div>
           </CardHeader>
-          
+
           <CardContent>
             {/* 预览区域 */}
             <div className="aspect-video bg-slate-100 dark:bg-slate-900 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
@@ -501,9 +500,9 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
                   }}
                 />
               ) : media.type === MEDIA_TYPES.DOCUMENT && media.accessUrl ? (
-                <iframe 
+                <iframe
                   key={media.accessUrl}
-                  src={media.accessUrl} 
+                  src={media.accessUrl}
                   className="w-full h-full border-0"
                   title={media.title}
                   loading="lazy"
@@ -517,16 +516,16 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
                 <div className="text-center">
                   {getMediaIcon(media.type)}
                   <p className="text-sm text-muted-foreground mt-2">
-                    {media.type === MEDIA_TYPES.DOCUMENT 
-                      ? '正在加载文档预览...' 
+                    {media.type === MEDIA_TYPES.DOCUMENT
+                      ? '正在加载文档预览...'
                       : media.type === MEDIA_TYPES.VIDEO || media.type === MEDIA_TYPES.AUDIO || media.type === MEDIA_TYPES.IMAGE
-                        ? '正在加载预览...' 
+                        ? '正在加载预览...'
                         : '预览不可用'}
                   </p>
                   {(media.type === MEDIA_TYPES.VIDEO || media.type === MEDIA_TYPES.AUDIO || media.type === MEDIA_TYPES.IMAGE || media.type === MEDIA_TYPES.DOCUMENT) && !media.accessUrl && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       className="mt-2"
                       onClick={() => fetchMediaAccessUrl(media.id)}
                     >
@@ -537,21 +536,17 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
                 </div>
               )}
             </div>
-            
+
             {/* 操作按钮 */}
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1">
+              <Button variant="outline" className="w-full">
                 <Download className="h-4 w-4 mr-2" />
                 下载
-              </Button>
-              <Button variant="outline" className="flex-1">
-                <Share2 className="h-4 w-4 mr-2" />
-                分享
               </Button>
             </div>
           </CardContent>
         </Card>
-        
+
         {/* 详细信息 */}
         <Card>
           <CardHeader>
@@ -620,4 +615,4 @@ export default function MediaDetailPage({ params }: { params: { id: string } }) 
       </div>
     </div>
   );
-} 
+}

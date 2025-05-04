@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import WrongQuestionList from '@/components/learning/wrong-question/wrong-question-list';
+import WrongQuestionListNew from '@/components/learning/wrong-question/wrong-question-list-new';
 import { useAuthStore } from '@/stores/auth-store';
 import { UserRole } from '@/types/auth';
 
@@ -17,7 +17,7 @@ export default function WrongQuestionsPage() {
     );
   }
 
-  const hasUserRole = user.roles.some(role => 
+  const hasUserRole = user.roles.some(role =>
     role.code?.replace('ROLE_', '') === UserRole.USER
   );
 
@@ -38,7 +38,7 @@ export default function WrongQuestionsPage() {
         </p>
       </div>
 
-      <WrongQuestionList />
+      <WrongQuestionListNew />
     </div>
   );
-} 
+}

@@ -89,7 +89,7 @@ export enum CourseDifficulty {
 }
 
 // 机构简要信息
-export interface InstitutionVO {
+export interface InstitutionBriefVO {
   id: number;
   name: string;
   logo?: string;
@@ -107,7 +107,7 @@ export interface Course {
   publishedVersionId?: number; // 指向发布版本的ID
   creatorId?: number;
   creatorName?: string;
-  institution?: InstitutionVO;
+  institution?: InstitutionBriefVO;
   category?: Category;
   tags?: Tag[];
   paymentType: number;
@@ -188,41 +188,41 @@ export interface Section {
   contentType: string; // video, document, audio, text, image, mixed
   chapterId: number;
   chapterTitle?: string;
-  
+
   // 访问类型
   accessType?: number;
-  
+
   // 预计学习时间（分钟）
   estimatedMinutes?: number;
-  
+
   // 资源类型鉴别器：MEDIA, QUESTION_GROUP, NONE
   resourceTypeDiscriminator?: string;
-  
+
   // 直接关联的媒体资源（仅当resourceTypeDiscriminator为MEDIA时有效）
   media?: MediaVO;
-  
+
   // 媒体资源ID（仅当resourceTypeDiscriminator为MEDIA时有效）
   mediaId?: number;
-  
+
   // 媒体资源类型(primary, supplementary, homework, reference)
   mediaResourceType?: string;
-  
+
   // 直接关联的题目组（仅当resourceTypeDiscriminator为QUESTION_GROUP时有效）
   questionGroup?: QuestionGroupVO;
-  
+
   // 题目组ID（仅当resourceTypeDiscriminator为QUESTION_GROUP时有效）
   questionGroupId?: number;
-  
+
   // 题目组配置（仅当resourceTypeDiscriminator为QUESTION_GROUP时有效）
   randomOrder?: boolean;
   orderByDifficulty?: boolean;
   showAnalysis?: boolean;
-  
+
   // 已弃用：使用直接关联的媒体资源或题目组替代
   resources?: SectionResource[];
   // 已弃用：使用直接关联的媒体资源或题目组替代
   questionGroups?: SectionQuestionGroup[];
-  
+
   createdTime?: number;
   updatedTime?: number;
 }
@@ -403,4 +403,29 @@ export interface CourseListResponse {
     paged: boolean;
     unpaged: boolean;
   };
-} 
+}
+
+/**
+ * 课程视图对象 (用于管理员机构课程管理)
+ */
+export interface CourseVO {
+  id: number;
+  title: string;
+  description?: string;
+  coverUrl?: string;
+  status: number;
+  institutionId?: number;
+  institutionName?: string;
+  price: number;
+  difficulty: number;
+  chapterCount?: number;
+  totalDuration?: number;
+  learningCount?: number;
+  studentCount?: number;
+  favoriteCount?: number;
+  averageRating?: number;
+  reviewCount?: number;
+  tags?: string[];
+  createdAt: string;
+  updatedAt: string;
+}

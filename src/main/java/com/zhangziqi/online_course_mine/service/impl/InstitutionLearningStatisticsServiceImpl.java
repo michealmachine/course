@@ -72,8 +72,9 @@ public class InstitutionLearningStatisticsServiceImpl implements InstitutionLear
         statisticsVO.setTotalLearners(totalLearners != null ? totalLearners : 0L);
 
         // 获取总学习时长
-        Long totalDuration = learningRecordRepository.findTotalLearningDurationByInstitution(institutionId);
-        statisticsVO.setTotalLearningDuration(totalDuration != null ? totalDuration : 0L);
+        Number totalDurationNum = learningRecordRepository.findTotalLearningDurationByInstitution(institutionId);
+        Long totalDuration = totalDurationNum != null ? totalDurationNum.longValue() : 0L;
+        statisticsVO.setTotalLearningDuration(totalDuration);
 
         // 获取今日学习时长
         Long todayDuration = learningRecordRepository.findTodayLearningDurationByInstitution(institutionId);
@@ -181,11 +182,21 @@ public class InstitutionLearningStatisticsServiceImpl implements InstitutionLear
 
         List<Object[]> results = learningRecordRepository.findLearningStatsByActivityTypeForInstitution(institutionId);
 
+        // 计算总时长
+        long totalDuration = 0;
+        for (Object[] result : results) {
+            Long duration = result[1] != null ? ((Number) result[1]).longValue() : 0L;
+            totalDuration += duration;
+        }
+
         List<ActivityTypeStatVO> stats = new ArrayList<>();
         for (Object[] result : results) {
             String activityType = (String) result[0];
             Long duration = result[1] != null ? ((Number) result[1]).longValue() : 0L;
             Integer count = result[2] != null ? ((Number) result[2]).intValue() : 0;
+
+            // 计算百分比
+            Double percentage = totalDuration > 0 ? (double) duration / totalDuration : 0.0;
 
             LearningActivityType type = LearningActivityType.getByCode(activityType);
             String description = type != null ? type.getDescription() : activityType;
@@ -195,6 +206,7 @@ public class InstitutionLearningStatisticsServiceImpl implements InstitutionLear
                     .activityTypeDescription(description)
                     .totalDurationSeconds(duration)
                     .activityCount(count)
+                    .percentage(percentage)
                     .build());
         }
 
@@ -217,10 +229,6 @@ public class InstitutionLearningStatisticsServiceImpl implements InstitutionLear
         if (courses.isEmpty()) {
             return Page.empty(pageable);
         }
-
-        // 课程ID与课程映射
-        Map<Long, Course> courseMap = courses.stream()
-                .collect(Collectors.toMap(Course::getId, course -> course));
 
         // 获取课程学习统计
         List<Object[]> courseStatsRaw = learningRecordRepository.findLearningStatsByCourseForInstitution(institutionId);
@@ -311,30 +319,83 @@ public class InstitutionLearningStatisticsServiceImpl implements InstitutionLear
     public Long getInstitutionTodayLearningDuration(Long institutionId) {
         log.info("获取机构今日学习时长, 机构ID: {}", institutionId);
 
-        Long duration = learningRecordRepository.findTodayLearningDurationByInstitution(institutionId);
-        return duration != null ? duration : 0L;
+        Number duration = learningRecordRepository.findTodayLearningDurationByInstitution(institutionId);
+        return duration != null ? duration.longValue() : 0L;
     }
 
     @Override
     @Transactional(readOnly = true)
     @Cacheable(value = CacheConfig.INSTITUTION_STATS_CACHE,
               key = "'institution_total_duration_' + #institutionId")
-    public Long getInstitutionTotalLearningDuration(Long institutionId) {
+    public Number getInstitutionTotalLearningDuration(Long institutionId) {
         log.info("获取机构总学习时长, 机构ID: {}", institutionId);
 
-        Long duration = learningRecordRepository.findTotalLearningDurationByInstitution(institutionId);
-        return duration != null ? duration : 0L;
+        try {
+            Number durationObj = learningRecordRepository.findTotalLearningDurationByInstitution(institutionId);
+
+            if (durationObj == null) {
+                return 0L;
+            }
+
+            log.info("获取机构总学习时长成功, 机构ID: {}, 总时长: {}, 类型: {}",
+                    institutionId, durationObj, durationObj.getClass().getName());
+
+            // 直接返回 Number 对象，让调用者决定如何处理
+            return durationObj;
+        } catch (Exception e) {
+            log.warn("获取机构总学习时长时发生异常, 机构ID: {}, 错误: {}", institutionId, e.getMessage());
+            // 尝试直接查询并手动计算总时长
+            try {
+                List<LearningRecord> records = learningRecordRepository.findByInstitutionId(institutionId);
+                Long totalDuration = records.stream()
+                        .filter(r -> r.getDurationSeconds() != null)
+                        .mapToLong(LearningRecord::getDurationSeconds)
+                        .sum();
+                log.info("备用方法获取机构总学习时长成功, 机构ID: {}, 总时长: {}", institutionId, totalDuration);
+                return totalDuration;
+            } catch (Exception ex) {
+                log.error("备用方法获取机构总学习时长失败, 机构ID: {}, 错误: {}", institutionId, ex.getMessage());
+                return 0L;
+            }
+        }
     }
 
     @Override
     @Transactional(readOnly = true)
     @Cacheable(value = CacheConfig.INSTITUTION_STATS_CACHE,
               key = "'institution_learner_count_' + #institutionId")
-    public Long getInstitutionLearnerCount(Long institutionId) {
+    public Number getInstitutionLearnerCount(Long institutionId) {
         log.info("获取机构学习人数, 机构ID: {}", institutionId);
 
-        Long count = learningRecordRepository.countUniqueUsersByInstitution(institutionId);
-        return count != null ? count : 0L;
+        try {
+            Object countObj = learningRecordRepository.countUniqueUsersByInstitution(institutionId);
+
+            if (countObj == null) {
+                return 0L;
+            }
+
+            // 处理不同类型的返回值
+            if (countObj instanceof Long) {
+                return (Long) countObj;
+            } else if (countObj instanceof Integer) {
+                return Long.valueOf(((Integer) countObj).longValue());
+            } else if (countObj instanceof Number) {
+                return Long.valueOf(((Number) countObj).longValue());
+            } else {
+                log.warn("获取机构学习人数返回了意外的类型: {}, 机构ID: {}",
+                        countObj.getClass().getName(), institutionId);
+                // 尝试转换为字符串再解析为Long
+                try {
+                    return Long.valueOf(countObj.toString());
+                } catch (NumberFormatException nfe) {
+                    log.error("无法将返回值转换为Long: {}", countObj);
+                    return 0L;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("获取机构学习人数时发生异常, 机构ID: {}, 错误: {}", institutionId, e.getMessage());
+            return 0L;
+        }
     }
 
     @Override
@@ -460,11 +521,21 @@ public class InstitutionLearningStatisticsServiceImpl implements InstitutionLear
 
         List<Object[]> results = learningRecordRepository.findLearningStatsByActivityTypeForCourse(courseId);
 
+        // 计算总时长
+        long totalDuration = 0;
+        for (Object[] result : results) {
+            Long duration = result[1] != null ? ((Number) result[1]).longValue() : 0L;
+            totalDuration += duration;
+        }
+
         List<ActivityTypeStatVO> stats = new ArrayList<>();
         for (Object[] result : results) {
             String activityType = (String) result[0];
             Long duration = result[1] != null ? ((Number) result[1]).longValue() : 0L;
             Integer count = result[2] != null ? ((Number) result[2]).intValue() : 0;
+
+            // 计算百分比
+            Double percentage = totalDuration > 0 ? (double) duration / totalDuration : 0.0;
 
             LearningActivityType type = LearningActivityType.getByCode(activityType);
             String description = type != null ? type.getDescription() : activityType;
@@ -474,6 +545,7 @@ public class InstitutionLearningStatisticsServiceImpl implements InstitutionLear
                     .activityTypeDescription(description)
                     .totalDurationSeconds(duration)
                     .activityCount(count)
+                    .percentage(percentage)
                     .build());
         }
 
@@ -849,11 +921,21 @@ public class InstitutionLearningStatisticsServiceImpl implements InstitutionLear
         List<Object[]> results = learningRecordRepository.findLearningStatsByActivityTypeForUserAndCourse(
                 userId, courseId);
 
+        // 计算总时长
+        long totalDuration = 0;
+        for (Object[] result : results) {
+            Long duration = result[1] != null ? ((Number) result[1]).longValue() : 0L;
+            totalDuration += duration;
+        }
+
         List<ActivityTypeStatVO> stats = new ArrayList<>();
         for (Object[] result : results) {
             String activityType = (String) result[0];
             Long duration = result[1] != null ? ((Number) result[1]).longValue() : 0L;
             Integer count = result[2] != null ? ((Number) result[2]).intValue() : 0;
+
+            // 计算百分比
+            Double percentage = totalDuration > 0 ? (double) duration / totalDuration : 0.0;
 
             LearningActivityType type = LearningActivityType.getByCode(activityType);
             String description = type != null ? type.getDescription() : activityType;
@@ -863,6 +945,7 @@ public class InstitutionLearningStatisticsServiceImpl implements InstitutionLear
                     .activityTypeDescription(description)
                     .totalDurationSeconds(duration)
                     .activityCount(count)
+                    .percentage(percentage)
                     .build());
         }
 

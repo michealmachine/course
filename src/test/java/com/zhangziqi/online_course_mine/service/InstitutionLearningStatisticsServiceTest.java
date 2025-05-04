@@ -545,9 +545,9 @@ public class InstitutionLearningStatisticsServiceTest {
         when(learningRecordRepository.findTotalLearningDurationByInstitution(1L))
                 .thenReturn(7200L);
 
-        Long result = statisticsService.getInstitutionTotalLearningDuration(1L);
+        Number result = statisticsService.getInstitutionTotalLearningDuration(1L);
 
-        assertEquals(7200L, result);
+        assertEquals(7200L, result.longValue());
     }
 
     @Test
@@ -556,9 +556,9 @@ public class InstitutionLearningStatisticsServiceTest {
         when(learningRecordRepository.countUniqueUsersByInstitution(1L))
                 .thenReturn(25L);
 
-        Long result = statisticsService.getInstitutionLearnerCount(1L);
+        Number result = statisticsService.getInstitutionLearnerCount(1L);
 
-        assertEquals(25L, result);
+        assertEquals(25L, result.longValue());
     }
 
     @Test

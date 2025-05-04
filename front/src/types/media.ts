@@ -14,8 +14,8 @@ export enum MediaType {
 export enum MediaStatus {
   UPLOADING = 'UPLOADING',
   PROCESSING = 'PROCESSING',
-  READY = 'READY',
-  ERROR = 'ERROR'
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED'
 }
 
 /**
@@ -44,12 +44,12 @@ export interface AdminMediaVO extends MediaVO {
    * 机构名称
    */
   institutionName: string;
-  
+
   /**
    * 上传者用户名
    */
   uploaderUsername: string;
-  
+
   /**
    * 格式化后的文件大小
    */
@@ -64,17 +64,17 @@ export interface TypeDistribution {
    * 媒体类型
    */
   type: MediaType;
-  
+
   /**
    * 媒体类型显示名称
    */
   typeName: string;
-  
+
   /**
    * 该类型媒体数量
    */
   count: number;
-  
+
   /**
    * 占比
    */
@@ -89,14 +89,14 @@ export interface MediaTypeDistributionVO {
    * 总媒体数量
    */
   totalCount: number;
-  
+
   /**
    * 各类型媒体数量
    */
   typeCount: Record<string, number>;
-  
+
   /**
    * 分布详情，用于图表展示
    */
   distribution: TypeDistribution[];
-} 
+}

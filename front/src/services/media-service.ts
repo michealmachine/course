@@ -4,15 +4,7 @@ import { request } from './api';
 import { ApiResponse } from '@/types/api';
 import { AxiosResponse } from 'axios';
 import { StorageGrowthPointVO } from '@/types/stats';
-import { MediaType, MediaVO, AdminMediaVO } from '@/types/media';
-
-// 媒体状态
-export enum MediaStatus {
-  UPLOADING = 'UPLOADING', 
-  PROCESSING = 'PROCESSING',
-  COMPLETED = 'COMPLETED',
-  FAILED = 'FAILED'
-}
+import { MediaType, MediaVO, AdminMediaVO, MediaStatus } from '@/types/media';
 
 // 通用响应类型
 export interface Result<T> {
@@ -169,15 +161,15 @@ export interface MediaService {
 class MediaServiceImpl implements MediaService {
   async getMediaList(params: MediaQueryParams): Promise<Result<Page<MediaVO>>> {
     console.log('MediaService.getMediaList请求参数:', params);
-    
+
     // 确保将type作为查询参数传递
     const queryParams: any = { ...params };
-    
+
     // 如果传递了type参数，确保它被正确地作为查询参数传递
     if (params.type) {
       queryParams.type = params.type;
     }
-    
+
     console.log('发送到API的查询参数:', queryParams);
     const response: AxiosResponse<ApiResponse<Page<MediaVO>>> = await request.get('/media', { params: queryParams });
     return response.data as Result<Page<MediaVO>>;
@@ -239,4 +231,4 @@ class MediaServiceImpl implements MediaService {
   }
 }
 
-export const mediaService = new MediaServiceImpl(); 
+export const mediaService = new MediaServiceImpl();

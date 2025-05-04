@@ -44,6 +44,7 @@ const menuItems: MenuItem[] = [
     title: '仪表盘',
     href: '/dashboard',
     icon: <Home className="w-5 h-5" />,
+    roles: [UserRole.ADMIN, UserRole.USER, UserRole.INSTITUTION],
   },
   {
     title: '个人资料',
@@ -60,6 +61,7 @@ const menuItems: MenuItem[] = [
     title: '我的订单',
     href: '/dashboard/orders',
     icon: <ShoppingCart className="w-5 h-5" />,
+    roles: [UserRole.ADMIN, UserRole.USER, UserRole.INSTITUTION],
   },
   {
     title: '课程搜索',
@@ -107,7 +109,7 @@ const menuItems: MenuItem[] = [
     title: '课程元数据',
     href: '/dashboard/course-metadata',
     icon: <BookOpen className="w-5 h-5" />,
-    roles: [UserRole.ADMIN, UserRole.REVIEWER],
+    roles: [UserRole.ADMIN],
   },
   {
     title: '用户管理',
@@ -115,18 +117,19 @@ const menuItems: MenuItem[] = [
     icon: <Users className="w-5 h-5" />,
     roles: [UserRole.ADMIN],
   },
-  {
-    title: '角色管理',
-    href: '/dashboard/roles',
-    icon: <ShieldCheck className="w-5 h-5" />,
-    roles: [UserRole.ADMIN],
-  },
-  {
-    title: '权限管理',
-    href: '/dashboard/permissions',
-    icon: <ShieldCheck className="w-5 h-5" />,
-    roles: [UserRole.ADMIN],
-  },
+  // 角色管理和权限管理导航已移除，但页面保留
+  // {
+  //   title: '角色管理',
+  //   href: '/dashboard/roles',
+  //   icon: <ShieldCheck className="w-5 h-5" />,
+  //   roles: [UserRole.ADMIN],
+  // },
+  // {
+  //   title: '权限管理',
+  //   href: '/dashboard/permissions',
+  //   icon: <ShieldCheck className="w-5 h-5" />,
+  //   roles: [UserRole.ADMIN],
+  // },
   {
     title: '配额管理',
     href: '/dashboard/admin-quota',
@@ -137,7 +140,7 @@ const menuItems: MenuItem[] = [
     title: '课程管理',
     href: '/dashboard/courses',
     icon: <BookOpen className="w-5 h-5" />,
-    roles: [UserRole.ADMIN, UserRole.INSTITUTION],
+    roles: [UserRole.INSTITUTION],
   },
   {
     title: '机构审核',
@@ -152,9 +155,9 @@ const menuItems: MenuItem[] = [
     roles: [UserRole.ADMIN, UserRole.REVIEWER],
   },
   {
-    title: '统计数据',
-    href: '/dashboard/statistics',
-    icon: <BarChart2 className="w-5 h-5" />,
+    title: '机构课程管理',
+    href: '/dashboard/admin-institutions',
+    icon: <Building2 className="w-5 h-5" />,
     roles: [UserRole.ADMIN],
   },
 ];

@@ -42,7 +42,7 @@ public interface CourseService {
      * @return 课程
      */
     CourseVO getCourseById(Long id);
-    
+
     /**
      * 获取课程完整结构（包括章节和小节）
      *
@@ -171,7 +171,7 @@ public interface CourseService {
      * @param discountPrice 折扣价格
      * @return 更新后的课程
      */
-    CourseVO updatePaymentSettings(Long id, Integer paymentType, 
+    CourseVO updatePaymentSettings(Long id, Integer paymentType,
         java.math.BigDecimal price, java.math.BigDecimal discountPrice);
 
     /**
@@ -182,7 +182,7 @@ public interface CourseService {
      * @return 课程分页
      */
     Page<CourseVO> getCoursesByStatus(Integer status, Pageable pageable);
-    
+
     /**
      * 获取指定状态且由特定审核员负责的课程列表
      *
@@ -195,7 +195,7 @@ public interface CourseService {
 
     /**
      * 获取机构的工作区课程列表（非发布版本）
-     * 
+     *
      * @param institutionId 机构ID
      * @param pageable 分页参数
      * @return 课程VO分页
@@ -204,16 +204,16 @@ public interface CourseService {
 
     /**
      * 获取机构的发布课程列表
-     * 
+     *
      * @param institutionId 机构ID
      * @param pageable 分页参数
      * @return 课程VO分页
      */
     Page<CourseVO> getPublishedCoursesByInstitution(Long institutionId, Pageable pageable);
-    
+
     /**
      * 根据工作区版本ID获取发布版本
-     * 
+     *
      * @param workspaceId 工作区版本ID
      * @return 发布版本课程，如果不存在则返回null
      */
@@ -228,7 +228,7 @@ public interface CourseService {
      * @return 分页课程结果
      */
     Page<CourseVO> searchCourses(CourseSearchDTO searchDTO, Pageable pageable);
-    
+
     /**
      * 获取热门课程
      * 按学习人数排序，只返回已发布状态的课程
@@ -237,7 +237,7 @@ public interface CourseService {
      * @return 热门课程列表
      */
     List<CourseVO> getHotCourses(int limit);
-    
+
     /**
      * 获取最新课程
      * 按创建时间排序，只返回已发布状态的课程
@@ -249,19 +249,19 @@ public interface CourseService {
 
     /**
      * 获取高评分课程
-     * 
+     *
      * @param limit 数量限制
      * @return 高评分课程列表
      */
     List<CourseVO> getTopRatedCourses(int limit);
-    
+
     /**
      * 增加课程学习人数
-     * 
+     *
      * @param courseId 课程ID
      */
     void incrementStudentCount(Long courseId);
-    
+
     /**
      * 更新课程评分（用于添加新评分）
      *
@@ -269,7 +269,7 @@ public interface CourseService {
      * @param newRating 新评分
      */
     void updateCourseRating(Long courseId, Integer newRating);
-    
+
     /**
      * 更新课程评分（用于修改已有评分）
      *
@@ -288,4 +288,33 @@ public interface CourseService {
      * @return 课程结构VO
      */
     CourseStructureVO getPublicCourseStructure(Long id, boolean isUserEnrolled);
-} 
+
+    /**
+     * 获取标签关联的所有课程（不限状态）
+     * 用于管理界面展示标签关联的所有课程
+     *
+     * @param tagId 标签ID
+     * @param pageable 分页参数
+     * @return 课程分页
+     */
+    Page<CourseVO> getCoursesByTagId(Long tagId, Pageable pageable);
+
+    /**
+     * 获取分类关联的所有课程（不限状态）
+     * 用于管理界面展示分类关联的所有课程
+     *
+     * @param categoryId 分类ID
+     * @param pageable 分页参数
+     * @return 课程分页
+     */
+    Page<CourseVO> getCoursesByCategoryId(Long categoryId, Pageable pageable);
+
+    /**
+     * 获取所有课程（分页）
+     * 用于管理员查看所有课程
+     *
+     * @param pageable 分页参数
+     * @return 课程分页
+     */
+    Page<CourseVO> getAllCourses(Pageable pageable);
+}

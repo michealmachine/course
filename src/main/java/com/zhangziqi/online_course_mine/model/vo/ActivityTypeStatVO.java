@@ -14,24 +14,29 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ActivityTypeStatVO {
-    
+
     /**
      * 活动类型代码
      */
     private String activityType;
-    
+
     /**
      * 活动类型描述
      */
     private String activityTypeDescription;
-    
+
     /**
      * 学习总时长（秒）
      */
     private Long totalDurationSeconds;
-    
+
     /**
      * 活动次数
      */
     private Integer activityCount;
-} 
+
+    /**
+     * 占总时长的百分比
+     */
+    private Double percentage;
+}

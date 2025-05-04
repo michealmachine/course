@@ -66,7 +66,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
      * @return 是否存在
      */
     boolean existsByPhone(String phone);
-    
+
     /**
      * 统计机构成员数量
      *
@@ -75,7 +75,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
      */
     @Query("SELECT COUNT(u) FROM User u WHERE u.institution.id = :institutionId")
     long countByInstitutionId(@Param("institutionId") Long institutionId);
-    
+
     /**
      * 根据机构ID查询所有用户
      *
@@ -84,7 +84,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
      */
     @Query("SELECT u FROM User u WHERE u.institution.id = :institutionId")
     List<User> findByInstitutionId(@Param("institutionId") Long institutionId);
-    
+
     /**
      * 根据机构ID分页查询用户
      *
@@ -94,7 +94,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
      */
     @Query("SELECT u FROM User u WHERE u.institution.id = :institutionId")
     Page<User> findByInstitutionId(@Param("institutionId") Long institutionId, Pageable pageable);
-    
+
     /**
      * 根据机构ID和关键字搜索用户（用户名或邮箱包含关键字）
      *
@@ -107,8 +107,27 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
            "AND (LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
            "OR LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')))")
     Page<User> findByInstitutionIdAndKeyword(
-            @Param("institutionId") Long institutionId, 
+            @Param("institutionId") Long institutionId,
             @Param("keyword") String keyword,
+            Pageable pageable);
+
+    /**
+     * 根据机构ID和用户名模糊查询或邮箱模糊查询
+     *
+     * @param institutionId 机构ID
+     * @param username 用户名关键词
+     * @param institutionId2 机构ID（重复参数，与institutionId相同）
+     * @param email 邮箱关键词
+     * @param pageable 分页参数
+     * @return 分页用户列表
+     */
+    @Query("SELECT u FROM User u WHERE (u.institution.id = :institutionId1 AND LOWER(u.username) LIKE LOWER(CONCAT('%', :username, '%'))) " +
+           "OR (u.institution.id = :institutionId2 AND LOWER(u.email) LIKE LOWER(CONCAT('%', :email, '%')))")
+    Page<User> findByInstitutionIdAndUsernameContainingIgnoreCaseOrInstitutionIdAndEmailContainingIgnoreCase(
+            @Param("institutionId1") Long institutionId1,
+            @Param("username") String username,
+            @Param("institutionId2") Long institutionId2,
+            @Param("email") String email,
             Pageable pageable);
 
     /**
@@ -119,7 +138,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
      */
     @Query("SELECT COUNT(DISTINCT u) FROM User u JOIN u.roles r WHERE r.id = :roleId")
     long countByRoleId(@Param("roleId") Long roleId);
-    
+
     /**
      * 统计指定时间范围内创建的用户数量
      *
@@ -129,9 +148,9 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
      */
     @Query("SELECT COUNT(u) FROM User u WHERE u.createdAt BETWEEN :startTime AND :endTime")
     long countByCreatedAtBetween(
-            @Param("startTime") LocalDateTime startTime, 
+            @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime);
-    
+
     /**
      * 统计指定状态的用户数量
      *
@@ -139,7 +158,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
      * @return 用户数量
      */
     long countByStatus(Integer status);
-    
+
     /**
      * 统计最后登录时间在指定时间之后的用户数量
      *
@@ -148,7 +167,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
      */
     @Query("SELECT COUNT(u) FROM User u WHERE u.lastLoginAt IS NOT NULL AND u.lastLoginAt >= :lastLoginTime")
     long countByLastLoginAtAfter(@Param("lastLoginTime") LocalDateTime lastLoginTime);
-    
+
     /**
      * 统计最后登录时间在指定时间范围内的用户数量
      *
@@ -158,9 +177,9 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
      */
     @Query("SELECT COUNT(u) FROM User u WHERE u.lastLoginAt IS NOT NULL AND u.lastLoginAt BETWEEN :startTime AND :endTime")
     long countByLastLoginAtBetween(
-            @Param("startTime") LocalDateTime startTime, 
+            @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime);
-    
+
     /**
      * 统计指定日期每个小时的用户登录分布
      *
@@ -172,9 +191,9 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
            "WHERE u.lastLoginAt BETWEEN :dateStart AND :dateEnd " +
            "GROUP BY HOUR(u.lastLoginAt) ORDER BY hour")
     List<Object[]> countUserLoginByHourOfDay(
-            @Param("dateStart") LocalDateTime dateStart, 
+            @Param("dateStart") LocalDateTime dateStart,
             @Param("dateEnd") LocalDateTime dateEnd);
-    
+
     /**
      * 统计最近一段时间内每个星期几的用户登录分布
      *
@@ -186,9 +205,9 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
            "WHERE u.lastLoginAt BETWEEN :startTime AND :endTime " +
            "GROUP BY FUNCTION('DAYOFWEEK', u.lastLoginAt) ORDER BY weekday")
     List<Object[]> countUserLoginByDayOfWeek(
-            @Param("startTime") LocalDateTime startTime, 
+            @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime);
-    
+
     /**
      * 按日期统计用户注册数量
      *
@@ -200,9 +219,9 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
            "WHERE u.createdAt BETWEEN :startDate AND :endDate " +
            "GROUP BY FUNCTION('DATE_FORMAT', u.createdAt, '%Y-%m-%d') ORDER BY date")
     List<Object[]> countUserRegistrationsByDateRange(
-            @Param("startDate") LocalDateTime startDate, 
+            @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate);
-    
+
     /**
      * 按日期统计用户活跃数量
      *
@@ -214,6 +233,6 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
            "WHERE u.lastLoginAt BETWEEN :startDate AND :endDate " +
            "GROUP BY FUNCTION('DATE_FORMAT', u.lastLoginAt, '%Y-%m-%d') ORDER BY date")
     List<Object[]> countUserActivityByDateRange(
-            @Param("startDate") LocalDateTime startDate, 
+            @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate);
-} 
+}

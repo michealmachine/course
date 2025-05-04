@@ -76,7 +76,7 @@ public interface InstitutionLearningStatisticsService {
      * @param institutionId 机构ID
      * @return 总学习时长（秒）
      */
-    Long getInstitutionTotalLearningDuration(Long institutionId);
+    Number getInstitutionTotalLearningDuration(Long institutionId);
 
     /**
      * 获取机构学习人数
@@ -84,7 +84,7 @@ public interface InstitutionLearningStatisticsService {
      * @param institutionId 机构ID
      * @return 学习人数
      */
-    Long getInstitutionLearnerCount(Long institutionId);
+    Number getInstitutionLearnerCount(Long institutionId);
 
     /**
      * 获取课程学习统计概览

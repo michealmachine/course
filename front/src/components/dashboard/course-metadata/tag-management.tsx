@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tag, TagDTO, Course } from '@/types/course';
 import {
   Table,
@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -36,6 +37,7 @@ import { Loader2, Plus, Search, Trash2, Edit, ChevronDown, ChevronUp } from 'luc
 import { toast } from 'sonner';
 import tagService from '@/services/tag';
 import courseService from '@/services/course-service';
+import metadataService from '@/services/metadata-service';
 import {
   Pagination,
   PaginationContent,
@@ -79,6 +81,19 @@ export function TagManagement() {
   const [expandedTag, setExpandedTag] = useState<number | null>(null);
   const [tagCourses, setTagCourses] = useState<Course[]>([]);
   const [loadingCourses, setLoadingCourses] = useState(false);
+  const [totalCourseCount, setTotalCourseCount] = useState(0);
+
+  // 计算进度条的值（0-100）
+  const calculateProgressValue = (count: number): number => {
+    if (count === 0) return 0;
+
+    // 使用当前页面的课程总数作为基底
+    // 如果总数为0，返回100%（避免除以0）
+    if (totalCourseCount === 0) return 100;
+
+    // 计算百分比，最小为5%（确保即使很小的值也能看到一点进度）
+    return Math.max(5, Math.min(100, (count / totalCourseCount) * 100));
+  };
 
   // 表单初始化
   const form = useForm<z.infer<typeof tagFormSchema>>({
@@ -94,10 +109,18 @@ export function TagManagement() {
     setIsLoading(true);
     try {
       const result = await tagService.getTagList(searchKeyword, page);
-      setTags(result.content || []);
+      const tagList = result.content || [];
+      setTags(tagList);
       setTotalPages(result.totalPages || 0);
       setTotalItems(result.totalElements || 0);
       setCurrentPage(result.pageable?.pageNumber || 0);
+
+      // 计算当前页面的课程总数，用于进度条
+      if (tagList.length > 0) {
+        // 计算当前页面所有标签关联的课程总数
+        const totalCourses = tagList.reduce((sum, tag) => sum + (tag.courseCount || 0), 0);
+        setTotalCourseCount(totalCourses);
+      }
     } catch (error) {
       toast.error('加载标签列表失败');
       console.error('加载标签列表失败:', error);
@@ -110,12 +133,8 @@ export function TagManagement() {
   const loadTagCourses = async (tagId: number) => {
     setLoadingCourses(true);
     try {
-      // 使用现有的课程搜索API
-      const result = await courseService.searchCourses({
-        tagIds: [tagId],
-        page: 0,
-        pageSize: 6
-      });
+      // 使用新的元数据API获取所有状态的课程
+      const result = await metadataService.getTagCourses(tagId, 0, 6);
       setTagCourses(result.content || []);
     } catch (error) {
       console.error('加载标签课程失败:', error);
@@ -284,7 +303,6 @@ export function TagManagement() {
               <TableHead>ID</TableHead>
               <TableHead>名称</TableHead>
               <TableHead>描述</TableHead>
-              <TableHead>使用次数</TableHead>
               <TableHead>关联课程</TableHead>
               <TableHead>创建时间</TableHead>
               <TableHead className="text-right">操作</TableHead>
@@ -293,39 +311,56 @@ export function TagManagement() {
           <TableBody>
             {isLoading && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center p-4">
+                <TableCell colSpan={6} className="text-center p-4">
                   <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                 </TableCell>
               </TableRow>
             )}
             {!isLoading && tags.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center p-4">
+                <TableCell colSpan={6} className="text-center p-4">
                   未找到标签数据
                 </TableCell>
               </TableRow>
             )}
             {!isLoading && tags.map((tag) => (
-              <>
+              <React.Fragment key={tag.id}>
                 <TableRow
-                  key={tag.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => toggleTag(tag.id)}
+                  className="hover:bg-muted/50"
                 >
                   <TableCell>{tag.id}</TableCell>
                   <TableCell>
                     <div className="flex items-center">
                       <Badge variant="outline">{tag.name}</Badge>
-                      {expandedTag === tag.id ? (
-                        <ChevronUp className="ml-2 h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="ml-2 h-4 w-4" />
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="ml-2 p-0 h-6 w-6"
+                        onClick={(e) => toggleTag(tag.id, e)}
+                      >
+                        {expandedTag === tag.id ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </Button>
                     </div>
                   </TableCell>
                   <TableCell>{tag.description || '-'}</TableCell>
-                  <TableCell>{tag.useCount || 0}</TableCell>
-                  <TableCell>{tag.courseCount || 0}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between">
+                        <span>{tag.courseCount || 0}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {totalCourseCount > 0 ? Math.round((tag.courseCount || 0) / totalCourseCount * 100) : 0}%
+                        </span>
+                      </div>
+                      <Progress
+                        value={calculateProgressValue(tag.courseCount || 0)}
+                        className="h-1.5"
+                      />
+                    </div>
+                  </TableCell>
                   <TableCell>
                     {tag.createdAt ? new Date(tag.createdAt).toLocaleString() : '-'}
                   </TableCell>
@@ -335,7 +370,6 @@ export function TagManagement() {
                         variant="outline"
                         size="sm"
                         onClick={(e) => {
-                          e.stopPropagation();
                           handleOpenEditDialog(tag);
                         }}
                       >
@@ -345,7 +379,6 @@ export function TagManagement() {
                         variant="destructive"
                         size="sm"
                         onClick={(e) => {
-                          e.stopPropagation();
                           setTagToDelete(tag);
                           setIsDeleteDialogOpen(true);
                         }}
@@ -359,7 +392,7 @@ export function TagManagement() {
                 {/* 展开的课程列表 */}
                 {expandedTag === tag.id && (
                   <TableRow>
-                    <TableCell colSpan={7} className="p-0 border-t-0">
+                    <TableCell colSpan={6} className="p-0 border-t-0">
                       <div className="bg-muted/20 p-4">
                         <h4 className="font-medium mb-3">关联课程</h4>
                         <CourseListView
@@ -371,7 +404,7 @@ export function TagManagement() {
                     </TableCell>
                   </TableRow>
                 )}
-              </>
+              </React.Fragment>
             ))}
           </TableBody>
         </Table>
