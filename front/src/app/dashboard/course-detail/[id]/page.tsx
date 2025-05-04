@@ -10,13 +10,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
-import { 
-  ChevronLeft, 
-  AlertCircle, 
-  BookOpen, 
-  Clock, 
-  Star, 
-  Users, 
+import {
+  ChevronLeft,
+  AlertCircle,
+  BookOpen,
+  Clock,
+  Star,
+  Users,
   ChevronRight,
   Info,
   Heart,
@@ -63,7 +63,7 @@ export default function CourseDetailPage() {
   const router = useRouter();
   const courseId = Number(params.id);
   const { isAuthenticated } = useAuthStore();
-  
+
   // 状态管理
   const [course, setCourse] = useState<CourseStructureVO | null>(null);
   const [loading, setLoading] = useState(true);
@@ -77,25 +77,25 @@ export default function CourseDetailPage() {
   const [favoritesLoading, setFavoritesLoading] = useState<boolean>(false);
   const [isUserEnrolled, setIsUserEnrolled] = useState<boolean>(false);
   const [enrollmentLoading, setEnrollmentLoading] = useState<boolean>(false);
-  
+
   // 加载课程结构数据
   useEffect(() => {
     const loadCourseData = async () => {
       if (!courseId) return;
-      
+
       try {
         setLoading(true);
         setError(null);
-        
+
         // 获取课程结构数据
         const data = await courseService.getPublicCourseStructure(courseId);
         setCourse(data);
-        
+
         // 默认选择第一章节和小节
         if (data.chapters && data.chapters.length > 0) {
           const firstChapter = data.chapters[0];
           setSelectedChapterId(firstChapter.id);
-          
+
           if (firstChapter.sections && firstChapter.sections.length > 0) {
             const firstSection = firstChapter.sections[0];
             setSelectedSectionId(firstSection.id);
@@ -110,10 +110,10 @@ export default function CourseDetailPage() {
         setLoading(false);
       }
     };
-    
+
     loadCourseData();
   }, [courseId]);
-  
+
   // 检查用户是否已购买课程
   useEffect(() => {
     const checkEnrollment = async () => {
@@ -121,29 +121,30 @@ export default function CourseDetailPage() {
         setIsUserEnrolled(false);
         return;
       }
-      
+
       try {
         setEnrollmentLoading(true);
-        
+
         // 调用API检查用户是否已购买课程
         const userCourse = await userCourseService.getUserCourseRecord(courseId);
         setIsUserEnrolled(!!userCourse);
       } catch (err) {
-        console.error('检查课程购买状态失败:', err);
+        // 如果是404错误（未找到学习记录），这是预期的行为，不是真正的错误
+        // 不需要在控制台打印错误信息
         setIsUserEnrolled(false);
       } finally {
         setEnrollmentLoading(false);
       }
     };
-    
+
     checkEnrollment();
   }, [courseId, isAuthenticated]);
-  
+
   // 检查是否已收藏
   useEffect(() => {
     const checkFavorite = async () => {
       if (!courseId) return;
-      
+
       try {
         setFavoritesLoading(true);
         const isFavorited = await favoriteService.checkFavorite(courseId);
@@ -154,17 +155,17 @@ export default function CourseDetailPage() {
         setFavoritesLoading(false);
       }
     };
-    
+
     checkFavorite();
   }, [courseId]);
-  
+
   // 处理收藏/取消收藏
   const handleToggleFavorite = async () => {
     if (!courseId) return;
-    
+
     try {
       setFavoritesLoading(true);
-      
+
       if (isFavorite) {
         await favoriteService.removeFavorite(courseId);
         toast.success('已取消收藏');
@@ -172,7 +173,7 @@ export default function CourseDetailPage() {
         await favoriteService.addFavorite(courseId);
         toast.success('收藏成功');
       }
-      
+
       setIsFavorite(!isFavorite);
     } catch (err: any) {
       console.error('操作收藏失败:', err);
@@ -181,14 +182,14 @@ export default function CourseDetailPage() {
       setFavoritesLoading(false);
     }
   };
-  
+
   // 处理章节点击
   const handleChapterClick = (chapterId: number) => {
     if (selectedChapterId === chapterId) {
       setSelectedChapterId(null);
     } else {
       setSelectedChapterId(chapterId);
-      
+
       // 查找该章节的第一个小节并选中
       const chapter = course?.chapters.find(c => c.id === chapterId);
       if (chapter && chapter.sections.length > 0) {
@@ -196,11 +197,11 @@ export default function CourseDetailPage() {
       }
     }
   };
-  
+
   // 处理小节点击
   const handleSectionClick = (sectionId: number) => {
     setSelectedSectionId(sectionId);
-    
+
     // 查找选中的小节
     if (course) {
       for (const chapter of course.chapters) {
@@ -214,24 +215,24 @@ export default function CourseDetailPage() {
       }
     }
   };
-  
+
   // 返回按钮处理
   const handleBack = () => {
     router.back();
   };
-  
+
   // 处理购买课程
   const handleEnrollCourse = () => {
     if (!course) return;
-    
+
     // 跳转到课程购买页面 (可根据实际情况调整)
     router.push(`/dashboard/checkout/${course.course.id}`);
   };
-  
+
   // 渲染章节目录
   const renderChapters = () => {
     if (!course || !course.chapters) return null;
-    
+
     return (
       <Accordion
         type="multiple"
@@ -259,7 +260,7 @@ export default function CourseDetailPage() {
                     onClick={() => handleSectionClick(section.id)}
                   >
                     <span className="text-sm">{section.title}</span>
-                    
+
                     {/* 显示付费标记或资源类型 */}
                     {section.accessType === 1 ? (
                       <Badge variant="outline" className="text-xs">付费</Badge>
@@ -275,7 +276,7 @@ export default function CourseDetailPage() {
       </Accordion>
     );
   };
-  
+
   // 加载中状态
   if (loading) {
     return (
@@ -287,7 +288,7 @@ export default function CourseDetailPage() {
           </Button>
           <Skeleton className="h-6 w-48" />
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-1">
             <Skeleton className="h-[600px] w-full rounded-md" />
@@ -299,7 +300,7 @@ export default function CourseDetailPage() {
       </div>
     );
   }
-  
+
   // 错误状态
   if (error) {
     return (
@@ -308,7 +309,7 @@ export default function CourseDetailPage() {
           <ChevronLeft className="h-4 w-4 mr-2" />
           返回
         </Button>
-        
+
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>加载失败</AlertTitle>
@@ -317,7 +318,7 @@ export default function CourseDetailPage() {
       </div>
     );
   }
-  
+
   // 课程不存在
   if (!course) {
     return (
@@ -326,7 +327,7 @@ export default function CourseDetailPage() {
           <ChevronLeft className="h-4 w-4 mr-2" />
           返回
         </Button>
-        
+
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>课程不存在</AlertTitle>
@@ -337,15 +338,15 @@ export default function CourseDetailPage() {
       </div>
     );
   }
-  
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="container py-8">
         {/* 顶部导航栏 */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               onClick={handleBack}
               className="hover:bg-slate-100"
             >
@@ -356,7 +357,7 @@ export default function CourseDetailPage() {
               <h1 className="text-2xl font-bold text-slate-800">{course.course.title}</h1>
             )}
           </div>
-          
+
           {/* 收藏按钮 */}
           <Button
             variant="outline"
@@ -392,35 +393,35 @@ export default function CourseDetailPage() {
               </CardContent>
             </Card>
           </div>
-          
+
           {/* 右侧内容区 */}
           <div className="md:col-span-2">
             <Card className="border-0 shadow-sm h-[calc(100vh-180px)]">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col">
                 <CardHeader className="pb-0 px-4 pt-3">
                   <TabsList className="w-full bg-slate-100 p-1">
-                    <TabsTrigger 
-                      value="overview" 
+                    <TabsTrigger
+                      value="overview"
                       className="flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm"
                     >
                       课程信息
                     </TabsTrigger>
-                    <TabsTrigger 
-                      value="content" 
+                    <TabsTrigger
+                      value="content"
                       disabled={!selectedSection}
                       className="flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm"
                     >
                       课程内容
                     </TabsTrigger>
-                    <TabsTrigger 
-                      value="reviews" 
+                    <TabsTrigger
+                      value="reviews"
                       className="flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm"
                     >
                       评论
                     </TabsTrigger>
                   </TabsList>
                 </CardHeader>
-                
+
                 <CardContent className="p-4 flex-1 overflow-hidden">
                   <TabsContent value="overview" className="mt-0 h-full">
                     <ScrollArea className="h-[calc(100vh-240px)]">
@@ -434,14 +435,14 @@ export default function CourseDetailPage() {
                             />
                           </div>
                         )}
-                        
+
                         <div>
                           <h3 className="text-lg font-semibold mb-2 text-slate-800">课程简介</h3>
                           <p className="text-slate-600 leading-relaxed">{course?.course.description || "暂无课程简介"}</p>
                         </div>
-                        
+
                         <Separator className="my-2" />
-                        
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {course?.course.institution && (
                             <div className="bg-white p-3 rounded-lg border border-slate-100">
@@ -451,25 +452,25 @@ export default function CourseDetailPage() {
                               </div>
                             </div>
                           )}
-                          
+
                           {course?.course.paymentType !== undefined && (
                             <div className="bg-white p-3 rounded-lg border border-slate-100">
                               <p className="text-sm font-medium text-slate-500 mb-1">付费类型</p>
                               <Badge variant={course.course.paymentType === CoursePaymentType.FREE ? "secondary" : "default"}
-                                className={course.course.paymentType === CoursePaymentType.FREE ? 
+                                className={course.course.paymentType === CoursePaymentType.FREE ?
                                   "bg-emerald-50 text-emerald-700 border-emerald-200" : ""}>
                                 {course.course.paymentType === CoursePaymentType.FREE ? '免费' : '付费'}
                               </Badge>
                             </div>
                           )}
-                          
+
                           {course?.course.price !== undefined && course.course.paymentType === CoursePaymentType.PAID && (
                             <div className="bg-white p-3 rounded-lg border border-slate-100">
                               <p className="text-sm font-medium text-slate-500 mb-1">价格</p>
                               <p className="text-primary font-medium text-lg">¥{course.course.price}</p>
                             </div>
                           )}
-                          
+
                           {course?.course.totalDuration !== undefined && (
                             <div className="bg-white p-3 rounded-lg border border-slate-100">
                               <p className="text-sm font-medium text-slate-500 mb-1">总时长</p>
@@ -479,7 +480,7 @@ export default function CourseDetailPage() {
                               </div>
                             </div>
                           )}
-                          
+
                           {course?.course.averageRating !== undefined && (
                             <div className="bg-white p-3 rounded-lg border border-slate-100">
                               <p className="text-sm font-medium text-slate-500 mb-1">课程评分</p>
@@ -496,7 +497,7 @@ export default function CourseDetailPage() {
                               </div>
                             </div>
                           )}
-                          
+
                           {course?.course.studentCount !== undefined && (
                             <div className="bg-white p-3 rounded-lg border border-slate-100">
                               <p className="text-sm font-medium text-slate-500 mb-1">学习人数</p>
@@ -507,11 +508,11 @@ export default function CourseDetailPage() {
                             </div>
                           )}
                         </div>
-                        
+
                         {(course?.course.targetAudience || course?.course.learningObjectives) && (
                           <>
                             <Separator className="my-2" />
-                            
+
                             <div className="space-y-4">
                               {course?.course.targetAudience && (
                                 <div>
@@ -519,7 +520,7 @@ export default function CourseDetailPage() {
                                   <p className="text-slate-600">{course.course.targetAudience}</p>
                                 </div>
                               )}
-                              
+
                               {course?.course.learningObjectives && (
                                 <div>
                                   <h3 className="text-lg font-semibold mb-1 text-slate-800">学习目标</h3>
@@ -532,7 +533,7 @@ export default function CourseDetailPage() {
                       </div>
                     </ScrollArea>
                   </TabsContent>
-                  
+
                   <TabsContent value="content" className="mt-0 h-full">
                     {selectedSection ? (
                       <ScrollArea className="h-[calc(100vh-240px)]">
@@ -542,7 +543,7 @@ export default function CourseDetailPage() {
                             {selectedSection.description && (
                               <p className="text-slate-600 mb-2">{selectedSection.description}</p>
                             )}
-                            
+
                             <div className="flex flex-wrap gap-2">
                               {selectedSection.duration && (
                                 <Badge variant="outline" className="bg-white flex items-center px-2 py-0.5">
@@ -550,30 +551,30 @@ export default function CourseDetailPage() {
                                   {Math.round(selectedSection.duration / 60)} 分钟
                                 </Badge>
                               )}
-                              
-                              <Badge 
+
+                              <Badge
                                 variant={selectedSection.accessType === 0 ? "secondary" : "outline"}
                                 className={`flex items-center px-2 py-0.5 ${
-                                  selectedSection.accessType === 0 
-                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                  selectedSection.accessType === 0
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                     : 'bg-white'
                                 }`}
                               >
                                 {selectedSection.accessType === 0 ? '免费试看' : '付费内容'}
                               </Badge>
-                              
-                              <Badge 
-                                variant="outline" 
+
+                              <Badge
+                                variant="outline"
                                 className="bg-white flex items-center px-2 py-0.5"
                               >
-                                {selectedSection.resourceTypeDiscriminator === 'MEDIA' ? '媒体' : 
+                                {selectedSection.resourceTypeDiscriminator === 'MEDIA' ? '媒体' :
                                  selectedSection.resourceTypeDiscriminator === 'QUESTION_GROUP' ? '题组' : '未知类型'}
                               </Badge>
                             </div>
                           </div>
-                          
+
                           {/* 小节内容播放器 */}
-                          {(selectedSection.resourceTypeDiscriminator === 'MEDIA' && selectedSection.mediaId) || 
+                          {(selectedSection.resourceTypeDiscriminator === 'MEDIA' && selectedSection.mediaId) ||
                            (selectedSection.resourceTypeDiscriminator === 'QUESTION_GROUP' && selectedSection.questionGroupId) ? (
                             <div className="bg-white rounded-lg shadow-sm">
                               <ReviewContentPlayer section={selectedSection} />
@@ -600,7 +601,7 @@ export default function CourseDetailPage() {
                       </div>
                     )}
                   </TabsContent>
-                  
+
                   <TabsContent value="reviews" className="mt-0 h-full">
                     <ScrollArea className="h-[calc(100vh-240px)] pr-4">
                       <div className="pb-6">
@@ -617,10 +618,10 @@ export default function CourseDetailPage() {
                             </Button>
                           </div>
                         )}
-                        
+
                         {course && (
-                          <CourseReviewSection 
-                            courseId={course.course.id} 
+                          <CourseReviewSection
+                            courseId={course.course.id}
                             isUserEnrolled={isUserEnrolled}
                           />
                         )}
@@ -635,4 +636,4 @@ export default function CourseDetailPage() {
       </div>
     </div>
   );
-} 
+}

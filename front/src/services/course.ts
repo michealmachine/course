@@ -1,9 +1,9 @@
 'use client';
 
 import { request } from './api';
-import { 
-  Course, CourseCreateDTO, 
-  PreviewUrlVO, 
+import {
+  Course, CourseCreateDTO,
+  PreviewUrlVO,
   CourseStatus,
   CoursePaymentType,
   CourseQueryParams,
@@ -17,7 +17,7 @@ import { AxiosResponse } from 'axios';
  */
 const buildQueryParams = (params?: CourseQueryParams): any => {
   if (!params) return {};
-  
+
   const queryParams: any = {};
   if (params.page !== undefined) queryParams.page = params.page;
   if (params.size !== undefined) queryParams.size = params.size;
@@ -26,8 +26,37 @@ const buildQueryParams = (params?: CourseQueryParams): any => {
   if (params.categoryId) queryParams.categoryId = params.categoryId;
   if (params.difficulty !== undefined) queryParams.difficulty = params.difficulty;
   if (params.sortBy) queryParams.sort = `${params.sortBy},${params.sortDir || 'asc'}`;
-  
+
   return queryParams;
+};
+
+/**
+ * 创建空的分页结果
+ */
+const getEmptyPaginationResult = (page: number, size: number): PaginationResult<Course> => {
+  return {
+    content: [],
+    totalElements: 0,
+    totalPages: 0,
+    size,
+    number: page,
+    empty: true,
+    first: true,
+    last: true,
+    numberOfElements: 0,
+    pageable: {
+      pageNumber: page,
+      pageSize: size,
+      sort: {
+        empty: true,
+        sorted: false,
+        unsorted: true
+      },
+      offset: 0,
+      paged: true,
+      unpaged: false
+    }
+  };
 };
 
 /**
@@ -42,66 +71,24 @@ const courseService = {
       const params: any = { page, size };
       if (keyword) params.keyword = keyword;
       if (status !== undefined) params.status = status;
-      
-      const response: AxiosResponse<ApiResponse<PaginationResult<Course>>> = 
-        await request.get<PaginationResult<Course>>('/courses', { params });
-      
+
+      // 添加silentOnAuthError参数，避免在控制台显示认证错误
+      const response: AxiosResponse<ApiResponse<PaginationResult<Course>>> =
+        await request.get<PaginationResult<Course>>('/courses', {
+          params,
+          silentOnAuthError: true
+        });
+
       // 确保响应数据符合预期格式
       if (response?.data?.data) {
         return response.data.data;
       }
-      
+
       // 如果响应格式不符，返回一个空的分页结果
-      console.warn('API响应格式不符合预期:', response);
-      return {
-        content: [],
-        totalElements: 0,
-        totalPages: 0,
-        size,
-        number: page,
-        empty: true,
-        first: true,
-        last: true,
-        numberOfElements: 0,
-        pageable: {
-          pageNumber: page,
-          pageSize: size,
-          sort: {
-            empty: true,
-            sorted: false,
-            unsorted: true
-          },
-          offset: 0,
-          paged: true,
-          unpaged: false
-        }
-      };
+      return getEmptyPaginationResult(page, size);
     } catch (error) {
-      console.error('获取课程列表失败:', error);
       // 出错时返回空结果而不是抛出异常，让UI层处理
-      return {
-        content: [],
-        totalElements: 0,
-        totalPages: 0,
-        size,
-        number: page,
-        empty: true,
-        first: true,
-        last: true,
-        numberOfElements: 0,
-        pageable: {
-          pageNumber: page,
-          pageSize: size,
-          sort: {
-            empty: true,
-            sorted: false,
-            unsorted: true
-          },
-          offset: 0,
-          paged: true,
-          unpaged: false
-        }
-      };
+      return getEmptyPaginationResult(page, size);
     }
   },
 
@@ -163,9 +150,9 @@ const courseService = {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      
+
       const response: AxiosResponse<ApiResponse<Course>> = await request.post<Course>(
-        `/courses/${id}/cover`, 
+        `/courses/${id}/cover`,
         formData,
         {
           headers: {
@@ -184,19 +171,19 @@ const courseService = {
    * 更新课程支付设置
    */
   updatePaymentSettings: async (
-    id: number, 
-    paymentType: CoursePaymentType, 
-    price?: number, 
+    id: number,
+    paymentType: CoursePaymentType,
+    price?: number,
     discountPrice?: number
   ): Promise<Course> => {
     try {
       const params: any = { paymentType };
       if (price !== undefined) params.price = price;
       if (discountPrice !== undefined) params.discountPrice = discountPrice;
-      
+
       const response: AxiosResponse<ApiResponse<Course>> = await request.post<Course>(
-        `/courses/${id}/payment`, 
-        null, 
+        `/courses/${id}/payment`,
+        null,
         { params }
       );
       return response.data.data;
@@ -265,10 +252,10 @@ const courseService = {
     try {
       const params: any = {};
       if (comment) params.comment = comment;
-      
+
       const response: AxiosResponse<ApiResponse<Course>> = await request.post<Course>(
-        `/courses/${id}/review/approve`, 
-        null, 
+        `/courses/${id}/review/approve`,
+        null,
         { params }
       );
       return response.data.data;
@@ -284,10 +271,10 @@ const courseService = {
   rejectCourse: async (id: number, reason: string): Promise<Course> => {
     try {
       const params: any = { reason };
-      
+
       const response: AxiosResponse<ApiResponse<Course>> = await request.post<Course>(
-        `/courses/${id}/review/reject`, 
-        null, 
+        `/courses/${id}/review/reject`,
+        null,
         { params }
       );
       return response.data.data;
@@ -326,7 +313,7 @@ const courseService = {
       throw error;
     }
   },
-  
+
   /**
    * 获取课程的发布版本
    */
@@ -343,4 +330,4 @@ const courseService = {
   }
 };
 
-export default courseService; 
+export default courseService;

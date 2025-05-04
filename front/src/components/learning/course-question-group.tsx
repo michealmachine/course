@@ -90,8 +90,78 @@ export function CourseQuestionGroup({
       return;
     }
 
-    console.log("处理后的题目列表:", questionsToUse);
-    setProcessedQuestions(questionsToUse);
+    // 处理题目数据，为每个题目添加correctOptions字段
+    const processedQuestions = questionsToUse.map(question => {
+      // 如果已经有correctOptions字段，直接使用
+      if (question.correctOptions && question.correctOptions.length > 0) {
+        return question;
+      }
+
+      // 从options中提取正确选项
+      const correctOptions: string[] = [];
+
+      // 判断题目类型
+      const questionType = getQuestionType(question.type);
+
+      console.log(`处理题目 ID=${question.id}, 标题=${question.title}, 类型=${questionType}:`, {
+        options: question.options,
+        analysis: question.analysis,
+        explanation: question.explanation
+      });
+
+      // 处理选择题（单选、多选、判断题）
+      if (questionType === QuestionType.SINGLE_CHOICE ||
+          questionType === QuestionType.MULTIPLE_CHOICE) {
+        // 确保options是数组
+        if (question.options && Array.isArray(question.options)) {
+          // 遍历选项，找出正确选项
+          question.options.forEach((option, index) => {
+            // 选项可能是字符串或对象
+            if (typeof option === 'object' && option !== null && option.isCorrect) {
+              // 将选项索引转换为字母（A, B, C...）
+              const optionLetter = String.fromCharCode(65 + index);
+              correctOptions.push(optionLetter);
+              console.log(`题目 ID=${question.id} 找到正确选项: ${optionLetter}, 内容:`, option);
+            }
+          });
+        }
+      } else if (questionType === QuestionType.TRUE_FALSE) {
+        // 判断题的正确答案
+        if (question.options && Array.isArray(question.options)) {
+          if (question.options.length >= 2) {
+            // 判断题通常第一个选项是"正确"，第二个选项是"错误"
+            if (typeof question.options[0] === 'object' && question.options[0]?.isCorrect) {
+              correctOptions.push('T'); // 正确
+              console.log(`题目 ID=${question.id} 判断题正确答案: T (正确)`);
+            } else if (typeof question.options[1] === 'object' && question.options[1]?.isCorrect) {
+              correctOptions.push('F'); // 错误
+              console.log(`题目 ID=${question.id} 判断题正确答案: F (错误)`);
+            }
+          }
+        }
+      } else if (questionType === QuestionType.FILL_BLANK || questionType === QuestionType.SHORT_ANSWER) {
+        // 填空题和简答题的正确答案
+        if (question.answer) {
+          correctOptions.push(question.answer);
+          console.log(`题目 ID=${question.id} 填空/简答题正确答案:`, question.answer);
+        }
+      }
+
+      console.log(`题目 ID=${question.id} 提取的正确答案:`, correctOptions);
+
+      // 设置explanation字段（如果没有但有analysis字段）
+      const explanation = question.explanation || question.analysis;
+
+      // 返回处理后的题目
+      return {
+        ...question,
+        correctOptions,
+        explanation
+      };
+    });
+
+    console.log("处理后的题目列表:", processedQuestions);
+    setProcessedQuestions(processedQuestions);
 
     // 检查sectionId是否存在
     if (!questionGroup.sectionId) {
@@ -593,6 +663,20 @@ export function CourseQuestionGroup({
     const userAnswers = answers[questionId] || [];
     const questionType = getQuestionType(question.type);
 
+    // 添加调试日志
+    console.log('渲染题目选项:', {
+      questionId,
+      questionType,
+      options: question.options,
+      optionsType: question.options ? typeof question.options : 'undefined',
+      isArray: question.options ? Array.isArray(question.options) : false,
+      firstOption: question.options && question.options.length > 0 ? question.options[0] : null,
+      firstOptionType: question.options && question.options.length > 0 ? typeof question.options[0] : null,
+      correctOptions: question.correctOptions,
+      explanation: question.explanation,
+      analysis: question.analysis
+    });
+
     // 对于填空题和简答题，使用特殊处理
     if (questionType === QuestionType.FILL_BLANK || questionType === QuestionType.SHORT_ANSWER) {
       return (
@@ -689,58 +773,83 @@ export function CourseQuestionGroup({
     // 根据题目类型渲染不同的选项组件
     if (question.type === 1 || getQuestionType(question.type) === QuestionType.SINGLE_CHOICE) {
       return (
-        <RadioGroup
-          value={userAnswers[0] || ''}
-          onValueChange={handleSingleChoiceChange}
-          disabled={isSubmittedQuestion}
-          className="space-y-3 mt-4"
-        >
-          {question.options?.map((option, index) => {
-            const optionValue = String.fromCharCode(65 + index); // A, B, C, D...
-            const isSelected = userAnswers.includes(optionValue);
-            const isCorrectOption = isSubmittedQuestion && question.correctOptions?.includes(optionValue);
+        <div className="space-y-4 mt-4">
+          <RadioGroup
+            value={userAnswers[0] || ''}
+            onValueChange={handleSingleChoiceChange}
+            disabled={isSubmittedQuestion}
+            className="space-y-3"
+          >
+            {question.options?.map((option, index) => {
+              const optionValue = String.fromCharCode(65 + index); // A, B, C, D...
+              const isSelected = userAnswers.includes(optionValue);
+              const isCorrectOption = isSubmittedQuestion && question.correctOptions?.includes(optionValue);
 
-            return (
-              <div
-                key={index}
-                className={`flex items-start space-x-2 p-3 rounded-md ${
-                  isSubmittedQuestion && isSelected && isCorrectOption
-                    ? 'bg-green-50 dark:bg-green-950/20'
-                    : isSubmittedQuestion && isSelected && !isCorrectOption
-                      ? 'bg-red-50 dark:bg-red-950/20'
-                      : isSubmittedQuestion && !isSelected && isCorrectOption
-                        ? 'bg-blue-50 dark:bg-blue-950/20'
-                        : ''
-                }`}
-              >
-                <RadioGroupItem
-                  value={optionValue}
-                  id={`option-${questionId}-${index}`}
-                  disabled={isSubmittedQuestion}
-                />
-                <div className="grid gap-1.5 leading-none w-full">
-                  <div className="flex items-center justify-between">
-                    <Label
-                      htmlFor={`option-${questionId}-${index}`}
-                      className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed
-                        peer-disabled:opacity-70 flex-1 ${
-                          isSubmittedQuestion && isCorrectOption ? 'text-green-600 dark:text-green-400' : ''
-                        }`}
-                    >
-                      {optionValue}. {option}
-                    </Label>
-                    {isSubmittedQuestion && isSelected && isCorrectOption && (
-                      <CircleCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
-                    )}
-                    {isSubmittedQuestion && isSelected && !isCorrectOption && (
-                      <CircleX className="h-5 w-5 text-red-600 dark:text-red-400" />
-                    )}
+              return (
+                <div
+                  key={index}
+                  className={`flex items-start space-x-2 p-3 rounded-md ${
+                    isSubmittedQuestion && isSelected && isCorrectOption
+                      ? 'bg-green-50 dark:bg-green-950/20'
+                      : isSubmittedQuestion && isSelected && !isCorrectOption
+                        ? 'bg-red-50 dark:bg-red-950/20'
+                        : isSubmittedQuestion && !isSelected && isCorrectOption
+                          ? 'bg-blue-50 dark:bg-blue-950/20'
+                          : ''
+                  }`}
+                >
+                  <RadioGroupItem
+                    value={optionValue}
+                    id={`option-${questionId}-${index}`}
+                    disabled={isSubmittedQuestion}
+                  />
+                  <div className="grid gap-1.5 leading-none w-full">
+                    <div className="flex items-center justify-between">
+                      <Label
+                        htmlFor={`option-${questionId}-${index}`}
+                        className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed
+                          peer-disabled:opacity-70 flex-1 ${
+                            isSubmittedQuestion && isCorrectOption ? 'text-green-600 dark:text-green-400 font-bold' : ''
+                          }`}
+                      >
+                        <span className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-xs font-medium mr-2 ${
+                          isSubmittedQuestion && isCorrectOption
+                            ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'
+                            : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
+                        }`}>
+                          {optionValue}
+                        </span>
+                        {typeof option === 'object' && option !== null ?
+                          (option.content || JSON.stringify(option)) :
+                          option}
+                        {isSubmittedQuestion && isCorrectOption && (
+                          <span className="ml-2 text-xs text-green-600 dark:text-green-400">
+                            (正确答案)
+                          </span>
+                        )}
+                      </Label>
+                      {isSubmittedQuestion && isSelected && isCorrectOption && (
+                        <CircleCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
+                      )}
+                      {isSubmittedQuestion && isSelected && !isCorrectOption && (
+                        <CircleX className="h-5 w-5 text-red-600 dark:text-red-400" />
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </RadioGroup>
+              );
+            })}
+          </RadioGroup>
+
+          {/* 显示解析 */}
+          {isSubmittedQuestion && (question.explanation || question.analysis) && (
+            <Alert className="mt-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>解析</AlertTitle>
+              <AlertDescription>{question.explanation || question.analysis}</AlertDescription>
+            </Alert>
+          )}
+        </div>
       );
     }
 
@@ -779,10 +888,24 @@ export function CourseQuestionGroup({
                       htmlFor={`option-${questionId}-${index}`}
                       className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed
                         peer-disabled:opacity-70 flex-1 ${
-                          isSubmittedQuestion && isCorrectOption ? 'text-green-600 dark:text-green-400' : ''
+                          isSubmittedQuestion && isCorrectOption ? 'text-green-600 dark:text-green-400 font-bold' : ''
                         }`}
                     >
-                      {optionValue}. {option}
+                      <span className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-xs font-medium mr-2 ${
+                        isSubmittedQuestion && isCorrectOption
+                          ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'
+                          : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
+                      }`}>
+                        {optionValue}
+                      </span>
+                      {typeof option === 'object' && option !== null ?
+                        (option.content || JSON.stringify(option)) :
+                        option}
+                      {isSubmittedQuestion && isCorrectOption && (
+                        <span className="ml-2 text-xs text-green-600 dark:text-green-400">
+                          (正确答案)
+                        </span>
+                      )}
                     </Label>
                     {isSubmittedQuestion && isCorrectOption && (
                       <CircleCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
@@ -792,6 +915,15 @@ export function CourseQuestionGroup({
               </div>
             );
           })}
+
+          {/* 显示解析 */}
+          {isSubmittedQuestion && (question.explanation || question.analysis) && (
+            <Alert className="mt-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>解析</AlertTitle>
+              <AlertDescription>{question.explanation || question.analysis}</AlertDescription>
+            </Alert>
+          )}
         </div>
       );
     }
@@ -835,10 +967,22 @@ export function CourseQuestionGroup({
                       htmlFor={`option-${questionId}-${option.value}`}
                       className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed
                         peer-disabled:opacity-70 flex-1 ${
-                          isSubmittedQuestion && isCorrectOption ? 'text-green-600 dark:text-green-400' : ''
+                          isSubmittedQuestion && isCorrectOption ? 'text-green-600 dark:text-green-400 font-bold' : ''
                         }`}
                     >
-                      {option.value}. {option.label}
+                      <span className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-xs font-medium mr-2 ${
+                        isSubmittedQuestion && isCorrectOption
+                          ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'
+                          : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
+                      }`}>
+                        {option.value}
+                      </span>
+                      {option.label}
+                      {isSubmittedQuestion && isCorrectOption && (
+                        <span className="ml-2 text-xs text-green-600 dark:text-green-400">
+                          (正确答案)
+                        </span>
+                      )}
                     </Label>
                     {isSubmittedQuestion && isSelected && isCorrectOption && (
                       <CircleCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
@@ -848,6 +992,15 @@ export function CourseQuestionGroup({
               </div>
             );
           })}
+
+          {/* 显示解析 */}
+          {isSubmittedQuestion && (question.explanation || question.analysis) && (
+            <Alert className="mt-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>解析</AlertTitle>
+              <AlertDescription>{question.explanation || question.analysis}</AlertDescription>
+            </Alert>
+          )}
         </RadioGroup>
       );
     }
@@ -904,6 +1057,11 @@ export function CourseQuestionGroup({
                   </Badge>
                   <span className="flex-1">{currentQuestion.title}</span>
                 </CardTitle>
+                {currentQuestion.content && (
+                  <div className="mt-2 text-sm">
+                    {currentQuestion.content}
+                  </div>
+                )}
                 {currentQuestion.score && (
                   <CardDescription className="mt-1">
                     分值: {currentQuestion.score}分

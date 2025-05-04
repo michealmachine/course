@@ -24,11 +24,51 @@ export function MyCoursesList() {
   const fetchCourses = async () => {
     try {
       setLoading(true);
+      console.log('开始获取用户课程列表...', '用户ID:', user?.id);
+
+      // 直接从后端获取数据
+      try {
+        console.log('尝试直接使用fetch获取数据...');
+        const token = localStorage.getItem('token');
+        console.log('当前token:', token ? '已设置' : '未设置');
+
+        const directResponse = await fetch('/api/user-courses', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Cache-Control': 'no-cache'
+          }
+        });
+
+        console.log('直接获取响应状态:', directResponse.status);
+        const directData = await directResponse.json();
+        console.log('直接获取的原始数据:', directData);
+
+        if (directData && directData.data && Array.isArray(directData.data)) {
+          console.log(`直接获取成功: ${directData.data.length} 门课程`);
+          setCourses(directData.data);
+          setLoading(false);
+          return;
+        }
+      } catch (fetchError) {
+        console.error('直接获取数据失败:', fetchError);
+      }
+
+      // 如果直接获取失败，使用服务方法
+      console.log('使用服务方法获取数据...');
       const response = await userCourseService.getUserPurchasedCourses();
-      setCourses(response);
+      console.log('获取到的用户课程列表:', response);
+
+      if (Array.isArray(response)) {
+        console.log(`成功获取到 ${response.length} 门课程`);
+        setCourses(response);
+      } else {
+        console.warn('返回的课程列表不是数组:', response);
+        setCourses([]);
+      }
     } catch (error) {
       console.error('获取课程列表失败:', error);
       toast.error('获取课程列表失败');
+      setCourses([]);
     } finally {
       setLoading(false);
     }
@@ -138,4 +178,4 @@ export function MyCoursesList() {
       )}
     </div>
   );
-} 
+}

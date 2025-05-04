@@ -65,7 +65,7 @@ public interface UserService {
      * @param username 用户名
      */
     void updateLastLoginTime(String username);
-    
+
     /**
      * 分页查询用户列表
      *
@@ -73,7 +73,7 @@ public interface UserService {
      * @return 用户列表（分页）
      */
     Page<UserVO> getUserList(UserQueryDTO queryDTO);
-    
+
     /**
      * 获取用户详情
      *
@@ -81,7 +81,7 @@ public interface UserService {
      * @return 用户详情
      */
     UserVO getUserById(Long id);
-    
+
     /**
      * 创建用户
      *
@@ -89,7 +89,7 @@ public interface UserService {
      * @return 创建后的用户信息
      */
     UserVO createUser(UserDTO userDTO);
-    
+
     /**
      * 更新用户
      *
@@ -98,7 +98,7 @@ public interface UserService {
      * @return 更新后的用户信息
      */
     UserVO updateUser(Long id, UserDTO userDTO);
-    
+
     /**
      * 删除用户
      *
@@ -133,14 +133,14 @@ public interface UserService {
      * @return 更新后的用户信息
      */
     UserVO assignRoles(Long userId, Set<Long> roleIds);
-    
+
     /**
      * 批量删除用户
      *
      * @param ids 用户ID列表
      */
     void batchDeleteUsers(List<Long> ids);
-    
+
     /**
      * 获取当前登录用户信息
      *
@@ -148,7 +148,7 @@ public interface UserService {
      * @return 用户详细信息
      */
     UserVO getCurrentUser(String username);
-    
+
     /**
      * 更新当前用户个人信息
      *
@@ -158,7 +158,7 @@ public interface UserService {
      * @return 更新后的用户信息
      */
     UserVO updateCurrentUserProfile(String username, String nickname, String phone);
-    
+
     /**
      * 修改当前用户密码
      *
@@ -168,7 +168,7 @@ public interface UserService {
      * @return 是否修改成功
      */
     boolean changePassword(String username, String oldPassword, String newPassword);
-    
+
     /**
      * 更新当前用户头像
      *
@@ -177,7 +177,7 @@ public interface UserService {
      * @return 更新后的用户信息
      */
     UserVO updateAvatar(String username, String avatarUrl);
-    
+
     /**
      * 上传并更新用户头像
      *
@@ -187,7 +187,7 @@ public interface UserService {
      * @throws IOException 文件处理异常
      */
     Map<String, String> uploadAndUpdateAvatar(String username, MultipartFile file) throws IOException;
-    
+
     /**
      * 更新当前用户邮箱
      *
@@ -198,7 +198,7 @@ public interface UserService {
      * @return 更新后的用户信息
      */
     UserVO updateEmail(String username, String newEmail, String emailCode, String password);
-    
+
     /**
      * 获取用户基本信息（用于前端展示）
      *
@@ -251,4 +251,13 @@ public interface UserService {
      * @return 用户活跃度统计数据
      */
     UserActivityStatsVO getUserActivityStats();
+
+    /**
+     * 重置用户密码
+     *
+     * @param email 用户邮箱
+     * @param emailCode 邮箱验证码
+     * @return 是否重置成功
+     */
+    boolean resetPassword(String email, String emailCode);
 }

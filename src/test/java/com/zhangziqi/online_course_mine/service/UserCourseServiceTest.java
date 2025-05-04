@@ -619,6 +619,54 @@ public class UserCourseServiceTest {
     }
 
     @Test
+    @DisplayName("创建用户课程关系 - 已退款课程重新购买")
+    void createUserCourseRelation_RefundedCourseRebuy() {
+        // 准备测试数据
+        UserCourse refundedUserCourse = UserCourse.builder()
+                .id(1L)
+                .user(testUser)
+                .course(testCourse)
+                .purchasedAt(LocalDateTime.now().minusDays(7)) // 一周前购买
+                .order(testOrder)
+                .progress(50) // 有一些学习进度
+                .status(UserCourseStatus.REFUNDED.ordinal()) // 已退款状态
+                .learnDuration(3600) // 有一些学习时长
+                .build();
+
+        Order newOrder = Order.builder()
+                .id(2L)
+                .orderNo("NEW12345678")
+                .user(testUser)
+                .course(testCourse)
+                .amount(BigDecimal.valueOf(99.99))
+                .status(OrderStatus.PAID.ordinal())
+                .createdAt(LocalDateTime.now())
+                .paidAt(LocalDateTime.now())
+                .build();
+
+        when(userCourseRepository.findByUser_IdAndCourse_Id(anyLong(), anyLong())).thenReturn(Optional.of(refundedUserCourse));
+        when(orderRepository.findById(anyLong())).thenReturn(Optional.of(newOrder));
+        when(userCourseRepository.save(any(UserCourse.class))).thenReturn(refundedUserCourse);
+
+        // 执行方法
+        UserCourse result = userCourseService.createUserCourseRelation(testUser.getId(), testCourse.getId(), newOrder.getId(), true);
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(UserCourseStatus.NORMAL.ordinal(), result.getStatus()); // 状态应该更新为正常
+        assertEquals(newOrder, result.getOrder()); // 订单应该更新为新订单
+        assertNotNull(result.getPurchasedAt()); // 购买时间应该更新
+
+        // 验证方法调用
+        verify(userCourseRepository).findByUser_IdAndCourse_Id(testUser.getId(), testCourse.getId());
+        verify(orderRepository).findById(newOrder.getId());
+        verify(userCourseRepository).save(refundedUserCourse);
+        verify(userRepository, never()).findById(anyLong());
+        verify(courseRepository, never()).findById(anyLong());
+        verify(courseRepository, never()).save(any(Course.class));
+    }
+
+    @Test
     @DisplayName("创建用户课程关系 - 免费课程无订单")
     void createUserCourseRelation_FreeCourseNoOrder() {
         // 准备测试数据

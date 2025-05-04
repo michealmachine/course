@@ -27,6 +27,7 @@ import { Separator } from '@/components/ui/separator';
 // 创建与QuestionDTO匹配的表单验证模式
 const questionFormSchema = z.object({
   title: z.string().min(1, { message: '题目标题不能为空' }),
+  content: z.string().optional(),
   description: z.string().optional(),
   type: z.nativeEnum(QuestionType),
   difficulty: z.nativeEnum(QuestionDifficulty),
@@ -55,19 +56,19 @@ interface QuestionDetailFormProps {
   isSubmitting?: boolean;
 }
 
-export function QuestionDetailForm({ 
-  question, 
-  tags, 
-  readOnly = false, 
-  onSubmit, 
-  isSubmitting = false 
+export function QuestionDetailForm({
+  question,
+  tags,
+  readOnly = false,
+  onSubmit,
+  isSubmitting = false
 }: QuestionDetailFormProps) {
   // 将题目数据转换为表单数据
   const toFormValues = (question: Question) => {
     // 确保 tagIds 是数组类型
-    const tagIds = question.tagIds || 
+    const tagIds = question.tagIds ||
                   (question.tags ? question.tags.map(tag => tag.id) : []);
-    
+
     // 单选题和判断题确保只有一个正确答案
     let options = question.options || [];
     if (question.type === QuestionType.SINGLE_CHOICE || question.type === QuestionType.TRUE_FALSE) {
@@ -79,7 +80,7 @@ export function QuestionDetailForm({
         }));
       }
     }
-    
+
     // 判断题内容确保为"正确"和"错误"
     if (question.type === QuestionType.TRUE_FALSE && (!options || options.length !== 2)) {
       // 创建判断题的默认选项
@@ -88,9 +89,10 @@ export function QuestionDetailForm({
         { content: '错误', isCorrect: false, optionOrder: 1 } as any
       ];
     }
-    
+
     return {
       title: question.title,
+      content: question.content || '',
       description: question.description || '',
       type: question.type,
       difficulty: question.difficulty,
@@ -107,36 +109,36 @@ export function QuestionDetailForm({
       score: question.score || 1 // 默认分值为1
     };
   };
-  
+
   // 设置表单
   const form = useForm<FormValues>({
     resolver: zodResolver(questionFormSchema),
     defaultValues: toFormValues(question)
   });
-  
+
   // 当外部问题数据更新时，重置表单
   useEffect(() => {
     form.reset(toFormValues(question));
   }, [question, form]);
-  
+
   // 处理表单提交
   const handleSubmit = (data: FormValues) => {
     try {
       // 确保不修改题目类型
       data.type = question.type;
-      
+
       // 基础表单验证
       if (!data.title.trim()) {
         toast.error("题目标题不能为空");
         return;
       }
-      
+
       // 验证分值
       if (!data.score || data.score < 1 || data.score > 100) {
         toast.error("分值必须在1-100之间");
         return;
       }
-      
+
       // 根据题目类型进行特定验证
       if (data.type === QuestionType.SINGLE_CHOICE || data.type === QuestionType.MULTIPLE_CHOICE) {
         // 选项验证
@@ -144,21 +146,21 @@ export function QuestionDetailForm({
           toast.error(`${data.type === QuestionType.SINGLE_CHOICE ? "单选题" : "多选题"}至少需要两个选项`);
           return;
         }
-        
+
         // 确保所有选项都有内容
         const emptyOptions = data.options.filter(option => !option.content.trim());
         if (emptyOptions.length > 0) {
           toast.error("所有选项都必须填写内容");
           return;
         }
-        
+
         // 确保选择题至少有一个正确答案
         const hasCorrectOption = data.options.some(option => option.isCorrect);
         if (!hasCorrectOption) {
           toast.error("请至少选择一个正确答案");
           return;
         }
-        
+
         // 单选题确保只有一个正确答案
         if (data.type === QuestionType.SINGLE_CHOICE) {
           const correctCount = data.options.filter(option => option.isCorrect).length;
@@ -168,20 +170,34 @@ export function QuestionDetailForm({
           }
         }
       }
-      
+
       // 创建提交数据对象
+      const { description, tagIds, content, ...restData } = data;
       const submitData: QuestionDTO = {
-        ...data,
+        ...restData,
         // 确保其他必要字段存在
         institutionId: data.institutionId || question.institutionId,
-        // 确保content字段正确设置 - 用description的值
-        content: data.description,
+        // 保留content字段的值，不要用description覆盖
+        content: content || description, // 如果content不存在，才使用description
         // 确保score字段正确设置
         score: data.score
       };
-      
+
+      // 处理选项，确保使用orderIndex而不是optionOrder
+      if (submitData.options && submitData.options.length > 0) {
+        submitData.options = submitData.options.map((option, index) => ({
+          content: option.content,
+          isCorrect: option.isCorrect,
+          orderIndex: option.optionOrder || index,
+          // 不包含optionOrder字段，避免后端反序列化错误
+        }));
+      }
+
+      // 确保不包含tagIds字段，后端DTO中没有这个字段
+      delete (submitData as any).tagIds;
+
       console.log('最终提交数据:', submitData);
-      
+
       // 直接调用提交回调
       onSubmit(submitData);
     } catch (error) {
@@ -189,16 +205,16 @@ export function QuestionDetailForm({
       toast.error('表单提交失败: ' + (error instanceof Error ? error.message : '未知错误'));
     }
   };
-  
+
   // 添加选项
   const addOption = () => {
     const currentOptions = form.getValues('options') || [];
     form.setValue('options', [
-      ...currentOptions, 
-      { content: '', isCorrect: false, optionOrder: currentOptions.length }
+      ...currentOptions,
+      { content: '', isCorrect: false, orderIndex: currentOptions.length }
     ]);
   };
-  
+
   // 删除选项
   const removeOption = (index: number) => {
     const currentOptions = form.getValues('options') || [];
@@ -206,45 +222,45 @@ export function QuestionDetailForm({
       toast.error('选择题至少需要两个选项');
       return;
     }
-    
+
     const newOptions = currentOptions.filter((_, i) => i !== index)
-      .map((opt, i) => ({ ...opt, optionOrder: i }));
-    
+      .map((opt, i) => ({ ...opt, orderIndex: i }));
+
     form.setValue('options', newOptions);
   };
-  
+
   // 获取标签选项
   const tagOptions = tags.map(tag => ({
     label: tag.name,
     value: tag.id
   }));
-  
+
   // 处理标签选择变更
   const handleTagChange = (values: (number | string)[]) => {
     // 将字符串值转换为数字
-    const numericValues = values.map(val => 
+    const numericValues = values.map(val =>
       typeof val === 'string' ? parseInt(val, 10) : val
     ) as number[];
-    
+
     // 直接设置表单值并触发表单验证
-    form.setValue('tagIds', numericValues, { 
+    form.setValue('tagIds', numericValues, {
       shouldValidate: true,
       shouldDirty: true,
       shouldTouch: true
     });
   };
-  
+
   // 处理单选题选项选择
   const handleSingleChoiceChange = (value: string) => {
     const index = parseInt(value);
     const options = form.getValues('options') || [];
-    
+
     // 创建一个新的选项数组，确保只有一个正确答案
     const updatedOptions = options.map((opt, idx) => ({
       ...opt,
       isCorrect: idx === index
     }));
-    
+
     // 更新表单值
     form.setValue('options', updatedOptions, {
       shouldValidate: true,
@@ -252,7 +268,7 @@ export function QuestionDetailForm({
       shouldTouch: true
     });
   };
-  
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
@@ -277,7 +293,7 @@ export function QuestionDetailForm({
                   </FormItem>
                 )}
               />
-              
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* 题目类型 - 只读 */}
                 <FormField
@@ -336,10 +352,10 @@ export function QuestionDetailForm({
                     <FormItem>
                       <FormLabel>分值</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          min="1" 
-                          max="100" 
+                        <Input
+                          type="number"
+                          min="1"
+                          max="100"
                           {...field}
                           onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
                           value={field.value}
@@ -353,6 +369,21 @@ export function QuestionDetailForm({
                   )}
                 />
               </div>
+
+              {/* 题目内容 */}
+              <FormField
+                control={form.control}
+                name="content"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>题目内容</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} placeholder="请输入题目内容" className="min-h-[100px]" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               {/* 题目描述 */}
               <FormField
@@ -391,7 +422,7 @@ export function QuestionDetailForm({
           </CardHeader>
           <CardContent>
             {/* 选择题选项编辑区域 */}
-            {(form.watch('type') === QuestionType.SINGLE_CHOICE || 
+            {(form.watch('type') === QuestionType.SINGLE_CHOICE ||
               form.watch('type') === QuestionType.MULTIPLE_CHOICE) && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between mb-2">
@@ -411,7 +442,7 @@ export function QuestionDetailForm({
                     添加选项
                   </Button>
                 </div>
-                
+
                 <div className="space-y-2 rounded-md border p-3">
                   {form.watch('type') === QuestionType.SINGLE_CHOICE && (
                     <div className="grid grid-cols-[1fr_auto_auto] gap-3">
@@ -420,7 +451,7 @@ export function QuestionDetailForm({
                       <div></div>
                     </div>
                   )}
-                  
+
                   {form.watch('type') === QuestionType.SINGLE_CHOICE && (
                     <RadioGroup
                       value={form.watch('options')?.findIndex(opt => opt.isCorrect)?.toString() || ''}
@@ -455,7 +486,7 @@ export function QuestionDetailForm({
                       ))}
                     </RadioGroup>
                   )}
-                  
+
                   {form.watch('type') === QuestionType.MULTIPLE_CHOICE && (
                     <div className="space-y-2">
                       <div className="grid grid-cols-[1fr_auto_auto] gap-3">
@@ -463,7 +494,7 @@ export function QuestionDetailForm({
                         <div className="text-sm font-medium text-muted-foreground text-center">正确答案</div>
                         <div></div>
                       </div>
-                      
+
                       {form.watch('options')?.map((option, index) => (
                         <div key={index} className="grid grid-cols-[1fr_auto_auto] gap-3 items-center">
                           <FormField
@@ -518,8 +549,8 @@ export function QuestionDetailForm({
                     value={form.watch('options')?.findIndex(opt => opt.isCorrect)?.toString() || '0'}
                     onValueChange={(value) => {
                       const updatedOptions = [
-                        { content: '正确', isCorrect: value === '0', optionOrder: 0 },
-                        { content: '错误', isCorrect: value === '1', optionOrder: 1 }
+                        { content: '正确', isCorrect: value === '0', orderIndex: 0 },
+                        { content: '错误', isCorrect: value === '1', orderIndex: 1 }
                       ];
                       form.setValue('options', updatedOptions);
                     }}
@@ -539,7 +570,7 @@ export function QuestionDetailForm({
             )}
 
             {/* 填空题和简答题的答案 */}
-            {(form.watch('type') === QuestionType.FILL_BLANK || 
+            {(form.watch('type') === QuestionType.FILL_BLANK ||
               form.watch('type') === QuestionType.SHORT_ANSWER) && (
               <FormField
                 control={form.control}
@@ -605,8 +636,8 @@ export function QuestionDetailForm({
             />
           </CardContent>
           <CardFooter className="flex justify-end pt-2">
-            <Button 
-              type="button" 
+            <Button
+              type="button"
               disabled={isSubmitting}
               onClick={form.handleSubmit(handleSubmit)}
               className="relative"
@@ -627,4 +658,4 @@ export function QuestionDetailForm({
       </form>
     </Form>
   );
-} 
+}

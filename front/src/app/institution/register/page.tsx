@@ -51,7 +51,7 @@ export default function InstitutionRegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isEmailSubmitting, setIsEmailSubmitting] = useState<boolean>(false);
   const { clearError, sendEmailVerificationCode } = useAuthStore();
-  
+
   // 初始化表单
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -67,58 +67,58 @@ export default function InstitutionRegisterPage() {
       emailCode: "",
     }
   });
-  
+
   // 处理验证码Key变化
   const handleCaptchaKeyChange = (newCaptchaKey: string) => {
     setCaptchaKey(newCaptchaKey);
     form.setValue("captchaKey", newCaptchaKey);
   };
-  
+
   // 发送邮箱验证码
   const onSendEmailCode = async () => {
     clearError();
-    
+
     const email = form.getValues("email");
     const captchaCode = form.getValues("captchaCode");
-    
+
     // 验证邮箱和验证码
     const emailResult = z.string().email("请输入有效的邮箱地址").safeParse(email);
     const captchaResult = z.string().min(1, "验证码不能为空").safeParse(captchaCode);
-    
+
     if (!emailResult.success) {
       form.setError("email", { message: emailResult.error.errors[0].message });
       return;
     }
-    
+
     if (!captchaResult.success) {
       form.setError("captchaCode", { message: captchaResult.error.errors[0].message });
       return;
     }
-    
+
     // 确保验证码Key存在
     if (!captchaKey) {
       console.error("验证码Key不存在，重新获取验证码");
       toast.error("验证码已失效，请点击验证码图片刷新");
       return;
     }
-    
+
     setIsEmailSubmitting(true);
-    
+
     try {
       await sendEmailVerificationCode({
         email,
         captchaCode,
         captchaKey,
       });
-      
+
       // 保存用于验证的captchaKey
       setEmailCaptchaKey(captchaKey);
-      
+
       toast.success("验证码已发送到您的邮箱，请查收");
       setCountdown(60); // 设置60秒倒计时
     } catch (error: any) {
       console.error("发送邮箱验证码失败：", error);
-      
+
       if (error.message?.includes("验证码")) {
         toast.error("验证码错误，请重新输入");
       } else {
@@ -128,40 +128,40 @@ export default function InstitutionRegisterPage() {
       setIsEmailSubmitting(false);
     }
   };
-  
+
   // 提交基本信息
   const onBasicInfoSubmit = () => {
     const basicFields = ["username", "password", "confirmPassword", "institutionCode"];
     const hasErrors = basicFields.some(field => !!form.formState.errors[field as keyof RegisterFormValues]);
-    
+
     if (hasErrors) {
       return;
     }
-    
+
     setActiveTab("email-verify");
   };
-  
+
   // 验证邮箱
   const onVerifyEmail = async () => {
     clearError();
-    
+
     const emailCode = form.getValues("emailCode");
-    
+
     if (!emailCode || emailCode.length !== 6) {
       form.setError("emailCode", { message: "请输入6位数字验证码" });
       return;
     }
-    
+
     setIsEmailVerified(true);
     toast.success("邮箱验证成功");
     setActiveTab("submit");
   };
-  
+
   // 最终提交注册
   const onSubmit = async (data: RegisterFormValues) => {
     clearError();
     setIsSubmitting(true);
-    
+
     console.log("准备提交机构用户注册请求:", {
       username: data.username,
       email: data.email,
@@ -169,14 +169,20 @@ export default function InstitutionRegisterPage() {
       captchaKey: data.captchaKey,
       // 不输出密码信息
     });
-    
+
     try {
+      // 创建一个新对象，排除confirmPassword字段
+      const { confirmPassword, ...registerData } = data;
+
+      console.log("准备发送注册请求，已移除confirmPassword字段");
+      console.log("注册数据:", JSON.stringify(registerData));
+
       // 调用API注册机构用户
-      await institutionAuthService.register(data);
-      
+      await institutionAuthService.register(registerData);
+
       console.log("注册请求成功发送");
       toast.success("注册成功！");
-      
+
       // 跳转到登录页面
       router.push("/login");
     } catch (error: any) {
@@ -193,7 +199,7 @@ export default function InstitutionRegisterPage() {
       setIsSubmitting(false);
     }
   };
-  
+
   // 倒计时效果
   useEffect(() => {
     if (countdown > 0) {
@@ -203,7 +209,7 @@ export default function InstitutionRegisterPage() {
       return () => clearInterval(timer);
     }
   }, [countdown]);
-  
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-lg w-full">
@@ -217,28 +223,28 @@ export default function InstitutionRegisterPage() {
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-3 mb-6">
-                <TabsTrigger 
-                  value="basic-info" 
+                <TabsTrigger
+                  value="basic-info"
                   className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                 >
                   基本信息
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="email-verify" 
+                <TabsTrigger
+                  value="email-verify"
                   disabled={form.formState.errors.username || form.formState.errors.password || form.formState.errors.confirmPassword || form.formState.errors.institutionCode}
                   className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                 >
                   邮箱验证
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="submit" 
+                <TabsTrigger
+                  value="submit"
                   disabled={!isEmailVerified}
                   className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                 >
                   提交注册
                 </TabsTrigger>
               </TabsList>
-              
+
               <Form {...form}>
                 <TabsContent value="basic-info">
                   <div className="space-y-4 mt-4">
@@ -247,7 +253,7 @@ export default function InstitutionRegisterPage() {
                         请填写基本信息，点击下一步进行邮箱验证
                       </AlertDescription>
                     </Alert>
-                    
+
                     <FormField
                       control={form.control}
                       name="username"
@@ -264,7 +270,7 @@ export default function InstitutionRegisterPage() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={form.control}
                       name="password"
@@ -278,7 +284,7 @@ export default function InstitutionRegisterPage() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={form.control}
                       name="confirmPassword"
@@ -292,7 +298,7 @@ export default function InstitutionRegisterPage() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={form.control}
                       name="institutionCode"
@@ -309,7 +315,7 @@ export default function InstitutionRegisterPage() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <div className="pt-4 flex justify-between">
                       <Button type="button" variant="outline" asChild>
                         <Link href="/institution">返回</Link>
@@ -320,7 +326,7 @@ export default function InstitutionRegisterPage() {
                     </div>
                   </div>
                 </TabsContent>
-                
+
                 <TabsContent value="email-verify">
                   <div className="space-y-4 mt-4">
                     <Alert className="bg-blue-50 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-900">
@@ -328,7 +334,7 @@ export default function InstitutionRegisterPage() {
                         请提供您的电子邮箱并完成验证
                       </AlertDescription>
                     </Alert>
-                    
+
                     <FormField
                       control={form.control}
                       name="email"
@@ -342,7 +348,7 @@ export default function InstitutionRegisterPage() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={form.control}
                       name="phone"
@@ -356,7 +362,7 @@ export default function InstitutionRegisterPage() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={form.control}
                       name="captchaCode"
@@ -373,7 +379,7 @@ export default function InstitutionRegisterPage() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={form.control}
                       name="emailCode"
@@ -384,9 +390,9 @@ export default function InstitutionRegisterPage() {
                             <FormControl>
                               <Input placeholder="请输入邮箱验证码" {...field} className="bg-slate-50 dark:bg-slate-900" />
                             </FormControl>
-                            <Button 
-                              type="button" 
-                              variant="outline" 
+                            <Button
+                              type="button"
+                              variant="outline"
                               onClick={onSendEmailCode}
                               disabled={countdown > 0 || isEmailSubmitting}
                               className="whitespace-nowrap"
@@ -398,7 +404,7 @@ export default function InstitutionRegisterPage() {
                         </FormItem>
                       )}
                     />
-                    
+
                     <div className="pt-4 flex justify-between">
                       <Button type="button" onClick={() => setActiveTab("basic-info")} variant="outline">
                         返回上一步
@@ -409,7 +415,7 @@ export default function InstitutionRegisterPage() {
                     </div>
                   </div>
                 </TabsContent>
-                
+
                 <TabsContent value="submit">
                   <div className="space-y-4 mt-4">
                     <Alert className="bg-green-50 dark:bg-green-950 text-green-800 dark:text-green-300 border-green-200 dark:border-green-900">
@@ -417,7 +423,7 @@ export default function InstitutionRegisterPage() {
                         请确认以下信息无误，点击"提交注册"完成注册
                       </AlertDescription>
                     </Alert>
-                    
+
                     <div className="border border-slate-200 dark:border-slate-700 rounded-md p-4 space-y-3">
                       <div className="grid grid-cols-2 gap-2">
                         <div>
@@ -440,23 +446,23 @@ export default function InstitutionRegisterPage() {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="border border-slate-200 dark:border-slate-700 rounded-md p-4">
                       <p className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">验证码确认</p>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
                         为确保注册成功，请在提交前刷新验证码
                       </p>
                       <div className="flex items-center gap-2">
-                        <Input 
-                          placeholder="请输入验证码" 
+                        <Input
+                          placeholder="请输入验证码"
                           defaultValue={form.getValues("captchaCode")}
                           onChange={(e) => form.setValue("captchaCode", e.target.value, { shouldValidate: true })}
-                          className="bg-slate-50 dark:bg-slate-900 w-32" 
+                          className="bg-slate-50 dark:bg-slate-900 w-32"
                         />
                         <Captcha onCaptchaKeyChange={handleCaptchaKeyChange} />
                       </div>
                     </div>
-                    
+
                     <div className="pt-4 flex justify-between">
                       <Button type="button" onClick={() => setActiveTab("email-verify")} variant="outline">
                         返回上一步
@@ -482,4 +488,4 @@ export default function InstitutionRegisterPage() {
       </div>
     </div>
   );
-} 
+}

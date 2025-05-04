@@ -149,8 +149,8 @@ export default function AddQuestionsPage({ params }: PageProps) {
                 }}
                 className="max-w-sm"
               />
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="icon"
                 onClick={fetchQuestions}
               >
@@ -242,7 +242,16 @@ export default function AddQuestionsPage({ params }: PageProps) {
                             }
                           />
                         </TableCell>
-                        <TableCell>{question.title}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{question.title}</span>
+                            {question.content && (
+                              <p className="text-sm mt-1">
+                                {question.content}
+                              </p>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>{getQuestionTypeText(question.type)}</TableCell>
                         <TableCell>
                           <Badge variant={getQuestionDifficultyColor(question.difficulty)}>
@@ -288,4 +297,4 @@ export default function AddQuestionsPage({ params }: PageProps) {
       </Card>
     </div>
   );
-} 
+}

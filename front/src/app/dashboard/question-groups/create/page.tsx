@@ -13,25 +13,27 @@ import { Textarea } from '@/components/ui/textarea';
 import { questionGroupService } from '@/services';
 import { QuestionGroupDTO } from '@/types/question';
 import { useAuthStore } from '@/stores/auth-store';
+import { getQuestionsPageUrl } from '@/utils/navigationUtils';
 
 // 创建问题组页面
 export default function CreateQuestionGroupPage() {
   const router = useRouter();
   const { user } = useAuthStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // 问题组表单数据
   const [formData, setFormData] = useState<QuestionGroupDTO>({
     name: '',
     description: '',
     institutionId: user?.institutionId || 0
   });
-  
+
   // 返回列表
   const handleBack = () => {
-    router.back();
+    // 返回到题目管理页面的题组标签页
+    router.push(getQuestionsPageUrl('groups'));
   };
-  
+
   // 处理输入变化
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -40,7 +42,7 @@ export default function CreateQuestionGroupPage() {
       [name]: value
     }));
   };
-  
+
   // 提交表单
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,8 +60,9 @@ export default function CreateQuestionGroupPage() {
     setIsSubmitting(true);
     try {
       await questionGroupService.createGroup(formData);
-      toast.success('创建成功');
-      router.push('/dashboard/question-groups');
+      toast.success('创建题组成功');
+      // 跳转到题目管理页面的题组标签页
+      router.push(getQuestionsPageUrl('groups'));
     } catch (error) {
       console.error('创建题组失败:', error);
       toast.error('创建失败');
@@ -67,7 +70,7 @@ export default function CreateQuestionGroupPage() {
       setIsSubmitting(false);
     }
   };
-  
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -76,7 +79,7 @@ export default function CreateQuestionGroupPage() {
           返回
         </Button>
       </div>
-      
+
       <form onSubmit={handleSubmit}>
         <Card>
           <CardHeader>
@@ -98,7 +101,7 @@ export default function CreateQuestionGroupPage() {
                 placeholder="输入题组名称"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="description">描述</Label>
               <Textarea
@@ -121,4 +124,4 @@ export default function CreateQuestionGroupPage() {
       </form>
     </div>
   );
-} 
+}

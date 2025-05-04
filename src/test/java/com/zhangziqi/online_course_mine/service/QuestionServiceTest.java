@@ -36,6 +36,7 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.eq;
 
 @ExtendWith(MockitoExtension.class)
 public class QuestionServiceTest {
@@ -147,7 +148,7 @@ public class QuestionServiceTest {
                 .answer("这是答案")
                 .options(optionDTOs)
                 .build();
-        
+
         // 模拟questionTagService.getTagsByQuestionId返回空列表
         lenient().when(questionTagService.getTagsByQuestionId(anyLong())).thenReturn(new ArrayList<>());
     }
@@ -275,7 +276,7 @@ public class QuestionServiceTest {
 
         // 设置模拟行为
         when(institutionRepository.findById(anyLong())).thenReturn(Optional.of(testInstitution));
-        when(questionRepository.findByInstitution(any(Institution.class), any(Pageable.class))).thenReturn(questionPage);
+        when(questionRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(Pageable.class))).thenReturn(questionPage);
         when(optionRepository.findByQuestionIdOrderByOrderIndexAsc(anyLong())).thenReturn(testOptions);
 
         // 执行测试
@@ -290,7 +291,7 @@ public class QuestionServiceTest {
 
         // 验证方法调用
         verify(institutionRepository).findById(testInstitution.getId());
-        verify(questionRepository).findByInstitution(testInstitution, pageable);
+        verify(questionRepository).findAll(any(org.springframework.data.jpa.domain.Specification.class), eq(pageable));
         verify(optionRepository).findByQuestionIdOrderByOrderIndexAsc(testQuestion.getId());
     }
 
@@ -390,21 +391,21 @@ public class QuestionServiceTest {
     void updateQuestion_Success() {
         // 准备测试数据
         testQuestionDTO.setId(1L);
-        
+
         // 设置模拟行为
         when(questionRepository.findByIdAndInstitutionId(anyLong(), anyLong())).thenReturn(Optional.of(testQuestion));
         when(questionRepository.save(any(Question.class))).thenReturn(testQuestion);
         doNothing().when(optionRepository).deleteByQuestionId(anyLong());
         when(optionRepository.saveAll(anyList())).thenReturn(testOptions);
-        
+
         // 执行测试
         QuestionVO result = questionService.updateQuestion(testQuestionDTO, testUser.getId());
-        
+
         // 验证结果
         assertNotNull(result);
         assertEquals(testQuestion.getId(), result.getId());
         assertEquals(testQuestion.getTitle(), result.getTitle());
-        
+
         // 验证方法调用
         verify(questionRepository).findByIdAndInstitutionId(testQuestionDTO.getId(), testQuestionDTO.getInstitutionId());
         verify(questionRepository).save(any(Question.class));
@@ -495,13 +496,13 @@ public class QuestionServiceTest {
             savedQuestion.setId(1L);
             return savedQuestion;
         });
-        
+
         // 设置保存后的选项和问题的关联
         when(optionRepository.saveAll(anyList())).thenAnswer(invocation -> {
             List<QuestionOption> options = invocation.getArgument(0);
             Question question = new Question();
             question.setId(1L);
-            
+
             return options.stream()
                     .peek(option -> option.setQuestion(question))
                     .collect(Collectors.toList());
@@ -571,4 +572,4 @@ public class QuestionServiceTest {
         verify(userRepository).findById(testUser.getId());
         verify(questionRepository).save(any(Question.class));
     }
-} 
+}

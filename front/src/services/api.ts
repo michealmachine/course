@@ -36,7 +36,7 @@ api.interceptors.request.use(
   (config) => {
     // 从localStorage获取token
     const token = getStorageItem('token');
-    
+
     // 如果存在token，添加到请求头
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -45,7 +45,7 @@ api.interceptors.request.use(
         delete config.params.headers;
       }
     }
-    
+
     return config;
   },
   (error) => {
@@ -60,7 +60,7 @@ const shouldRefreshToken = (token: string): boolean => {
     const payload = JSON.parse(atob(token.split('.')[1]));
     const expiresIn = payload.exp * 1000; // 转换为毫秒
     const now = Date.now();
-    
+
     // 如果token还有15分钟就过期，才刷新
     return expiresIn - now < 15 * 60 * 1000;
   } catch (error) {
@@ -83,48 +83,48 @@ api.interceptors.response.use(
   async (error: AxiosError<ApiResponse>) => {
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
     const requestUrl = originalRequest.url || '';
-    
+
     // 检查是否为登录或注册请求
-    const isAuthRequest = requestUrl.includes('/auth/login') || 
+    const isAuthRequest = requestUrl.includes('/auth/login') ||
                          requestUrl.includes('/auth/register') ||
                          requestUrl.includes('/auth/captcha') ||
                          requestUrl.includes('/auth/refresh-token');
-    
+
     // 只在401错误时尝试刷新token
     if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
       originalRequest._retry = true;
-      
+
       try {
         // 尝试刷新令牌
         const refreshToken = getStorageItem('refreshToken');
-        
+
         if (refreshToken) {
           console.log('Token过期，开始刷新');
           const response = await axios.post<ApiResponse<{ accessToken: string; refreshToken: string; tokenType: string; expiresIn: number }>>(
             `${api.defaults.baseURL}/auth/refresh-token`,
             { refreshToken }
           );
-          
+
           if (response.data.code !== 200 || !response.data.data) {
             throw new Error(response.data.message || '刷新令牌失败');
           }
-          
+
           const { accessToken, refreshToken: newRefreshToken, tokenType = 'Bearer' } = response.data.data;
-          
+
           if (!accessToken) {
             throw new Error('刷新令牌失败：未获取到有效的访问令牌');
           }
-          
+
           // 更新localStorage中的令牌
           setStorageItem('token', accessToken);
           setStorageItem('refreshToken', newRefreshToken);
-          
+
           // 更新请求头并重试原始请求
           const authHeader = `${tokenType} ${accessToken}`;
           api.defaults.headers.common.Authorization = authHeader;
           originalRequest.headers = originalRequest.headers || {};
           originalRequest.headers.Authorization = authHeader;
-          
+
           return api(originalRequest);
         } else {
           throw new Error('会话已过期，请重新登录');
@@ -133,22 +133,22 @@ api.interceptors.response.use(
         // 刷新失败，清除令牌并重定向到登录页
         removeStorageItem('token');
         removeStorageItem('refreshToken');
-        
+
         if (typeof window !== 'undefined') {
           window.location.href = '/login';
         }
-        
+
         return Promise.reject(refreshError);
       }
     }
-    
+
     // 构造API错误对象
     const apiError: ApiError = {
       code: error.response?.data?.code || error.response?.status || 500,
       message: error.response?.data?.message || error.message || '请求失败',
       errors: error.response?.data?.errors,
     };
-    
+
     return Promise.reject(apiError);
   }
 );
@@ -186,12 +186,33 @@ export const request = {
    */
   get: async <T>(url: string, config?: any): Promise<AxiosResponse<ApiResponse<T>>> => {
     try {
-      return await api.get<ApiResponse<T>>(url, config);
-    } catch (error) {
+      console.log(`开始GET请求: ${url}`, config);
+      const token = getStorageItem('token');
+      console.log(`当前token: ${token ? '已设置' : '未设置'}`);
+
+      // 确保请求头中包含Authorization
+      if (token && (!config || !config.headers)) {
+        config = config || {};
+        config.headers = config.headers || {};
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+
+      const response = await api.get<ApiResponse<T>>(url, config);
+      console.log(`GET ${url} 请求成功:`, response.status, response.data);
+      return response;
+    } catch (error: any) {
       // 如果配置中设置了silentOnAuthError，且是401或403错误，则静默失败（不打印错误）
-      const isAuthError = axios.isAxiosError(error) && 
+      const isAuthError = axios.isAxiosError(error) &&
         (error.response?.status === 401 || error.response?.status === 403);
-      
+
+      console.log(`GET ${url} 请求失败:`, {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+        config: error.config
+      });
+
       if (!(config?.silentOnAuthError && isAuthError)) {
         console.error(`GET ${url} 请求失败:`, error);
       }
@@ -207,12 +228,23 @@ export const request = {
    */
   post: async <T>(url: string, data?: any, config?: any): Promise<AxiosResponse<ApiResponse<T>>> => {
     try {
-      return await api.post<ApiResponse<T>>(url, data, config);
-    } catch (error) {
+      console.log(`开始POST请求: ${url}`, { data });
+      const response = await api.post<ApiResponse<T>>(url, data, config);
+      console.log(`POST ${url} 请求成功:`, response.status, response.data);
+      return response;
+    } catch (error: any) {
       // 如果配置中设置了silentOnAuthError，且是401或403错误，则静默失败（不打印错误）
-      const isAuthError = axios.isAxiosError(error) && 
+      const isAuthError = axios.isAxiosError(error) &&
         (error.response?.status === 401 || error.response?.status === 403);
-      
+
+      console.log(`POST ${url} 请求失败:`, {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+        config: error.config
+      });
+
       if (!(config?.silentOnAuthError && isAuthError)) {
         console.error(`POST ${url} 请求失败:`, error);
       }
@@ -231,9 +263,9 @@ export const request = {
       return await api.patch<ApiResponse<T>>(url, data, config);
     } catch (error) {
       // 如果配置中设置了silentOnAuthError，且是401或403错误，则静默失败（不打印错误）
-      const isAuthError = axios.isAxiosError(error) && 
+      const isAuthError = axios.isAxiosError(error) &&
         (error.response?.status === 401 || error.response?.status === 403);
-      
+
       if (!(config?.silentOnAuthError && isAuthError)) {
         console.error(`PATCH ${url} 请求失败:`, error);
       }
@@ -252,9 +284,9 @@ export const request = {
       return await api.put<ApiResponse<T>>(url, data, config);
     } catch (error) {
       // 如果配置中设置了silentOnAuthError，且是401或403错误，则静默失败（不打印错误）
-      const isAuthError = axios.isAxiosError(error) && 
+      const isAuthError = axios.isAxiosError(error) &&
         (error.response?.status === 401 || error.response?.status === 403);
-      
+
       if (!(config?.silentOnAuthError && isAuthError)) {
         console.error(`PUT ${url} 请求失败:`, error);
       }
@@ -272,9 +304,9 @@ export const request = {
       return await api.delete<ApiResponse<T>>(url, config);
     } catch (error) {
       // 如果配置中设置了silentOnAuthError，且是401或403错误，则静默失败（不打印错误）
-      const isAuthError = axios.isAxiosError(error) && 
+      const isAuthError = axios.isAxiosError(error) &&
         (error.response?.status === 401 || error.response?.status === 403);
-      
+
       if (!(config?.silentOnAuthError && isAuthError)) {
         console.error(`DELETE ${url} 请求失败:`, error);
       }
@@ -283,4 +315,4 @@ export const request = {
   }
 };
 
-export default api; 
+export default api;

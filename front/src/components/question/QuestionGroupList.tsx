@@ -35,9 +35,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Card, CardContent } from '@/components/ui/card';
-import { 
-  MoreHorizontal, 
-  Search, 
+import {
+  MoreHorizontal,
+  Search,
   Plus,
   Edit,
   Trash2,
@@ -139,14 +139,14 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
     // 如果正在加载，直接返回
     const id = parseInt(groupId);
     if (loadingGroups[id]) return;
-    
+
     // 只有没有缓存数据时才加载
     if (!groupQuestions[id]) {
       setLoadingGroups(prev => ({ ...prev, [id]: true }));
       try {
         const items = await questionGroupService.getGroupItems(id);
-        setGroupQuestions(prev => ({ 
-          ...prev, 
+        setGroupQuestions(prev => ({
+          ...prev,
           [id]: items.map(item => ({
             ...item.question,
             groupItemId: item.id
@@ -176,7 +176,7 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
     if (confirm('确定要删除此题组吗？')) {
       try {
         await questionGroupService.deleteGroup(id);
-        
+
         // 删除后更新展开状态和题目缓存
         const groupIdStr = id.toString();
         setExpandedGroups(prev => prev.filter(groupId => groupId !== groupIdStr));
@@ -185,7 +185,7 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
           delete newState[id];
           return newState;
         });
-        
+
         toast.success('删除成功');
         fetchGroups();
       } catch (error) {
@@ -215,16 +215,16 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
   // 加载可用题目列表
   const loadAvailableQuestions = async () => {
     if (!selectedGroupId) return;
-    
+
     setIsLoadingQuestions(true);
     try {
       // 处理标签ID
-      const tagId = selectedQuestionTagId && selectedQuestionTagId !== 'all' 
-        ? parseInt(selectedQuestionTagId) 
+      const tagId = selectedQuestionTagId && selectedQuestionTagId !== 'all'
+        ? parseInt(selectedQuestionTagId)
         : undefined;
-      
+
       const tagIds = tagId ? [tagId] : undefined;
-      
+
       const response = await questionService.getQuestionList({
         keyword: questionSearchKeyword,
         type: selectedQuestionType && selectedQuestionType !== 'all' ? parseInt(selectedQuestionType) : undefined,
@@ -256,7 +256,7 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
     try {
       // 使用questionGroupService.addQuestionsToGroup方法，它调用了正确的API
       await questionGroupService.addQuestionsToGroup(selectedGroupId, selectedQuestions);
-      
+
       // 添加成功后，如果组已经展开，则需要重新加载题目
       if (expandedGroups.includes(selectedGroupId.toString())) {
         // 清除当前组的题目缓存，强制重新加载
@@ -265,14 +265,14 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
           delete newState[selectedGroupId];
           return newState;
         });
-        
+
         // 重新加载题目
         handleGroupExpand(selectedGroupId.toString());
       }
-      
+
       // 重新获取题组列表以更新题目数量
       fetchGroups();
-      
+
       toast.success('添加题目成功', {
         description: `已成功添加 ${selectedQuestions.length} 个题目到题组`
       });
@@ -326,7 +326,7 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
     if (confirm('确定要从题组中移除此题目吗？')) {
       try {
         await questionGroupService.removeItemFromGroup(groupId, itemId);
-        
+
         // 更新本地缓存中的题目列表
         setGroupQuestions(prev => {
           const updatedQuestions = prev[groupId]?.filter(q => q.groupItemId !== itemId) || [];
@@ -335,10 +335,10 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
             [groupId]: updatedQuestions
           };
         });
-        
+
         // 更新题组列表以刷新题目计数
         fetchGroups();
-        
+
         toast.success('移除成功');
       } catch (error) {
         console.error('移除题目失败:', error);
@@ -359,7 +359,7 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
             </div>
           </CardContent>
         </Card>
-        
+
         {[...Array(3)].map((_, index) => (
           <Card key={index}>
             <CardContent className="p-4">
@@ -389,15 +389,15 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
                 }}
                 className="max-w-sm"
               />
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="icon"
                 onClick={() => debouncedFetchGroups(searchKeyword)}
               >
                 <Search className="h-4 w-4" />
               </Button>
             </div>
-            
+
             <Button onClick={(e) => {
               e.stopPropagation();
               handleCreateGroup();
@@ -408,7 +408,7 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
           </div>
         </CardContent>
       </Card>
-      
+
       {/* 题组列表 */}
       <Accordion
         type="multiple"
@@ -416,10 +416,10 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
         onValueChange={(value) => {
           // 直接更新状态
           setExpandedGroups(value);
-          
+
           // 检查新展开的组ID
           const newExpandedIds = value.filter(id => !expandedGroups.includes(id));
-          
+
           // 对每个新展开的组加载数据
           newExpandedIds.forEach(groupId => {
             handleGroupExpand(groupId);
@@ -442,7 +442,7 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
                   </Badge>
                 </div>
               </AccordionTrigger>
-              
+
               <div className="flex items-center space-x-2">
                 <Button
                   variant="outline"
@@ -455,12 +455,12 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
                   <FolderPlus className="h-4 w-4 mr-2" />
                   添加题目
                 </Button>
-                
+
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
                       }}
@@ -487,7 +487,7 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
                 </DropdownMenu>
               </div>
             </div>
-            
+
             <AccordionContent>
               <div className="px-4 pb-4">
                 {loadingGroups[group.id] ? (
@@ -513,7 +513,16 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
                     <TableBody>
                       {groupQuestions[group.id]?.map((question) => (
                         <TableRow key={question.id}>
-                          <TableCell>{question.title}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{question.title}</span>
+                              {question.content && (
+                                <p className="text-sm mt-1">
+                                  {question.content}
+                                </p>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>{getQuestionTypeText(question.type)}</TableCell>
                           <TableCell>
                             <Badge variant={getQuestionDifficultyColor(question.difficulty)}>
@@ -550,13 +559,13 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
           </AccordionItem>
         ))}
       </Accordion>
-      
+
       {groups.length === 0 && !isLoading && (
         <div className="text-center py-8 text-muted-foreground">
           暂无题组
         </div>
       )}
-      
+
       {/* 添加题目弹窗 */}
       <Dialog open={isAddQuestionsDialogOpen} onOpenChange={setIsAddQuestionsDialogOpen}>
         <DialogContent className="max-w-4xl">
@@ -569,7 +578,7 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
               选择要添加到题组的题目，已选择 <span className="font-semibold text-primary">{selectedQuestions.length}</span> 个题目
             </DialogDescription>
           </DialogHeader>
-          
+
           {/* 搜索和筛选 */}
           <div className="bg-muted/30 p-4 rounded-lg space-y-4">
             {/* 第一层：搜索框 */}
@@ -585,8 +594,8 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
                 }}
                 className="flex-1 border-primary/20 focus-visible:ring-primary/30"
               />
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="icon"
                 onClick={loadAvailableQuestions}
                 className="border-primary/20 hover:bg-primary/10 hover:text-primary"
@@ -619,7 +628,7 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <span className="text-sm text-muted-foreground">难度级别:</span>
                 <Select value={selectedQuestionDifficulty} onValueChange={setSelectedQuestionDifficulty}>
@@ -640,11 +649,11 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <span className="text-sm text-muted-foreground">标签筛选:</span>
-                <Select 
-                  value={selectedQuestionTagId} 
+                <Select
+                  value={selectedQuestionTagId}
                   onValueChange={setSelectedQuestionTagId}
                 >
                   <SelectTrigger className="w-[160px] border-primary/20 focus:ring-primary/30">
@@ -727,9 +736,9 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
                         )}
                       </div>
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       className={`h-8 w-8 opacity-0 group-hover:opacity-100 ${
                         selectedQuestions.includes(question.id) ? 'opacity-100' : ''
                       }`}
@@ -747,7 +756,7 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
               </div>
             )}
           </ScrollArea>
-          
+
           <DialogFooter>
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center text-sm text-muted-foreground space-x-2">
@@ -776,4 +785,4 @@ export function QuestionGroupList({ institutionId, onDataChange }: QuestionGroup
       </Dialog>
     </div>
   );
-} 
+}

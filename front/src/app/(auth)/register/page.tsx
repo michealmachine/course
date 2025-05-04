@@ -47,16 +47,16 @@ type EmailVerifyFormValues = z.infer<typeof emailVerifySchema>;
 
 export default function RegisterPage() {
   const router = useRouter();
-  
+
   const [activeTab, setActiveTab] = useState<string>("basic-info");
   const [captchaKey, setCaptchaKey] = useState<string>('');
   const [username, setUsername] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [codeSent, setCodeSent] = useState<boolean>(false);
   const [countdown, setCountdown] = useState<number>(0);
-  
+
   const { register: registerUser, sendEmailVerificationCode, isLoading, error, clearError } = useAuthStore();
-  
+
   // 第一步表单
   const basicInfoForm = useForm<BasicInfoFormValues>({
     resolver: zodResolver(basicInfoSchema),
@@ -66,7 +66,7 @@ export default function RegisterPage() {
       confirmPassword: '',
     },
   });
-  
+
   // 第二步表单
   const emailVerifyForm = useForm<EmailVerifyFormValues>({
     resolver: zodResolver(emailVerifySchema),
@@ -76,66 +76,66 @@ export default function RegisterPage() {
       emailCode: '',
     },
   });
-  
+
   // 处理验证码Key变化
   const handleCaptchaKeyChange = (newCaptchaKey: string) => {
     console.log('注册页面：验证码Key已更新', newCaptchaKey);
     setCaptchaKey(newCaptchaKey);
   };
-  
+
   // 处理基本信息提交
   const onBasicInfoSubmit = (data: BasicInfoFormValues) => {
     clearError();
-    
+
     // 保存用户名和密码
     setUsername(data.username);
     setPassword(data.password);
-    
+
     // 切换到第二步
     setActiveTab("email-verify");
   };
-  
+
   // 发送邮箱验证码
   const onSendEmailCode = async () => {
     clearError();
-    
+
     const email = emailVerifyForm.getValues('email');
     const captchaCode = emailVerifyForm.getValues('captchaCode');
-    
+
     // 验证邮箱和验证码
     const emailResult = z.string().email('请输入有效的邮箱地址').safeParse(email);
     const captchaResult = z.string().min(4, '验证码格式不正确').safeParse(captchaCode);
-    
+
     if (!emailResult.success) {
       emailVerifyForm.setError('email', { message: emailResult.error.errors[0].message });
       return;
     }
-    
+
     if (!captchaResult.success) {
       emailVerifyForm.setError('captchaCode', { message: captchaResult.error.errors[0].message });
       return;
     }
-    
+
     // 确保验证码Key存在
     if (!captchaKey) {
       console.error('验证码Key不存在，重新获取验证码');
       toast.error('验证码已失效，请点击验证码图片刷新');
       return;
     }
-    
+
     try {
       await sendEmailVerificationCode({
         email,
         captchaCode,
         captchaKey,
       });
-      
+
       toast.success('验证码已发送到您的邮箱，请查收');
       setCodeSent(true);
       setCountdown(60); // 设置60秒倒计时
     } catch (error: any) {
       console.error('发送邮箱验证码失败：', error);
-      
+
       // 针对验证码错误提供特定提示
       if (error.message?.includes('验证码')) {
         toast.error('验证码错误，请重新输入');
@@ -144,29 +144,31 @@ export default function RegisterPage() {
       }
     }
   };
-  
+
   // 注册提交
   const onRegisterSubmit = async (data: EmailVerifyFormValues) => {
     clearError();
-    
+
     if (!username || !password) {
       toast.error('请先填写基本信息');
       setActiveTab("basic-info");
       return;
     }
-    
+
     try {
-      // 将所有信息合并到注册请求中
-      await registerUser({
+      // 将所有信息合并到注册请求中（不包含confirmPassword字段）
+      const registerData = {
         username,
         password,
-        confirmPassword: password,
         email: data.email,
         captchaKey,
         captchaCode: data.captchaCode,
-        emailCode: data.emailCode,
-      });
-      
+        emailCode: data.emailCode
+      };
+
+      console.log('发送注册请求，数据：', JSON.stringify(registerData));
+      await registerUser(registerData);
+
       toast.success('注册成功，请登录');
       router.push('/login');
     } catch (error: any) {
@@ -174,7 +176,7 @@ export default function RegisterPage() {
       toast.error(error.message || '注册失败，请重试');
     }
   };
-  
+
   // 倒计时效果
   useEffect(() => {
     if (countdown > 0) {
@@ -186,7 +188,7 @@ export default function RegisterPage() {
       setCodeSent(false);
     }
   }, [countdown, codeSent]);
-  
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -201,7 +203,7 @@ export default function RegisterPage() {
             <TabsTrigger value="basic-info">基本信息</TabsTrigger>
             <TabsTrigger value="email-verify" disabled={!username || !password}>邮箱验证</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="basic-info">
             <Form {...basicInfoForm}>
               <form onSubmit={basicInfoForm.handleSubmit(onBasicInfoSubmit)} className="space-y-4">
@@ -210,7 +212,7 @@ export default function RegisterPage() {
                     {error}
                   </div>
                 )}
-                
+
                 <FormField
                   control={basicInfoForm.control}
                   name="username"
@@ -224,7 +226,7 @@ export default function RegisterPage() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={basicInfoForm.control}
                   name="password"
@@ -238,7 +240,7 @@ export default function RegisterPage() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={basicInfoForm.control}
                   name="confirmPassword"
@@ -252,14 +254,14 @@ export default function RegisterPage() {
                     </FormItem>
                   )}
                 />
-                
+
                 <Button type="submit" className="w-full">
                   下一步
                 </Button>
               </form>
             </Form>
           </TabsContent>
-          
+
           <TabsContent value="email-verify">
             <Form {...emailVerifyForm}>
               <form onSubmit={emailVerifyForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
@@ -268,13 +270,13 @@ export default function RegisterPage() {
                     {error}
                   </div>
                 )}
-                
+
                 {username && password && (
                   <div className="bg-muted/50 p-3 rounded-md mb-4">
                     <p className="text-sm text-muted-foreground">用户名: <span className="font-medium">{username}</span></p>
                   </div>
                 )}
-                
+
                 <FormField
                   control={emailVerifyForm.control}
                   name="email"
@@ -288,7 +290,7 @@ export default function RegisterPage() {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={emailVerifyForm.control}
                   name="captchaCode"
@@ -305,17 +307,17 @@ export default function RegisterPage() {
                     </FormItem>
                   )}
                 />
-                
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  className="w-full" 
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
                   onClick={onSendEmailCode}
                   disabled={isLoading || codeSent}
                 >
                   {isLoading ? '发送中...' : codeSent ? `重新发送(${countdown}s)` : '发送验证码'}
                 </Button>
-                
+
                 <FormField
                   control={emailVerifyForm.control}
                   name="emailCode"
@@ -329,15 +331,15 @@ export default function RegisterPage() {
                     </FormItem>
                   )}
                 />
-                
+
                 <Button type="submit" className="w-full" disabled={isLoading || !codeSent}>
                   {isLoading ? '注册中...' : '完成注册'}
                 </Button>
-                
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  className="w-full" 
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
                   onClick={() => setActiveTab("basic-info")}
                 >
                   返回上一步
@@ -351,14 +353,14 @@ export default function RegisterPage() {
         <div className="text-sm text-muted-foreground">
           已有账号？ <Link href="/login" className="text-primary hover:underline">立即登录</Link>
         </div>
-        
+
         <div className="w-full border-t pt-4">
           <div className="text-sm text-center">
-            如需创建机构账号或申请机构入驻，请前往 
+            如需创建机构账号或申请机构入驻，请前往
             <Link href="/institution" className="text-primary hover:underline">机构中心</Link>
           </div>
         </div>
       </CardFooter>
     </Card>
   );
-} 
+}

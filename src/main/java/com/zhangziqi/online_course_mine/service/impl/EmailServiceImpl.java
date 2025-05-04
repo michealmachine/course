@@ -28,7 +28,7 @@ public class EmailServiceImpl implements EmailService {
     private final JavaMailSender mailSender;
     private final StringRedisTemplate redisTemplate;
     private final TemplateEngine templateEngine;
-    
+
     @Value("${spring.mail.username}")
     private String emailFrom;
 
@@ -67,7 +67,7 @@ public class EmailServiceImpl implements EmailService {
             throw new RuntimeException("验证码邮件发送失败", e);
         }
     }
-    
+
     @Override
     public void sendEmailUpdateCode(String to, String code) {
         try {
@@ -100,6 +100,39 @@ public class EmailServiceImpl implements EmailService {
     }
 
     @Override
+    public String generateTempPassword() {
+        // 生成8位随机密码，包含数字、大小写字母
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        StringBuilder sb = new StringBuilder();
+        Random random = new Random();
+
+        // 确保至少包含一个数字
+        sb.append(random.nextInt(10));
+
+        // 确保至少包含一个大写字母
+        sb.append(chars.charAt(random.nextInt(26)));
+
+        // 确保至少包含一个小写字母
+        sb.append(chars.charAt(26 + random.nextInt(26)));
+
+        // 添加剩余的随机字符
+        for (int i = 3; i < 8; i++) {
+            sb.append(chars.charAt(random.nextInt(chars.length())));
+        }
+
+        // 打乱顺序
+        char[] tempPassword = sb.toString().toCharArray();
+        for (int i = 0; i < tempPassword.length; i++) {
+            int j = random.nextInt(tempPassword.length);
+            char temp = tempPassword[i];
+            tempPassword[i] = tempPassword[j];
+            tempPassword[j] = temp;
+        }
+
+        return new String(tempPassword);
+    }
+
+    @Override
     public void saveVerificationCode(String email, String code) {
         String key = verificationCodePrefix + email;
         redisTemplate.opsForValue().set(key, code, verificationCodeExpiration, TimeUnit.MINUTES);
@@ -123,7 +156,7 @@ public class EmailServiceImpl implements EmailService {
         Context context = new Context();
         context.setVariable("applicationId", applicationId);
         context.setVariable("institutionName", institutionName);
-        
+
         String content = templateEngine.process("email/application-confirmation", context);
         sendHtmlMail(to, "机构入驻申请确认", content);
     }
@@ -133,7 +166,7 @@ public class EmailServiceImpl implements EmailService {
         Context context = new Context();
         context.setVariable("registerCode", registerCode);
         context.setVariable("institutionName", institutionName);
-        
+
         String content = templateEngine.process("email/application-approved", context);
         sendHtmlMail(to, "机构入驻申请已通过", content);
     }
@@ -143,9 +176,32 @@ public class EmailServiceImpl implements EmailService {
         Context context = new Context();
         context.setVariable("institutionName", institutionName);
         context.setVariable("reason", reason);
-        
+
         String content = templateEngine.process("email/application-rejected", context);
         sendHtmlMail(to, "机构入驻申请未通过", content);
+    }
+
+    @Override
+    public void sendPasswordResetEmail(String to, String tempPassword) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+            helper.setFrom(emailFrom);
+            helper.setTo(to);
+            helper.setSubject("在线课程平台 - 密码重置");
+
+            // 使用Thymeleaf模板引擎渲染邮件内容
+            Context context = new Context();
+            context.setVariable("tempPassword", tempPassword);
+            String content = templateEngine.process("email/password-reset", context);
+
+            helper.setText(content, true);
+            mailSender.send(message);
+            log.info("密码重置邮件发送成功: {}", to);
+        } catch (MessagingException e) {
+            log.error("密码重置邮件发送失败: {}", to, e);
+            throw new RuntimeException("密码重置邮件发送失败", e);
+        }
     }
 
     /**
@@ -170,4 +226,4 @@ public class EmailServiceImpl implements EmailService {
             throw new RuntimeException("HTML邮件发送失败", e);
         }
     }
-} 
+}

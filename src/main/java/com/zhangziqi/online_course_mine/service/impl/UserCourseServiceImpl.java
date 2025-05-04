@@ -252,8 +252,32 @@ public class UserCourseServiceImpl implements UserCourseService {
         // 检查用户是否已购买该课程
         Optional<UserCourse> existingRelation = userCourseRepository.findByUser_IdAndCourse_Id(userId, courseId);
         if (existingRelation.isPresent()) {
-            log.info("用户已购买该课程，无需重复创建关系");
-            return existingRelation.get();
+            UserCourse userCourse = existingRelation.get();
+
+            // 检查课程状态，如果是已退款状态，则更新为正常状态
+            if (userCourse.getStatus() == UserCourseStatus.REFUNDED.getValue()) {
+                log.info("用户之前购买过该课程但已退款，更新为正常状态, 用户ID: {}, 课程ID: {}", userId, courseId);
+
+                // 更新状态为正常
+                userCourse.setStatusEnum(isPaid ? UserCourseStatus.NORMAL : UserCourseStatus.EXPIRED);
+                userCourse.setPurchasedAt(LocalDateTime.now());
+
+                // 更新订单关联
+                if (orderId != null) {
+                    Order order = orderRepository.findById(orderId)
+                            .orElseThrow(() -> new ResourceNotFoundException("订单不存在，ID: " + orderId));
+                    userCourse.setOrder(order);
+                }
+
+                // 保存更新
+                userCourseRepository.save(userCourse);
+                log.info("用户课程关系已更新为正常状态, ID: {}", userCourse.getId());
+
+                return userCourse;
+            } else {
+                log.info("用户已购买该课程，无需重复创建关系");
+                return userCourse;
+            }
         }
 
         // 查询用户

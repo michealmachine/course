@@ -61,7 +61,8 @@ export interface QuestionOption {
 export interface QuestionOptionDTO {
   content: string;
   isCorrect: boolean;
-  optionOrder: number;
+  orderIndex: number;  // 与后端保持一致，使用orderIndex而不是optionOrder
+  optionOrder?: number; // 保留兼容性
 }
 
 // 问题标签
@@ -152,12 +153,12 @@ export interface FailureItem {
    * Excel行号(从1开始)
    */
   rowIndex: number;
-  
+
   /**
    * 题目标题
    */
   title: string;
-  
+
   /**
    * 错误信息
    */
@@ -208,4 +209,4 @@ export interface QuestionGroupItem {
   question: Question;
   createdAt: string;
   updatedAt: string;
-} 
+}

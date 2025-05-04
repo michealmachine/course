@@ -59,6 +59,9 @@ public class AdminLearningStatisticsServiceTest {
     @Mock
     private InstitutionRepository institutionRepository;
 
+    @Mock
+    private InstitutionLearningStatisticsService institutionLearningStatisticsService;
+
     @InjectMocks
     private AdminLearningStatisticsServiceImpl statisticsService;
 
@@ -469,24 +472,19 @@ public class AdminLearningStatisticsServiceTest {
         // 模拟机构数据
         when(institutionRepository.findById(1L)).thenReturn(Optional.of(institution));
 
-        // 模拟学习人数数据
-        when(learningRecordRepository.countUniqueUsersByInstitution(1L)).thenReturn(2L);
+        // 创建一个模拟的机构学习统计VO
+        InstitutionLearningStatisticsVO mockStatisticsVO = InstitutionLearningStatisticsVO.builder()
+                .institutionId(1L)
+                .institutionName("测试机构")
+                .totalLearners(2L)
+                .totalLearningDuration(7200L)
+                .todayLearningDuration(3600L)
+                .totalActiveCourses(2)
+                .build();
 
-        // 模拟学习时长数据
-        when(learningRecordRepository.findTotalLearningDurationByInstitution(1L)).thenReturn(7200L);
-        when(learningRecordRepository.findTodayLearningDurationByInstitution(1L)).thenReturn(3600L);
-
-        // 模拟周学习记录
-        List<LearningRecord> weekRecords = Arrays.asList(record1, record2);
-        when(learningRecordRepository.findByInstitutionIdAndTimeRange(
-                eq(1L), any(LocalDateTime.class), any(LocalDateTime.class)))
-                .thenReturn(weekRecords);
-
-        // 模拟课程统计数据
-        List<Object[]> courseStats = new ArrayList<>();
-        courseStats.add(new Object[]{1L, "课程1", 10L, 5000L, 500});
-        courseStats.add(new Object[]{2L, "课程2", 5L, 3000L, 300});
-        when(learningRecordRepository.findLearningStatsByCourseForInstitution(1L)).thenReturn(courseStats);
+        // 模拟InstitutionLearningStatisticsService.getInstitutionLearningStatistics方法
+        when(institutionLearningStatisticsService.getInstitutionLearningStatistics(1L))
+                .thenReturn(mockStatisticsVO);
 
         // 执行方法
         InstitutionLearningStatisticsVO result = statisticsService.getInstitutionLearningStatistics(1L);
@@ -499,6 +497,10 @@ public class AdminLearningStatisticsServiceTest {
         assertEquals(7200L, result.getTotalLearningDuration());
         assertEquals(3600L, result.getTodayLearningDuration());
         assertEquals(2, result.getTotalActiveCourses());
+
+        // 验证方法调用
+        verify(institutionRepository).findById(1L);
+        verify(institutionLearningStatisticsService).getInstitutionLearningStatistics(1L);
     }
 
     @Test

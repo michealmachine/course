@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { CourseStatus } from '@/types/course';
+import { CourseStatus, CoursePaymentType } from '@/types/course';
 import {
   Table,
   TableBody,
@@ -13,6 +13,7 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import {
   CheckCircle,
   Clock,
@@ -23,7 +24,9 @@ import {
   PlusCircle,
   Filter,
   Eye,
-  History
+  History,
+  DollarSign,
+  BookOpen
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -147,6 +150,31 @@ export default function ReviewsPage() {
     }
   };
 
+  // 渲染付费类型
+  const renderPaymentType = (type?: CoursePaymentType, price?: number, discountPrice?: number) => {
+    // 如果类型未定义或无效，尝试根据价格判断
+    if (type === undefined || (type !== CoursePaymentType.FREE && type !== CoursePaymentType.PAID)) {
+      type = (price && price > 0) || (discountPrice && discountPrice > 0) ? CoursePaymentType.PAID : CoursePaymentType.FREE;
+    }
+
+    if (type === CoursePaymentType.FREE) {
+      return <span className="text-green-600 font-medium">免费</span>;
+    } else {
+      // 有折扣价且折扣价小于原价
+      if (discountPrice !== undefined && discountPrice > 0 && price !== undefined && discountPrice < price) {
+        return (
+          <div className="flex items-center gap-2">
+            <span className="text-amber-600 font-medium">¥ {discountPrice}</span>
+            <span className="text-muted-foreground line-through text-xs">¥ {price}</span>
+          </div>
+        );
+      } else {
+        // 只有原价
+        return <span className="text-amber-600 font-medium">¥ {price || 0}</span>;
+      }
+    }
+  };
+
   return (
     <div className="container py-6">
       <h1 className="text-3xl font-bold tracking-tight mb-6">内容审核</h1>
@@ -195,43 +223,71 @@ export default function ReviewsPage() {
             </div>
           ) : (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>课程标题</TableHead>
-                    <TableHead>机构</TableHead>
-                    <TableHead>状态</TableHead>
-                    <TableHead>提交时间</TableHead>
-                    <TableHead className="text-right">操作</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {courses.map((course) => (
-                    <TableRow key={course.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-primary" />
-                          <span>{course.title}</span>
+              <div className="space-y-4">
+                {courses.map((course) => (
+                  <Card
+                    key={course.id}
+                    className="overflow-hidden hover:shadow-sm transition-all duration-200"
+                  >
+                    <div className="flex items-stretch">
+                      {/* 课程图片 */}
+                      <div className="w-48 h-32 bg-muted relative flex-shrink-0">
+                        {course.coverUrl ? (
+                          <img
+                            src={course.coverUrl}
+                            alt={course.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center w-full h-full">
+                            <FileText className="w-12 h-12 text-muted-foreground/30" />
+                          </div>
+                        )}
+
+                        {/* 课程状态标签 */}
+                        <div className="absolute bottom-2 left-2">
+                          {renderStatusBadge(course.status)}
                         </div>
-                      </TableCell>
-                      <TableCell>{course.institution?.name || '未知机构'}</TableCell>
-                      <TableCell>{renderStatusBadge(course.status)}</TableCell>
-                      <TableCell>{course.submittedAt ? formatDate(course.submittedAt) : '未知'}</TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleStartReview(course.id)}
-                          className="gap-1"
-                        >
-                          <Eye className="h-4 w-4" />
-                          开始审核
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      </div>
+
+                      {/* 课程信息 */}
+                      <div className="p-4 flex-1 flex flex-col justify-between">
+                        <div>
+                          <h3 className="font-semibold text-lg line-clamp-1">{course.title}</h3>
+
+                          <div className="flex flex-wrap gap-4 mt-2">
+                            <div className="flex items-center text-sm text-muted-foreground">
+                              <Building className="h-4 w-4 mr-2" />
+                              <span>{course.institution?.name || '未知机构'}</span>
+                            </div>
+
+                            <div className="flex items-center text-sm">
+                              <DollarSign className="h-4 w-4 mr-2 text-muted-foreground" />
+                              {renderPaymentType(course.paymentType, course.price)}
+                            </div>
+
+                            <div className="flex items-center text-sm text-muted-foreground">
+                              <Clock className="h-4 w-4 mr-2" />
+                              <span>提交于: {course.submittedAt ? formatDate(course.submittedAt) : '未知'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-4">
+                          <Button
+                            onClick={() => handleStartReview(course.id)}
+                            size="sm"
+                            className="gap-1"
+                          >
+                            <Eye className="h-4 w-4" />
+                            开始审核
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
 
               {totalPages > 1 && (
                 <div className="mt-4 flex justify-center">
@@ -260,43 +316,66 @@ export default function ReviewsPage() {
             </div>
           ) : (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>课程标题</TableHead>
-                    <TableHead>机构</TableHead>
-                    <TableHead>状态</TableHead>
-                    <TableHead>开始审核时间</TableHead>
-                    <TableHead className="text-right">操作</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {courses.map((course) => (
-                    <TableRow key={course.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-primary" />
-                          <span>{course.title}</span>
+              <div className="space-y-4">
+                {courses.map((course) => (
+                  <Card
+                    key={course.id}
+                    className="overflow-hidden hover:shadow-sm transition-all duration-200"
+                  >
+                    <div className="flex items-stretch">
+                      {/* 课程图片 */}
+                      <div className="w-48 h-32 bg-muted relative flex-shrink-0">
+                        {course.coverUrl ? (
+                          <img
+                            src={course.coverUrl}
+                            alt={course.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center w-full h-full">
+                            <FileText className="w-12 h-12 text-muted-foreground/30" />
+                          </div>
+                        )}
+
+                        {/* 课程状态标签 */}
+                        <div className="absolute bottom-2 left-2">
+                          {renderStatusBadge(course.status)}
                         </div>
-                      </TableCell>
-                      <TableCell>{course.institution?.name || '未知机构'}</TableCell>
-                      <TableCell>{renderStatusBadge(course.status)}</TableCell>
-                      <TableCell>{course.reviewStartedAt ? formatDate(course.reviewStartedAt) : '未知'}</TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleContinueReview(course.id)}
-                          className="gap-1"
-                        >
-                          <Eye className="h-4 w-4" />
-                          继续审核
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      </div>
+
+                      {/* 课程信息 */}
+                      <div className="p-4 flex-1 flex flex-col justify-between">
+                        <div>
+                          <h3 className="font-semibold text-lg line-clamp-1">{course.title}</h3>
+
+                          <div className="flex flex-wrap gap-4 mt-2">
+                            <div className="flex items-center text-sm text-muted-foreground">
+                              <Building className="h-4 w-4 mr-2" />
+                              <span>{course.institution?.name || '未知机构'}</span>
+                            </div>
+
+                            <div className="flex items-center text-sm">
+                              <DollarSign className="h-4 w-4 mr-2 text-muted-foreground" />
+                              {renderPaymentType(course.paymentType, course.price)}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-4">
+                          <Button
+                            onClick={() => handleContinueReview(course.id)}
+                            size="sm"
+                            className="gap-1"
+                          >
+                            <Eye className="h-4 w-4" />
+                            继续审核
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
 
               {totalPages > 1 && (
                 <div className="mt-4 flex justify-center">

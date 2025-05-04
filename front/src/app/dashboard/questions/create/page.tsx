@@ -10,24 +10,24 @@ import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 import { questionService, questionTagService } from '@/services';
-import { 
-  Question, 
-  QuestionDTO, 
-  QuestionOption, 
-  QuestionOptionDTO, 
-  QuestionType, 
+import {
+  Question,
+  QuestionDTO,
+  QuestionOption,
+  QuestionOptionDTO,
+  QuestionType,
   QuestionDifficulty,
   QuestionTag
 } from '@/types/question';
@@ -39,7 +39,7 @@ export default function CreateQuestionPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tags, setTags] = useState<QuestionTag[]>([]);
   const [isTagsLoading, setIsTagsLoading] = useState(false);
-  
+
   // 问题表单数据
   const [question, setQuestion] = useState<Partial<QuestionDTO>>({
     title: '',
@@ -53,12 +53,12 @@ export default function CreateQuestionPage() {
     tagIds: [],
     score: 1 // 默认分值为1
   });
-  
+
   // 加载标签列表
   useEffect(() => {
     fetchTags();
   }, []);
-  
+
   // 当问题类型改变时，初始化选项
   useEffect(() => {
     if (question.type === QuestionType.SINGLE_CHOICE || question.type === QuestionType.MULTIPLE_CHOICE) {
@@ -91,7 +91,7 @@ export default function CreateQuestionPage() {
       }));
     }
   }, [question.type]);
-  
+
   // 获取标签列表
   const fetchTags = async () => {
     setIsTagsLoading(true);
@@ -107,18 +107,18 @@ export default function CreateQuestionPage() {
       setIsTagsLoading(false);
     }
   };
-  
+
   // 返回列表
   const handleBack = () => {
     router.push('/dashboard/questions');
   };
-  
+
   // 处理通用输入变化
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setQuestion(prev => ({ ...prev, [name]: value }));
   };
-  
+
   // 处理选择框变化
   const handleSelectChange = (name: string, value: string) => {
     if (name === 'type') {
@@ -141,23 +141,23 @@ export default function CreateQuestionPage() {
       setQuestion(prev => ({ ...prev, [name]: value }));
     }
   };
-  
+
   // 处理选项内容变化
   const handleOptionContentChange = (index: number, value: string) => {
     if (!question.options) return;
-    
+
     const updatedOptions = [...question.options];
     updatedOptions[index] = { ...updatedOptions[index], content: value };
-    
+
     setQuestion(prev => ({ ...prev, options: updatedOptions }));
   };
-  
+
   // 处理选项正确性变化
   const handleOptionCorrectChange = (index: number, isCorrect: boolean) => {
     if (!question.options) return;
-    
+
     const updatedOptions = [...question.options];
-    
+
     // 单选题需要确保只有一个选项被选中
     if (question.type === QuestionType.SINGLE_CHOICE && isCorrect) {
       updatedOptions.forEach((option, i) => {
@@ -166,40 +166,40 @@ export default function CreateQuestionPage() {
     } else {
       updatedOptions[index] = { ...updatedOptions[index], isCorrect };
     }
-    
+
     setQuestion(prev => ({ ...prev, options: updatedOptions }));
   };
-  
+
   // 添加选项
   const handleAddOption = () => {
     if (!question.options) return;
-    
+
     const newOption: QuestionOptionDTO = {
       content: '',
       isCorrect: false,
       optionOrder: question.options.length
     };
-    
+
     setQuestion(prev => ({
       ...prev,
       options: [...(prev.options || []), newOption]
     }));
   };
-  
+
   // 删除选项
   const handleRemoveOption = (index: number) => {
     if (!question.options) return;
-    
+
     const updatedOptions = question.options.filter((_, i) => i !== index)
       .map((option, i) => ({ ...option, optionOrder: i }));
-    
+
     setQuestion(prev => ({ ...prev, options: updatedOptions }));
   };
-  
+
   // 处理标签选择变化
   const handleTagChange = (tagId: number, checked: boolean) => {
     const currentTagIds = question.tagIds || [];
-    
+
     if (checked) {
       setQuestion(prev => ({
         ...prev,
@@ -212,7 +212,7 @@ export default function CreateQuestionPage() {
       }));
     }
   };
-  
+
   // 处理分数变更
   const handleScoreChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value);
@@ -221,7 +221,7 @@ export default function CreateQuestionPage() {
       score: isNaN(value) ? 1 : Math.max(1, Math.min(100, value))
     }));
   };
-  
+
   // 创建问题
   const handleSubmit = async () => {
     // 表单验证
@@ -229,63 +229,68 @@ export default function CreateQuestionPage() {
       toast.error('请输入问题标题');
       return;
     }
-    
+
     // 验证分值
     if (!question.score || question.score < 1 || question.score > 100) {
       toast.error('分值必须在1-100之间');
       return;
     }
-    
+
     // 选择题需要至少有两个选项
-    if ((question.type === QuestionType.SINGLE_CHOICE || 
-         question.type === QuestionType.MULTIPLE_CHOICE) && 
+    if ((question.type === QuestionType.SINGLE_CHOICE ||
+         question.type === QuestionType.MULTIPLE_CHOICE) &&
         (!question.options || question.options.length < 2)) {
       toast.error('选择题至少需要两个选项');
       return;
     }
-    
+
     // 选择题至少需要一个正确答案
-    if ((question.type === QuestionType.SINGLE_CHOICE || 
-         question.type === QuestionType.MULTIPLE_CHOICE) && 
+    if ((question.type === QuestionType.SINGLE_CHOICE ||
+         question.type === QuestionType.MULTIPLE_CHOICE) &&
         (!question.options || !question.options.some(option => option.isCorrect))) {
       toast.error('请标记至少一个正确答案');
       return;
     }
-    
+
     // 判断题必须有一个正确答案
-    if (question.type === QuestionType.TRUE_FALSE && 
+    if (question.type === QuestionType.TRUE_FALSE &&
         (!question.options || !question.options.some(option => option.isCorrect))) {
       toast.error('请选择正确答案');
       return;
     }
-    
+
     // 填空题和简答题需要有参考答案
-    if ((question.type === QuestionType.FILL_BLANK || 
-         question.type === QuestionType.SHORT_ANSWER) && 
+    if ((question.type === QuestionType.FILL_BLANK ||
+         question.type === QuestionType.SHORT_ANSWER) &&
         !question.answer) {
       toast.error('请输入参考答案');
       return;
     }
-    
+
     setIsSubmitting(true);
     try {
       // 准备提交数据，创建深拷贝避免修改原始状态
+      const { description, tagIds, ...questionData } = question as QuestionDTO;
       const submitData: QuestionDTO = {
-        ...question as QuestionDTO,
-        content: question.description // 确保content字段设置为description的值
+        ...questionData,
+        content: description // 确保content字段设置为description的值
       };
-      
-      // 如果有选项，将optionOrder映射为orderIndex字段以匹配后端API期望
+
+      // 如果有选项，确保设置orderIndex字段以匹配后端API期望
       if (submitData.options && submitData.options.length > 0) {
-        submitData.options = submitData.options.map(option => ({
-          ...option,
-          // 添加orderIndex字段以匹配后端API期望
-          orderIndex: option.optionOrder
-        })) as any;
+        submitData.options = submitData.options.map((option, index) => ({
+          content: option.content,
+          isCorrect: option.isCorrect,
+          orderIndex: option.optionOrder || index,
+          // 不要包含optionOrder字段，避免后端反序列化错误
+        }));
       }
-      
+
+      // 确保不包含tagIds字段，后端DTO中没有这个字段
+      delete (submitData as any).tagIds;
+
       console.log('提交的问题数据:', submitData);
-      
+
       await questionService.createQuestion(submitData);
       toast.success('创建问题成功');
       router.push('/dashboard/questions');
@@ -296,15 +301,15 @@ export default function CreateQuestionPage() {
       setIsSubmitting(false);
     }
   };
-  
+
   // 渲染选项输入
   const renderOptionsInput = () => {
     if (!question.options || question.options.length === 0) return null;
-    
+
     if (question.type === QuestionType.TRUE_FALSE) {
       const correctIndex = question.options.findIndex(o => o.isCorrect);
       const currentValue = correctIndex >= 0 ? correctIndex.toString() : "";
-      
+
       return (
         <div className="space-y-3">
           <Label>正确答案</Label>
@@ -333,12 +338,12 @@ export default function CreateQuestionPage() {
         </div>
       );
     }
-    
+
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <Label>选项</Label>
-          {(question.type === QuestionType.SINGLE_CHOICE || 
+          {(question.type === QuestionType.SINGLE_CHOICE ||
             question.type === QuestionType.MULTIPLE_CHOICE) && (
             <Button
               type="button"
@@ -351,7 +356,7 @@ export default function CreateQuestionPage() {
             </Button>
           )}
         </div>
-        
+
         {/* 单选题 */}
         {question.type === QuestionType.SINGLE_CHOICE && question.options && (
           <div className="space-y-2">
@@ -360,9 +365,9 @@ export default function CreateQuestionPage() {
               <div className="text-sm font-medium text-muted-foreground text-center">正确答案</div>
               <div></div>
             </div>
-            
+
             <RadioGroup
-              value={(question.options?.findIndex(o => o.isCorrect) ?? -1) >= 0 ? 
+              value={(question.options?.findIndex(o => o.isCorrect) ?? -1) >= 0 ?
                 (question.options?.findIndex(o => o.isCorrect) ?? -1).toString() : ""}
               onValueChange={(value) => {
                 const selectedIndex = parseInt(value);
@@ -401,7 +406,7 @@ export default function CreateQuestionPage() {
             </RadioGroup>
           </div>
         )}
-        
+
         {/* 多选题 */}
         {question.type === QuestionType.MULTIPLE_CHOICE && question.options && (
           <div className="space-y-2">
@@ -410,7 +415,7 @@ export default function CreateQuestionPage() {
               <div className="text-sm font-medium text-muted-foreground text-center">正确答案</div>
               <div></div>
             </div>
-            
+
             {(question.options || []).map((option, index) => (
               <div key={index} className="grid grid-cols-[1fr_auto_auto] gap-3 items-center">
                 <Input
@@ -422,7 +427,7 @@ export default function CreateQuestionPage() {
                   <Checkbox
                     id={`option-correct-${index}`}
                     checked={option.isCorrect}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       handleOptionCorrectChange(index, !!checked)
                     }
                   />
@@ -444,15 +449,15 @@ export default function CreateQuestionPage() {
       </div>
     );
   };
-  
+
   // 渲染答案输入
   const renderAnswerInput = () => {
-    if (question.type === QuestionType.SINGLE_CHOICE || 
-        question.type === QuestionType.MULTIPLE_CHOICE || 
+    if (question.type === QuestionType.SINGLE_CHOICE ||
+        question.type === QuestionType.MULTIPLE_CHOICE ||
         question.type === QuestionType.TRUE_FALSE) {
       return null;
     }
-    
+
     return (
       <div className="space-y-2">
         <Label htmlFor="answer">参考答案</Label>
@@ -467,20 +472,20 @@ export default function CreateQuestionPage() {
       </div>
     );
   };
-  
+
   // 渲染标签选择
   const renderTagsSelection = () => {
     if (isTagsLoading) {
       return <div className="text-sm text-muted-foreground">加载标签列表...</div>;
     }
-    
+
     if (!tags || tags.length === 0) {
       return (
         <div className="space-y-3">
           <div className="text-sm text-muted-foreground">暂无标签</div>
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => router.push('/dashboard/questions?tab=tags')}
           >
             <Plus className="h-3.5 w-3.5 mr-1" />
@@ -489,7 +494,7 @@ export default function CreateQuestionPage() {
         </div>
       );
     }
-    
+
     return (
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-2">
@@ -498,7 +503,7 @@ export default function CreateQuestionPage() {
               <Checkbox
                 id={`tag-${tag.id}`}
                 checked={(question.tagIds || []).includes(tag.id)}
-                onCheckedChange={(checked) => 
+                onCheckedChange={(checked) =>
                   handleTagChange(tag.id, checked as boolean)
                 }
               />
@@ -508,14 +513,14 @@ export default function CreateQuestionPage() {
             </div>
           ))}
         </div>
-        
+
         <div className="pt-2 flex justify-between items-center">
           <div className="text-xs text-muted-foreground">
             已选择 {(question.tagIds || []).length} 个标签
           </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => router.push('/dashboard/questions?tab=tags')}
           >
             管理标签
@@ -524,7 +529,7 @@ export default function CreateQuestionPage() {
       </div>
     );
   };
-  
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -536,7 +541,7 @@ export default function CreateQuestionPage() {
           <ArrowLeft className="h-4 w-4 mr-2" />
           返回列表
         </Button>
-        
+
         <Button
           size="sm"
           onClick={handleSubmit}
@@ -546,9 +551,9 @@ export default function CreateQuestionPage() {
           保存问题
         </Button>
       </div>
-      
+
       <Separator />
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <Card>
@@ -566,7 +571,7 @@ export default function CreateQuestionPage() {
                   placeholder="输入问题标题"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="description">问题描述</Label>
                 <Textarea
@@ -578,13 +583,13 @@ export default function CreateQuestionPage() {
                   rows={3}
                 />
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="type">问题类型</Label>
                   <Select
                     value={question.type?.toString()}
-                    onValueChange={(value) => 
+                    onValueChange={(value) =>
                       handleSelectChange('type', value)
                     }
                   >
@@ -600,12 +605,12 @@ export default function CreateQuestionPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="difficulty">难度级别</Label>
                   <Select
                     value={question.difficulty?.toString()}
-                    onValueChange={(value) => 
+                    onValueChange={(value) =>
                       handleSelectChange('difficulty', value)
                     }
                   >
@@ -639,7 +644,7 @@ export default function CreateQuestionPage() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader>
               <CardTitle>选项与答案</CardTitle>
@@ -650,7 +655,7 @@ export default function CreateQuestionPage() {
             <CardContent className="space-y-6">
               {renderOptionsInput()}
               {renderAnswerInput()}
-              
+
               <div className="space-y-2">
                 <Label htmlFor="analysis">解析</Label>
                 <Textarea
@@ -665,7 +670,7 @@ export default function CreateQuestionPage() {
             </CardContent>
           </Card>
         </div>
-        
+
         <div className="space-y-6">
           <Card>
             <CardHeader>
@@ -678,7 +683,7 @@ export default function CreateQuestionPage() {
               {renderTagsSelection()}
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardHeader>
               <CardTitle>预览</CardTitle>
@@ -691,14 +696,14 @@ export default function CreateQuestionPage() {
                     <p className="text-sm text-muted-foreground mt-1">{question.description}</p>
                   )}
                 </div>
-                
+
                 {/* 显示分值 */}
                 <div className="text-sm">
                   <span className="inline-flex items-center px-2 py-1 rounded-md bg-blue-100 text-blue-800 text-xs font-medium">
                     {question.score || 1}分
                   </span>
                 </div>
-                
+
                 {question.options && question.options.length > 0 && (
                   <div className="space-y-2">
                     {question.options.map((option, index) => (
@@ -713,9 +718,9 @@ export default function CreateQuestionPage() {
                     ))}
                   </div>
                 )}
-                
-                {(question.type === QuestionType.FILL_BLANK || 
-                  question.type === QuestionType.SHORT_ANSWER) && 
+
+                {(question.type === QuestionType.FILL_BLANK ||
+                  question.type === QuestionType.SHORT_ANSWER) &&
                   question.answer && (
                   <div>
                     <h4 className="text-sm font-medium">参考答案</h4>
@@ -729,4 +734,4 @@ export default function CreateQuestionPage() {
       </div>
     </div>
   );
-} 
+}

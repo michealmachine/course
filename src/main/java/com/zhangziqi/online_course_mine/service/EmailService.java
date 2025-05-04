@@ -22,11 +22,26 @@ public interface EmailService {
     void sendEmailUpdateCode(String to, String code);
 
     /**
+     * 发送密码重置邮件
+     *
+     * @param to 收件人邮箱
+     * @param tempPassword 临时密码
+     */
+    void sendPasswordResetEmail(String to, String tempPassword);
+
+    /**
      * 生成验证码
      *
      * @return 6位数字验证码
      */
     String generateVerificationCode();
+
+    /**
+     * 生成临时密码
+     *
+     * @return 随机临时密码
+     */
+    String generateTempPassword();
 
     /**
      * 保存验证码到Redis
@@ -44,7 +59,7 @@ public interface EmailService {
      * @return 是否验证通过
      */
     boolean validateVerificationCode(String email, String code);
-    
+
     /**
      * 发送机构申请确认邮件
      *
@@ -71,4 +86,4 @@ public interface EmailService {
      * @param reason 拒绝原因
      */
     void sendApplicationRejectedEmail(String to, String institutionName, String reason);
-} 
+}

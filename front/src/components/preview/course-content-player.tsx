@@ -12,11 +12,11 @@ import { QuestionGroup } from '@/types/question';
 import { QuestionGroupItemVO, Question, QuestionType, QuestionDifficulty } from '@/types/question';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { 
-  Video, 
-  FileText, 
-  Headphones, 
-  AlertCircle, 
+import {
+  Video,
+  FileText,
+  Headphones,
+  AlertCircle,
   Loader2,
   BrainCircuit,
   Clock,
@@ -38,24 +38,24 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
   const [questionGroup, setQuestionGroup] = useState<QuestionGroup | null>(null);
   const [activeTab, setActiveTab] = useState<string>('content');
   const [mediaUrlLoading, setMediaUrlLoading] = useState(false);
-  
+
   // 题组相关状态 - 提升到组件顶层
   const [expandedQuestionId, setExpandedQuestionId] = useState<number | null>(null);
   const [groupItems, setGroupItems] = useState<QuestionGroupItemVO[]>([]);
   const [loadingItems, setLoadingItems] = useState<boolean>(false);
   const [itemsError, setItemsError] = useState<string | null>(null);
-  
+
   // 加载小节资源
   useEffect(() => {
     async function loadSectionResources() {
       try {
         setLoading(true);
         setError(null);
-        
+
         // 重置资源状态
         setMedia(null);
         setQuestionGroup(null);
-        
+
         // 根据资源类型加载对应资源
         if (section.resourceTypeDiscriminator === 'MEDIA' && section.mediaId) {
           const mediaData = await mediaService.getMediaInfo(section.mediaId);
@@ -77,17 +77,17 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
         setLoading(false);
       }
     }
-    
+
     if (section) {
       loadSectionResources();
     }
   }, [section]);
-  
+
   // 加载题组中的题目 - 提升到组件顶层
   useEffect(() => {
     async function loadGroupItems() {
       if (!questionGroup) return;
-      
+
       try {
         setLoadingItems(true);
         setItemsError(null);
@@ -100,19 +100,19 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
         setLoadingItems(false);
       }
     }
-    
+
     if (questionGroup) {
       loadGroupItems();
     }
   }, [questionGroup]);
-  
+
   // 获取媒体访问URL
   const fetchMediaAccessUrl = async (mediaId: number) => {
     try {
       setMediaUrlLoading(true);
       console.log('获取媒体访问URL, mediaId:', mediaId);
       const response = await mediaService.getMediaAccessUrl(mediaId);
-      
+
       if (response && response.data && response.data.accessUrl) {
         console.log('获取到媒体访问URL');
         // 更新媒体对象的访问URL
@@ -134,7 +134,7 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
       setMediaUrlLoading(false);
     }
   };
-  
+
   // 处理展开/折叠题目 - 提升到组件顶层
   const handleToggleQuestion = (questionId: number) => {
     if (expandedQuestionId === questionId) {
@@ -143,7 +143,7 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
       setExpandedQuestionId(questionId);
     }
   };
-  
+
   // 获取问题类型文本
   const getQuestionTypeText = (type: QuestionType) => {
     switch (type) {
@@ -155,7 +155,7 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
       default: return '未知题型';
     }
   };
-  
+
   // 获取问题难度文本
   const getQuestionDifficultyText = (difficulty: QuestionDifficulty) => {
     switch (difficulty) {
@@ -165,7 +165,7 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
       default: return '未知难度';
     }
   };
-  
+
   // 获取问题类型对应的样式
   const getTypeStyle = (type: QuestionType) => {
     switch (type) {
@@ -177,7 +177,7 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
       default: return 'bg-gray-100 text-gray-800';
     }
   };
-  
+
   // 获取问题难度对应的样式
   const getDifficultyStyle = (difficulty: QuestionDifficulty) => {
     switch (difficulty) {
@@ -187,7 +187,7 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
       default: return 'bg-gray-100 text-gray-800';
     }
   };
-  
+
   // 渲染加载状态
   if (loading) {
     return (
@@ -202,7 +202,7 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
       </Card>
     );
   }
-  
+
   // 渲染错误状态
   if (error) {
     return (
@@ -213,14 +213,14 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
       </Alert>
     );
   }
-  
+
   // 渲染媒体内容
   const renderMediaContent = () => {
     if (!media) return <p className="text-center text-muted-foreground py-6">该小节没有关联媒体资源</p>;
-    
+
     // 根据媒体类型渲染不同的播放器
     const mediaType = media.type?.toLowerCase() || '';
-    
+
     // 判断是否已经获取到访问URL
     if (!media.accessUrl) {
       return (
@@ -233,15 +233,15 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
               </>
             ) : (
               <>
-                {mediaType.includes('video') 
+                {mediaType.includes('video')
                   ? <Video className="h-12 w-12 text-muted-foreground mb-4" />
                   : mediaType.includes('audio')
                     ? <Headphones className="h-12 w-12 text-muted-foreground mb-4" />
                     : <FileText className="h-12 w-12 text-muted-foreground mb-4" />
                 }
                 <p className="text-muted-foreground mb-4">媒体资源链接加载失败</p>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => media && fetchMediaAccessUrl(media.id)}
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />
@@ -253,23 +253,23 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
         </div>
       );
     }
-    
+
     // 视频
     if (mediaType.includes('video')) {
       return (
         <div className="rounded-lg overflow-hidden border shadow-sm">
           <div className="bg-muted p-2 flex justify-between items-center">
             <span className="text-sm font-medium">{media.title}</span>
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => window.open(media.accessUrl, '_blank')}
             >
               <ExternalLink className="h-4 w-4 mr-1" />
               新窗口打开
             </Button>
           </div>
-          
+
           <div className="aspect-video bg-black">
             <video
               key={media.accessUrl}
@@ -287,21 +287,21 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
               您的浏览器不支持HTML5视频播放，请更新浏览器版本。
             </video>
           </div>
-          
+
           {media.description && (
             <div className="p-3 bg-muted/50 border-t">
               <p className="text-sm text-muted-foreground">{media.description}</p>
             </div>
           )}
-          
+
           <div className="p-2 bg-muted flex justify-between items-center text-xs text-muted-foreground">
             <div>
               提示：可使用空格键暂停/播放，左右方向键快退/快进
             </div>
             <div className="flex items-center">
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 className="h-7 px-2"
                 onClick={() => {
                   const videoElement = document.querySelector('video');
@@ -319,20 +319,20 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
         </div>
       );
     }
-    
+
     // 文档 (PDF或其他文档，使用iframe)
-    if (mediaType.includes('pdf') || 
-        mediaType.includes('document') || 
-        mediaType.includes('msword') || 
-        mediaType.includes('excel') || 
+    if (mediaType.includes('pdf') ||
+        mediaType.includes('document') ||
+        mediaType.includes('msword') ||
+        mediaType.includes('excel') ||
         mediaType.includes('powerpoint')) {
       return (
         <div className="relative rounded-lg overflow-hidden border">
           <div className="flex justify-between items-center bg-muted p-2">
             <span className="text-sm font-medium">{media.title}</span>
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => window.open(media.accessUrl, '_blank')}
             >
               <ExternalLink className="h-4 w-4 mr-1" />
@@ -354,7 +354,7 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
         </div>
       );
     }
-    
+
     // 音频
     if (mediaType.includes('audio')) {
       return (
@@ -363,14 +363,14 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
             <div className="w-40 h-40 bg-primary/10 rounded-full flex items-center justify-center mb-2">
               <Headphones className="h-16 w-16 text-primary" />
             </div>
-            
+
             <div className="text-center mb-2">
               <h3 className="text-lg font-medium">{media.title}</h3>
               {media.description && (
                 <p className="text-sm text-muted-foreground mt-1">{media.description}</p>
               )}
             </div>
-            
+
             <div className="w-full max-w-md bg-card p-4 rounded-lg border shadow-sm">
               <audio
                 key={media.accessUrl}
@@ -386,14 +386,14 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
               >
                 您的浏览器不支持HTML5音频播放，请更新浏览器版本。
               </audio>
-              
+
               <div className="flex justify-between items-center mt-3 text-xs text-muted-foreground">
                 <div>
                   提示：可使用空格键暂停/播放
                 </div>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => window.open(media.accessUrl, '_blank')}
                 >
                   <ExternalLink className="h-3 w-3 mr-1" />
@@ -405,7 +405,7 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
         </div>
       );
     }
-    
+
     // 默认：提供下载链接
     return (
       <div className="p-6 bg-card rounded-lg border shadow-sm">
@@ -413,29 +413,29 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
           <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-4">
             <FileText className="h-10 w-10 text-primary" />
           </div>
-          
+
           <h3 className="text-lg font-medium mb-1">{media.title}</h3>
-          
+
           {media.description && (
             <p className="text-sm text-muted-foreground text-center mb-4 max-w-md">{media.description}</p>
           )}
-          
+
           <div className="text-center mb-6">
             <p className="text-sm text-muted-foreground">
               当前文件类型 ({media.type || '未知类型'}) 不支持在线预览
             </p>
           </div>
-          
+
           <div className="flex gap-3">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => window.open(media.accessUrl, '_blank')}
             >
               <FileText className="h-4 w-4 mr-2" />
               在浏览器中打开
             </Button>
-            
-            <Button 
+
+            <Button
               onClick={() => {
                 // 创建一个临时链接元素来触发下载
                 const a = document.createElement('a');
@@ -456,20 +456,20 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
       </div>
     );
   };
-  
+
   // 渲染选项列表
   const renderOptions = (question: Question) => {
     if (!question.options || question.options.length === 0) {
       return <p className="text-muted-foreground text-sm">该题目没有选项</p>;
     }
-    
+
     return (
       <div className="space-y-2 mt-3">
         {question.options.map((option, index) => {
           const optionLabel = String.fromCharCode(65 + index); // A, B, C, D...
-          
+
           return (
-            <div 
+            <div
               key={`${question.id}-option-${index}`}
               className={`flex p-3 rounded-md border ${
                 option.isCorrect ? 'bg-green-50 border-green-200' : 'bg-white'
@@ -477,16 +477,18 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
             >
               <div className="flex-shrink-0 mr-2">
                 <span className={`inline-flex items-center justify-center h-6 w-6 rounded-full text-xs font-medium ${
-                  option.isCorrect ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                  option.isCorrect ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
                 }`}>
                   {optionLabel}
                 </span>
               </div>
               <div className="flex-grow">
-                <div className="text-sm">{option.content}</div>
+                <div className={`text-sm ${option.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
+                  {option.content}
+                </div>
                 {option.isCorrect && (
-                  <div className="text-xs text-green-600 mt-1">
-                    正确答案
+                  <div className="text-xs text-green-600 dark:text-green-400 mt-1">
+                    (正确答案)
                   </div>
                 )}
               </div>
@@ -496,14 +498,14 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
       </div>
     );
   };
-  
+
   // 渲染判断题选项
   const renderTrueFalseOptions = (question: Question) => {
     const correctAnswer = question.answer?.toLowerCase() === 'true';
-    
+
     return (
       <div className="space-y-2 mt-3">
-        <div 
+        <div
           key={`${question.id}-true-option`}
           className={`flex p-3 rounded-md border ${
             correctAnswer ? 'bg-green-50 border-green-200' : 'bg-white'
@@ -511,22 +513,22 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
         >
           <div className="flex-shrink-0 mr-2">
             <span className={`inline-flex items-center justify-center h-6 w-6 rounded-full text-xs font-medium ${
-              correctAnswer ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+              correctAnswer ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
             }`}>
-              A
+              T
             </span>
           </div>
           <div className="flex-grow">
-            <div className="text-sm">正确</div>
+            <div className={`text-sm ${correctAnswer ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>正确</div>
             {correctAnswer && (
-              <div className="text-xs text-green-600 mt-1">
-                正确答案
+              <div className="text-xs text-green-600 dark:text-green-400 mt-1">
+                (正确答案)
               </div>
             )}
           </div>
         </div>
-        
-        <div 
+
+        <div
           key={`${question.id}-false-option`}
           className={`flex p-3 rounded-md border ${
             !correctAnswer ? 'bg-green-50 border-green-200' : 'bg-white'
@@ -534,16 +536,16 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
         >
           <div className="flex-shrink-0 mr-2">
             <span className={`inline-flex items-center justify-center h-6 w-6 rounded-full text-xs font-medium ${
-              !correctAnswer ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+              !correctAnswer ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
             }`}>
-              B
+              F
             </span>
           </div>
           <div className="flex-grow">
-            <div className="text-sm">错误</div>
+            <div className={`text-sm ${!correctAnswer ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>错误</div>
             {!correctAnswer && (
-              <div className="text-xs text-green-600 mt-1">
-                正确答案
+              <div className="text-xs text-green-600 dark:text-green-400 mt-1">
+                (正确答案)
               </div>
             )}
           </div>
@@ -551,16 +553,16 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
       </div>
     );
   };
-  
+
   // 渲染填空题答案
   const renderFillBlankAnswer = (question: Question) => {
     if (!question.answer) {
       return <p className="text-muted-foreground text-sm">该题目没有设置答案</p>;
     }
-    
+
     // 填空题可能有多个空，答案以分号分隔
     const answers = question.answer.split(';').map(ans => ans.trim());
-    
+
     return (
       <div className="mt-3 space-y-2">
         <div className="text-sm font-medium">参考答案:</div>
@@ -572,13 +574,13 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
       </div>
     );
   };
-  
+
   // 渲染简答题答案
   const renderShortAnswerAnswer = (question: Question) => {
     if (!question.answer) {
       return <p className="text-muted-foreground text-sm">该题目没有设置答案</p>;
     }
-    
+
     return (
       <div className="mt-3">
         <div className="text-sm font-medium">参考答案:</div>
@@ -588,7 +590,7 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
       </div>
     );
   };
-  
+
   // 根据题目类型渲染不同的选项/答案
   const renderQuestionAnswer = (question: Question) => {
     switch (question.type) {
@@ -605,11 +607,11 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
         return <p className="text-muted-foreground text-sm">未知题型</p>;
     }
   };
-  
+
   // 渲染题目组内容
   const renderQuestionGroupContent = () => {
     if (!questionGroup) return <p className="text-center text-muted-foreground py-6">该小节没有关联题目组</p>;
-    
+
     if (loadingItems) {
       return (
         <div className="p-6 bg-muted rounded-lg">
@@ -622,7 +624,7 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
               共 {questionGroup.questionCount || 0} 题
             </div>
           </div>
-          
+
           <div className="bg-card rounded-lg p-6 shadow-sm border">
             <div className="flex justify-center items-center py-10">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -632,7 +634,7 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
         </div>
       );
     }
-    
+
     if (itemsError) {
       return (
         <div className="p-6 bg-muted rounded-lg">
@@ -642,7 +644,7 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
               {questionGroup.name}
             </h3>
           </div>
-          
+
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>加载失败</AlertTitle>
@@ -651,7 +653,7 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
         </div>
       );
     }
-    
+
     if (groupItems.length === 0) {
       return (
         <div className="p-6 bg-muted rounded-lg">
@@ -661,14 +663,14 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
               {questionGroup.name}
             </h3>
           </div>
-          
+
           <div className="bg-card rounded-lg p-6 shadow-sm border text-center">
             <p className="text-muted-foreground">该题组暂无题目</p>
           </div>
         </div>
       );
     }
-    
+
     return (
       <div className="p-6 bg-muted rounded-lg">
         <div className="flex items-center justify-between mb-4">
@@ -680,15 +682,15 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
             共 {groupItems.length} 题
           </div>
         </div>
-        
+
         <div className="space-y-4">
           {groupItems.map((item, index) => {
             const { question } = item;
             const isExpanded = expandedQuestionId === question.id;
-            
+
             return (
               <div key={item.id} className="bg-card rounded-lg shadow-sm border overflow-hidden">
-                <div 
+                <div
                   className="flex items-start p-4 cursor-pointer"
                   onClick={() => handleToggleQuestion(question.id)}
                 >
@@ -712,6 +714,11 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
                     <div className="text-sm font-medium">
                       {question.title}
                     </div>
+                    {question.content && (
+                      <div className="mt-1 text-sm">
+                        {question.content}
+                      </div>
+                    )}
                     {question.description && (
                       <div className="mt-1 text-sm text-muted-foreground">
                         {question.description}
@@ -726,11 +733,11 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
                     )}
                   </div>
                 </div>
-                
+
                 {isExpanded && (
                   <div className="border-t px-4 py-3 bg-gray-50">
                     {renderQuestionAnswer(question)}
-                    
+
                     {question.analysis && (
                       <div className="mt-4 pt-3 border-t">
                         <div className="text-sm font-medium">题目解析:</div>
@@ -748,7 +755,7 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
       </div>
     );
   };
-  
+
   // 没有资源
   if (!media && !questionGroup && section.resourceTypeDiscriminator !== 'MEDIA' && section.resourceTypeDiscriminator !== 'QUESTION_GROUP') {
     return (
@@ -767,7 +774,7 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
       </Card>
     );
   }
-  
+
   return (
     <Card>
       <CardHeader>
@@ -788,4 +795,4 @@ export function CourseContentPlayer({ section }: CourseContentPlayerProps) {
       </CardContent>
     </Card>
   );
-} 
+}

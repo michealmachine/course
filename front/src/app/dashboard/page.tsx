@@ -6,6 +6,7 @@ import { UserRole } from '@/types/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BookOpen, Users, ShoppingCart, Activity, ShieldCheck, FileText } from 'lucide-react';
 import { ClearCacheButton } from '@/components/dashboard/admin/clear-cache-button';
+import { SyncLearningRecordsButton } from '@/components/dashboard/admin/sync-learning-records-button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatPrice, formatDuration } from '@/lib/utils';
@@ -376,9 +377,10 @@ export default function DashboardPage() {
           {/* 引入 DashboardOverview 组件 */}
           <DashboardOverview />
 
-          {/* 清除缓存按钮 */}
+          {/* 管理员工具按钮 */}
           <div className="flex justify-end">
             <ClearCacheButton />
+            <SyncLearningRecordsButton />
           </div>
         </div>
       )}

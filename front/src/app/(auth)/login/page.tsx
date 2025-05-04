@@ -37,10 +37,10 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/dashboard';
-  
+
   const [captchaKey, setCaptchaKey] = useState('');
   const { login, isLoading, error, clearError } = useAuthStore();
-  
+
   // 初始化表单
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -50,47 +50,47 @@ export default function LoginPage() {
       captchaCode: '',
     },
   });
-  
+
   // 处理验证码Key变化
   const handleCaptchaKeyChange = (newCaptchaKey: string) => {
     console.log('登录页面：验证码Key已更新', newCaptchaKey);
     setCaptchaKey(newCaptchaKey);
   };
-  
+
   // 提交表单
   const onSubmit = async (data: LoginFormValues) => {
     clearError();
-    
+
     // 确保验证码Key存在
     if (!captchaKey) {
       console.error('验证码Key不存在，重新获取验证码');
       toast.error('验证码已失效，请点击验证码图片刷新');
       return;
     }
-    
+
     console.log('表单提交，验证码信息：', {
       captchaCode: data.captchaCode,
       captchaKey: captchaKey,
     });
-    
+
     try {
       // 将captchaKey添加到请求中
       await login({
         ...data,
         captchaKey,
       });
-      
+
       toast.success('登录成功');
       router.push(redirectTo);
     } catch (error: any) {
       console.error('登录失败详情：', error);
-      
+
       // 提取详细的错误信息
       const errorMessage = error.message || '未知错误';
       const errorCode = error.code || '未知错误码';
-      
+
       console.error(`登录错误：${errorCode} - ${errorMessage}`);
-      
+
       // 针对不同类型的错误提供特定提示
       if (errorMessage.includes('验证码')) {
         toast.error('验证码错误，请重新输入');
@@ -111,7 +111,7 @@ export default function LoginPage() {
       }
     }
   };
-  
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -128,7 +128,7 @@ export default function LoginPage() {
                 {error}
               </div>
             )}
-            
+
             <FormField
               control={form.control}
               name="username"
@@ -142,13 +142,18 @@ export default function LoginPage() {
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={form.control}
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>密码</FormLabel>
+                  <div className="flex items-center justify-between">
+                    <FormLabel>密码</FormLabel>
+                    <Link href="/forgot-password" className="text-sm text-primary hover:underline">
+                      忘记密码?
+                    </Link>
+                  </div>
                   <FormControl>
                     <Input type="password" placeholder="请输入密码" {...field} />
                   </FormControl>
@@ -156,7 +161,7 @@ export default function LoginPage() {
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={form.control}
               name="captchaCode"
@@ -173,7 +178,7 @@ export default function LoginPage() {
                 </FormItem>
               )}
             />
-            
+
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? '登录中...' : '登录'}
             </Button>
@@ -190,4 +195,4 @@ export default function LoginPage() {
       </CardFooter>
     </Card>
   );
-} 
+}

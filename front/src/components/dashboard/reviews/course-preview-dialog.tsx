@@ -107,12 +107,12 @@ export function CoursePreviewDialog({
   // 查找指定ID的小节
   const findSectionById = (sectionId: number): SectionVO | null => {
     if (!courseStructure) return null;
-    
+
     for (const chapter of courseStructure.chapters) {
       const section = chapter.sections.find(s => s.id === sectionId);
       if (section) return section;
     }
-    
+
     return null;
   };
 
@@ -183,12 +183,12 @@ export function CoursePreviewDialog({
       <div className="space-y-4">
         <div className="font-medium text-lg">{media.title}</div>
         {media.description && <p className="text-sm text-muted-foreground">{media.description}</p>}
-        
+
         {media.type && media.type.startsWith('video') && media.accessUrl && (
           <div className="relative aspect-video rounded-md overflow-hidden bg-muted">
-            <video 
-              src={media.accessUrl} 
-              controls 
+            <video
+              src={media.accessUrl}
+              controls
               className="w-full h-full object-cover"
               poster={media.thumbnailUrl}
             >
@@ -196,7 +196,7 @@ export function CoursePreviewDialog({
             </video>
           </div>
         )}
-        
+
         {media.type && media.type.startsWith('audio') && media.accessUrl && (
           <div className="p-4 bg-muted rounded-md">
             <audio src={media.accessUrl} controls className="w-full">
@@ -204,23 +204,23 @@ export function CoursePreviewDialog({
             </audio>
           </div>
         )}
-        
+
         {media.type && media.type.startsWith('image') && media.accessUrl && (
           <div className="relative aspect-video rounded-md overflow-hidden bg-muted">
-            <img 
-              src={media.accessUrl} 
-              alt={media.title} 
+            <img
+              src={media.accessUrl}
+              alt={media.title}
               className="w-full h-full object-contain"
             />
           </div>
         )}
-        
+
         {(!media.type || (!media.type.startsWith('video') && !media.type.startsWith('audio') && !media.type.startsWith('image'))) && media.accessUrl && (
           <div className="p-4 border rounded-md flex items-center">
             <FileText className="h-5 w-5 mr-2 text-primary" />
-            <a 
-              href={media.accessUrl} 
-              target="_blank" 
+            <a
+              href={media.accessUrl}
+              target="_blank"
               rel="noopener noreferrer"
               className="text-primary underline"
             >
@@ -240,11 +240,11 @@ export function CoursePreviewDialog({
       <div className="space-y-4">
         <div className="font-medium text-lg">{questionGroup.name}</div>
         {questionGroup.description && <p className="text-sm text-muted-foreground">{questionGroup.description}</p>}
-        
+
         <div className="text-sm text-muted-foreground">
           共 {questionGroup.questions?.length || 0} 道题目
         </div>
-        
+
         {questionGroup.questions && questionGroup.questions.length > 0 && (
           <div className="space-y-4 mt-4">
             {questionGroup.questions.map((question: any, index: number) => (
@@ -252,37 +252,81 @@ export function CoursePreviewDialog({
                 <div className="font-medium">
                   题目 {index + 1}: {question.content}
                 </div>
-                
-                {question.type === 'MULTIPLE_CHOICE' && (
+
+                {(question.type === 'MULTIPLE_CHOICE' || question.type === 'SINGLE_CHOICE' || question.type === 0 || question.type === 1) && (
                   <div className="mt-2 space-y-2">
-                    {question.options && question.options.map((option: any) => (
-                      <div key={option.id} className="flex items-start">
-                        <div className={`w-6 h-6 flex items-center justify-center rounded border mr-2 ${option.isCorrect ? 'bg-green-100 border-green-500 text-green-700' : 'bg-gray-100'}`}>
-                          {option.label}
+                    {question.options && question.options.map((option: any, index: number) => {
+                      const optionLabel = String.fromCharCode(65 + index); // A, B, C, D...
+                      return (
+                        <div key={option.id || index} className={`flex p-3 rounded-md border ${
+                          option.isCorrect ? 'bg-green-50 border-green-200' : 'bg-white'
+                        }`}>
+                          <div className="flex-shrink-0 mr-2">
+                            <span className={`inline-flex items-center justify-center h-6 w-6 rounded-full text-xs font-medium ${
+                              option.isCorrect ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
+                            }`}>
+                              {option.label || optionLabel}
+                            </span>
+                          </div>
+                          <div className="flex-grow">
+                            <div className={`text-sm ${option.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
+                              {option.content}
+                            </div>
+                            {option.isCorrect && (
+                              <div className="text-xs text-green-600 dark:text-green-400 mt-1">
+                                (正确答案)
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div>{option.content}</div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
-                
-                {question.type === 'TRUE_FALSE' && (
+
+                {(question.type === 'TRUE_FALSE' || question.type === 2) && (
                   <div className="mt-2 space-y-2">
-                    <div className={`flex items-center ${question.answer === 'TRUE' ? 'text-green-700' : ''}`}>
-                      <div className={`w-6 h-6 flex items-center justify-center rounded border mr-2 ${question.answer === 'TRUE' ? 'bg-green-100 border-green-500' : 'bg-gray-100'}`}>
-                        T
+                    <div className={`flex p-3 rounded-md border ${question.answer === 'TRUE' ? 'bg-green-50 border-green-200' : 'bg-white'}`}>
+                      <div className="flex-shrink-0 mr-2">
+                        <span className={`inline-flex items-center justify-center h-6 w-6 rounded-full text-xs font-medium ${
+                          question.answer === 'TRUE' ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
+                        }`}>
+                          T
+                        </span>
                       </div>
-                      <div>正确</div>
+                      <div className="flex-grow">
+                        <div className={`text-sm ${question.answer === 'TRUE' ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
+                          正确
+                        </div>
+                        {question.answer === 'TRUE' && (
+                          <div className="text-xs text-green-600 dark:text-green-400 mt-1">
+                            (正确答案)
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className={`flex items-center ${question.answer === 'FALSE' ? 'text-green-700' : ''}`}>
-                      <div className={`w-6 h-6 flex items-center justify-center rounded border mr-2 ${question.answer === 'FALSE' ? 'bg-green-100 border-green-500' : 'bg-gray-100'}`}>
-                        F
+                    <div className={`flex p-3 rounded-md border ${question.answer === 'FALSE' ? 'bg-green-50 border-green-200' : 'bg-white'}`}>
+                      <div className="flex-shrink-0 mr-2">
+                        <span className={`inline-flex items-center justify-center h-6 w-6 rounded-full text-xs font-medium ${
+                          question.answer === 'FALSE' ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
+                        }`}>
+                          F
+                        </span>
                       </div>
-                      <div>错误</div>
+                      <div className="flex-grow">
+                        <div className={`text-sm ${question.answer === 'FALSE' ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
+                          错误
+                        </div>
+                        {question.answer === 'FALSE' && (
+                          <div className="text-xs text-green-600 dark:text-green-400 mt-1">
+                            (正确答案)
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
-                
+
                 {question.analysis && (
                   <div className="mt-3 pt-3 border-t text-sm">
                     <div className="font-medium">题目解析:</div>
@@ -306,7 +350,7 @@ export function CoursePreviewDialog({
             {courseStructure && ` - ${courseStructure.course.title}`}
           </DialogTitle>
         </DialogHeader>
-        
+
         {isLoading ? (
           <div className="flex flex-col items-center justify-center p-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
@@ -330,13 +374,13 @@ export function CoursePreviewDialog({
                   <div><span className="text-muted-foreground">创建者：</span>{courseStructure.course.creatorName || '未知'}</div>
                 </div>
               </div>
-              
+
               <div className="text-sm font-medium mb-2">章节目录</div>
-              
+
               <Accordion type="multiple" defaultValue={['chapter-0']} className="w-full">
                 {courseStructure.chapters.map((chapter, index) => (
-                  <AccordionItem 
-                    key={chapter.id} 
+                  <AccordionItem
+                    key={chapter.id}
                     value={`chapter-${index}`}
                     className="border-b"
                   >
@@ -364,7 +408,7 @@ export function CoursePreviewDialog({
                 ))}
               </Accordion>
             </div>
-            
+
             {/* 右侧内容预览 */}
             <div className="flex-1 pl-4 overflow-y-auto">
               {!selectedSectionId ? (
@@ -385,11 +429,11 @@ export function CoursePreviewDialog({
                       {sectionContent.type && (
                         renderMediaPreview(sectionContent)
                       )}
-                      
+
                       {sectionContent.questions && (
                         renderQuestionGroupPreview(sectionContent)
                       )}
-                      
+
                       {sectionContent.message && (
                         <div className="text-center text-muted-foreground py-8">
                           {sectionContent.message}
@@ -410,7 +454,7 @@ export function CoursePreviewDialog({
             无法加载课程内容
           </div>
         )}
-        
+
         {/* 审核评价表单 */}
         <div className="border-t pt-4 mt-auto">
           <div className="space-y-4">
@@ -424,7 +468,7 @@ export function CoursePreviewDialog({
                 className="mt-1.5"
               />
             </div>
-            
+
             <DialogFooter>
               <Button
                 variant="outline"
@@ -456,4 +500,4 @@ export function CoursePreviewDialog({
       </DialogContent>
     </Dialog>
   );
-} 
+}
