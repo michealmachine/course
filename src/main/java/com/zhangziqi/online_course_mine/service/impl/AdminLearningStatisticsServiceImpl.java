@@ -4,6 +4,7 @@ import com.zhangziqi.online_course_mine.config.CacheConfig;
 import com.zhangziqi.online_course_mine.exception.ResourceNotFoundException;
 import com.zhangziqi.online_course_mine.model.entity.Course;
 import com.zhangziqi.online_course_mine.model.entity.LearningRecord;
+import com.zhangziqi.online_course_mine.model.enums.CourseStatus;
 import com.zhangziqi.online_course_mine.model.enums.LearningActivityType;
 import com.zhangziqi.online_course_mine.model.vo.ActivityTypeStatVO;
 import com.zhangziqi.online_course_mine.model.vo.DailyLearningStatVO;
@@ -660,16 +661,25 @@ public class AdminLearningStatisticsServiceImpl implements AdminLearningStatisti
     public List<InstitutionLearningStatisticsVO.CourseStatisticsVO> getCourseRanking(String sortBy, Long institutionId, Integer limit) {
         log.info("获取课程学习统计排行, 排序字段: {}, 机构ID: {}, 数量限制: {}", sortBy, institutionId, limit);
 
-        // 获取课程列表
+        // 获取课程列表 - 只获取已发布的课程
         List<Course> courses;
         if (institutionId != null) {
-            // 获取指定机构的课程
-            courses = courseRepository.findAll().stream()
-                    .filter(course -> course.getInstitutionId() != null && course.getInstitutionId().equals(institutionId))
-                    .collect(Collectors.toList());
+            // 获取指定机构的已发布课程
+            Pageable unpaged = Pageable.unpaged(); // 不分页，获取所有结果
+            Page<Course> coursePage = courseRepository.findByInstitutionIdAndStatusAndIsPublishedVersion(
+                    institutionId,
+                    CourseStatus.PUBLISHED.getValue(),
+                    true,
+                    unpaged);
+            courses = coursePage.getContent();
         } else {
-            // 获取所有课程
-            courses = courseRepository.findAll();
+            // 获取所有已发布课程
+            Pageable unpaged = Pageable.unpaged(); // 不分页，获取所有结果
+            Page<Course> coursePage = courseRepository.findByStatusAndIsPublishedVersion(
+                    CourseStatus.PUBLISHED.getValue(),
+                    true,
+                    unpaged);
+            courses = coursePage.getContent();
         }
 
         if (courses.isEmpty()) {

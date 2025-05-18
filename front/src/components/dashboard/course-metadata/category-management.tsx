@@ -179,8 +179,8 @@ export function CategoryManagement() {
   const loadCategoryCourses = async (categoryId: number) => {
     setLoadingCourses(true);
     try {
-      // 使用新的元数据API获取所有状态的课程
-      const result = await metadataService.getCategoryCourses(categoryId, 0, 6);
+      // 使用新的元数据API获取课程，默认只返回发布版本
+      const result = await metadataService.getCategoryCourses(categoryId, true, 0, 6);
       setCategoryCourses(result.content || []);
     } catch (error) {
       console.error('加载分类课程失败:', error);
@@ -840,8 +840,8 @@ function CategoryTreeView({
   const loadNodeCourses = async (categoryId: number) => {
     setLoadingCourses(true);
     try {
-      // 使用新的元数据API获取所有状态的课程
-      const result = await metadataService.getCategoryCourses(categoryId, 0, 6);
+      // 使用新的元数据API获取课程，默认只返回发布版本
+      const result = await metadataService.getCategoryCourses(categoryId, true, 0, 6);
       setNodeCourses(result.content || []);
     } catch (error) {
       console.error('加载分类课程失败:', error);

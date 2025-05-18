@@ -224,4 +224,20 @@ public interface CourseRepository extends JpaRepository<Course, Long>, JpaSpecif
      */
     @Query("SELECT COUNT(c) FROM Course c WHERE c.institution.id = :institutionId AND c.status = :status")
     int countByInstitutionIdAndStatus(@Param("institutionId") Long institutionId, @Param("status") Integer status);
+
+    /**
+     * 根据机构ID、状态和是否为发布版本查询课程
+     *
+     * @param institutionId 机构ID
+     * @param status 课程状态
+     * @param isPublishedVersion 是否为发布版本
+     * @param pageable 分页参数
+     * @return 课程分页
+     */
+    @Query("SELECT c FROM Course c WHERE c.institution.id = :institutionId AND c.status = :status AND c.isPublishedVersion = :isPublishedVersion")
+    Page<Course> findByInstitutionIdAndStatusAndIsPublishedVersion(
+            @Param("institutionId") Long institutionId,
+            @Param("status") Integer status,
+            @Param("isPublishedVersion") Boolean isPublishedVersion,
+            Pageable pageable);
 }

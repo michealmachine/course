@@ -133,8 +133,8 @@ export function TagManagement() {
   const loadTagCourses = async (tagId: number) => {
     setLoadingCourses(true);
     try {
-      // 使用新的元数据API获取所有状态的课程
-      const result = await metadataService.getTagCourses(tagId, 0, 6);
+      // 使用新的元数据API获取课程，默认只返回发布版本
+      const result = await metadataService.getTagCourses(tagId, true, 0, 6);
       setTagCourses(result.content || []);
     } catch (error) {
       console.error('加载标签课程失败:', error);

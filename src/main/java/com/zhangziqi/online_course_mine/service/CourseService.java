@@ -290,31 +290,34 @@ public interface CourseService {
     CourseStructureVO getPublicCourseStructure(Long id, boolean isUserEnrolled);
 
     /**
-     * 获取标签关联的所有课程（不限状态）
-     * 用于管理界面展示标签关联的所有课程
+     * 获取标签关联的课程
+     * 用于管理界面展示标签关联的课程
      *
      * @param tagId 标签ID
+     * @param publishedOnly 是否只返回发布版本
      * @param pageable 分页参数
      * @return 课程分页
      */
-    Page<CourseVO> getCoursesByTagId(Long tagId, Pageable pageable);
+    Page<CourseVO> getCoursesByTagId(Long tagId, Boolean publishedOnly, Pageable pageable);
 
     /**
-     * 获取分类关联的所有课程（不限状态）
-     * 用于管理界面展示分类关联的所有课程
+     * 获取分类关联的课程
+     * 用于管理界面展示分类关联的课程
      *
      * @param categoryId 分类ID
+     * @param publishedOnly 是否只返回发布版本
      * @param pageable 分页参数
      * @return 课程分页
      */
-    Page<CourseVO> getCoursesByCategoryId(Long categoryId, Pageable pageable);
+    Page<CourseVO> getCoursesByCategoryId(Long categoryId, Boolean publishedOnly, Pageable pageable);
 
     /**
      * 获取所有课程（分页）
      * 用于管理员查看所有课程
      *
+     * @param publishedOnly 是否只返回发布版本
      * @param pageable 分页参数
      * @return 课程分页
      */
-    Page<CourseVO> getAllCourses(Pageable pageable);
+    Page<CourseVO> getAllCourses(Boolean publishedOnly, Pageable pageable);
 }

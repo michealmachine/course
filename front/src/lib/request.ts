@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 // 创建axios实例
 export const axiosInstance = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080',
-  timeout: 10000,
+  timeout: 30000, // 增加超时时间到30秒
   headers: {
     'Content-Type': 'application/json',
   },
@@ -67,4 +67,4 @@ axiosInstance.interceptors.response.use(
 
     return Promise.reject(error);
   }
-); 
+);

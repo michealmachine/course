@@ -637,9 +637,8 @@ export function QuestionDetailForm({
           </CardContent>
           <CardFooter className="flex justify-end pt-2">
             <Button
-              type="button"
-              disabled={isSubmitting}
-              onClick={form.handleSubmit(handleSubmit)}
+              type="submit"
+              disabled={isSubmitting || readOnly}
               className="relative"
             >
               {isSubmitting && (

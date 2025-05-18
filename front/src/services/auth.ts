@@ -276,7 +276,10 @@ const authService = {
       captchaCode: data.captchaCode
     });
 
-    const response = await request.post<any>('/auth/email-verification-code', data);
+    // 为邮箱验证码请求特别指定60秒的超时时间
+    const response = await request.post<any>('/auth/email-verification-code', data, {
+      timeout: 60000 // 60秒超时
+    });
     console.log('发送邮箱验证码响应：', response);
 
     // 检查响应状态
@@ -308,7 +311,10 @@ const authService = {
       // 确保使用完整的 URL
       const fullUrl = '/auth/password-reset-code';
       console.log('完整请求URL:', fullUrl);
-      const response = await request.post<any>(fullUrl, data);
+      // 为密码重置验证码请求特别指定60秒的超时时间
+      const response = await request.post<any>(fullUrl, data, {
+        timeout: 60000 // 60秒超时
+      });
       console.log('发送密码重置验证码响应：', response);
 
       // 检查响应状态

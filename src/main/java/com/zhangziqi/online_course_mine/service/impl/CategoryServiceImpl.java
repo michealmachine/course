@@ -108,14 +108,14 @@ public class CategoryServiceImpl implements CategoryService {
             category.setParent(parent);
             // 更新层级为父分类层级+1
             category.setLevel(parent.getLevel() + 1);
-            
+
             // 需要递归更新所有子分类的层级
             updateChildrenLevel(category);
         } else if (parentChanged) {
             // 父分类设为null，即变为根分类
             category.setParent(null);
             category.setLevel(1);
-            
+
             // 需要递归更新所有子分类的层级
             updateChildrenLevel(category);
         }
@@ -154,7 +154,7 @@ public class CategoryServiceImpl implements CategoryService {
         if (children.isEmpty()) {
             return false;
         }
-        
+
         for (Category child : children) {
             if (child.getId().equals(targetId) || isChildCategory(child.getId(), targetId)) {
                 return true;
@@ -202,7 +202,7 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     public Page<CategoryVO> listCategories(String keyword, Pageable pageable) {
         Page<Category> categoryPage;
-        
+
         if (StringUtils.hasText(keyword)) {
             // 创建动态查询条件
             Specification<Category> spec = (root, query, criteriaBuilder) -> {
@@ -217,7 +217,7 @@ public class CategoryServiceImpl implements CategoryService {
         } else {
             categoryPage = categoryRepository.findAll(pageable);
         }
-        
+
         return categoryPage.map(this::convertToCategoryVO);
     }
 
@@ -254,11 +254,11 @@ public class CategoryServiceImpl implements CategoryService {
         CategoryTreeVO treeVO = new CategoryTreeVO();
         BeanUtils.copyProperties(category, treeVO);
         treeVO.setFullPath(category.getFullPath());
-        
-        // 获取课程数量
-        long courseCount = categoryRepository.countCoursesByCategoryId(category.getId());
+
+        // 获取已发布课程数量
+        long courseCount = categoryRepository.countPublishedCoursesByCategoryId(category.getId());
         treeVO.setCourseCount(courseCount);
-        
+
         // 递归获取子分类
         List<Category> children = categoryRepository.findByParentId(category.getId());
         if (!children.isEmpty()) {
@@ -267,7 +267,7 @@ public class CategoryServiceImpl implements CategoryService {
                     .collect(Collectors.toList());
             treeVO.setChildren(childrenVOs);
         }
-        
+
         return treeVO;
     }
 
@@ -302,28 +302,28 @@ public class CategoryServiceImpl implements CategoryService {
         return categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("分类不存在"));
     }
-    
+
     /**
      * 将分类实体转换为VO对象
      */
     private CategoryVO convertToCategoryVO(Category category) {
         CategoryVO vo = new CategoryVO();
         BeanUtils.copyProperties(category, vo);
-        
+
         // 设置父分类信息
         if (category.getParent() != null) {
             vo.setParentId(category.getParent().getId());
             vo.setParentName(category.getParent().getName());
         }
-        
-        // 获取课程数量
-        long courseCount = categoryRepository.countCoursesByCategoryId(category.getId());
+
+        // 获取已发布课程数量
+        long courseCount = categoryRepository.countPublishedCoursesByCategoryId(category.getId());
         vo.setCourseCount((int) courseCount);
-        
+
         // 获取子分类数量
         long childrenCount = categoryRepository.countByParentId(category.getId());
         vo.setChildrenCount((int) childrenCount);
-        
+
         return vo;
     }
-} 
+}

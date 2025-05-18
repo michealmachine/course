@@ -166,17 +166,18 @@ public class AdminCourseController {
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "获取所有课程", description = "管理员分页获取所有课程")
+    @Operation(summary = "获取所有课程", description = "管理员分页获取所有课程，可选择只返回发布版本")
     public Result<Page<CourseVO>> getAllCourses(
             @Parameter(description = "页码") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") int size) {
+            @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "是否只返回发布版本") @RequestParam(defaultValue = "false") Boolean publishedOnly) {
         String username = SecurityUtil.getCurrentUsername();
 
-        log.info("管理员获取所有课程, 用户名: {}, 页码: {}, 每页数量: {}",
-                username, page, size);
+        log.info("管理员获取所有课程, 用户名: {}, 页码: {}, 每页数量: {}, 只返回发布版本: {}",
+                username, page, size, publishedOnly);
 
         Pageable pageable = PageRequest.of(page, size);
-        Page<CourseVO> courses = courseService.getAllCourses(pageable);
+        Page<CourseVO> courses = courseService.getAllCourses(publishedOnly, pageable);
 
         return Result.success(courses);
     }

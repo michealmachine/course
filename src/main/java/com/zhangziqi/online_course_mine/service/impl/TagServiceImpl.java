@@ -95,7 +95,7 @@ public class TagServiceImpl implements TagService {
     @Override
     public Page<TagVO> listTags(String keyword, Pageable pageable) {
         Page<Tag> tagPage;
-        
+
         if (StringUtils.hasText(keyword)) {
             // 创建动态查询条件
             Specification<Tag> spec = (root, query, criteriaBuilder) -> {
@@ -109,7 +109,7 @@ public class TagServiceImpl implements TagService {
         } else {
             tagPage = tagRepository.findAll(pageable);
         }
-        
+
         return tagPage.map(this::convertToTagVO);
     }
 
@@ -181,21 +181,18 @@ public class TagServiceImpl implements TagService {
         return tagRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("标签不存在"));
     }
-    
+
     /**
      * 将标签实体转换为VO对象
      */
     private TagVO convertToTagVO(Tag tag) {
         TagVO vo = new TagVO();
         BeanUtils.copyProperties(tag, vo);
-        
-        // 设置关联课程数量
-        if (tag.getCourses() != null) {
-            vo.setCourseCount(tag.getCourses().size());
-        } else {
-            vo.setCourseCount(0);
-        }
-        
+
+        // 设置关联已发布课程数量
+        long publishedCourseCount = tagRepository.countPublishedCoursesByTagId(tag.getId());
+        vo.setCourseCount((int) publishedCourseCount);
+
         return vo;
     }
 }

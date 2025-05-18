@@ -23,7 +23,9 @@ import {
   Maximize,
   RefreshCw,
   Clock,
-  BarChart2
+  BarChart2,
+  Headphones,
+  ExternalLink
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
@@ -941,13 +943,86 @@ export default function LearnCoursePage() {
     console.log("渲染内容区域，sectionContent:", sectionContent);
 
     if (sectionContent.resourceType === 'MEDIA' && sectionContent.media) {
-      return (
-        <CourseMediaPlayer
-          media={sectionContent.media}
-          onComplete={() => updateLearningProgress(100)}
-          onError={(error) => toast.error(error.toString())}
-        />
-      );
+      // 获取媒体类型
+      const mediaType = (sectionContent.media.type || '').toLowerCase();
+      console.log('媒体类型:', mediaType, '媒体ID:', sectionContent.media.id);
+
+      // 如果是文档类型，使用CourseDocumentViewer
+      if (mediaType.includes('document') || mediaType === 'document') {
+        console.log('使用CourseDocumentViewer渲染文档');
+        return (
+          <CourseDocumentViewer
+            media={sectionContent.media}
+            onProgress={(progress) => updateLearningProgress(progress)}
+          />
+        );
+      }
+      // 如果是音频类型，使用原生音频播放器
+      else if (mediaType.includes('audio') || mediaType === 'audio') {
+        console.log('使用原生音频播放器渲染音频');
+        return (
+          <div className="p-6 bg-muted rounded-lg">
+            <div className="flex flex-col items-center space-y-4">
+              <div className="w-40 h-40 bg-primary/10 rounded-full flex items-center justify-center mb-2">
+                <Headphones className="h-16 w-16 text-primary" />
+              </div>
+
+              <div className="text-center mb-2">
+                <h3 className="text-lg font-medium">{sectionContent.media.title}</h3>
+                {sectionContent.media.description && (
+                  <p className="text-sm text-muted-foreground mt-1">{sectionContent.media.description}</p>
+                )}
+              </div>
+
+              <div className="w-full max-w-md bg-card p-4 rounded-lg border shadow-sm">
+                <audio
+                  key={sectionContent.media.accessUrl}
+                  src={sectionContent.media.accessUrl}
+                  controls
+                  className="w-full"
+                  controlsList="nodownload"
+                  preload="metadata"
+                  onEnded={() => updateLearningProgress(100)}
+                  onError={(e) => {
+                    console.error('音频加载错误:', e);
+                    toast.error('音频加载失败，请重试');
+                  }}
+                >
+                  您的浏览器不支持HTML5音频播放，请更新浏览器版本。
+                </audio>
+
+                <div className="flex justify-between items-center mt-3 text-xs text-muted-foreground">
+                  <div>
+                    提示：可使用空格键暂停/播放
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => window.open(sectionContent.media.accessUrl, '_blank')}
+                  >
+                    <ExternalLink className="h-3 w-3 mr-1" />
+                    新窗口打开
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+      // 否则使用CourseMediaPlayer（适用于视频）
+      else {
+        console.log('使用CourseMediaPlayer渲染视频');
+        return (
+          <CourseMediaPlayer
+            media={sectionContent.media}
+            onComplete={() => updateLearningProgress(100)}
+            onError={(error) => toast.error(error.toString())}
+            courseId={Number(courseId)}
+            chapterId={currentChapterId}
+            sectionId={currentSectionId}
+          />
+        );
+      }
     } else if (sectionContent.resourceType === 'QUESTION_GROUP' && sectionContent.questionGroup) {
       // 添加调试信息，确认questionGroup的具体内容
       console.log("渲染题组内容，questionGroup:", sectionContent.questionGroup);

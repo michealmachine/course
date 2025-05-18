@@ -260,13 +260,6 @@ export default function CourseDetailPage() {
                     onClick={() => handleSectionClick(section.id)}
                   >
                     <span className="text-sm">{section.title}</span>
-
-                    {/* 显示付费标记或资源类型 */}
-                    {section.accessType === 1 ? (
-                      <Badge variant="outline" className="text-xs">付费</Badge>
-                    ) : (
-                      <Badge variant="secondary" className="text-xs">免费试看</Badge>
-                    )}
                   </div>
                 ))}
               </div>
@@ -552,16 +545,7 @@ export default function CourseDetailPage() {
                                 </Badge>
                               )}
 
-                              <Badge
-                                variant={selectedSection.accessType === 0 ? "secondary" : "outline"}
-                                className={`flex items-center px-2 py-0.5 ${
-                                  selectedSection.accessType === 0
-                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                    : 'bg-white'
-                                }`}
-                              >
-                                {selectedSection.accessType === 0 ? '免费试看' : '付费内容'}
-                              </Badge>
+
 
                               <Badge
                                 variant="outline"

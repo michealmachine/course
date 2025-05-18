@@ -18,25 +18,24 @@ import { QuestionTagDTO } from '@/types/question';
 export default function CreateQuestionTagPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // 问题标签表单数据
   const [formData, setFormData] = useState<QuestionTagDTO>({
     name: '',
-    description: '',
     institutionId: 1 // 这里应该根据实际情况获取机构ID
   });
-  
+
   // 返回列表
   const handleBack = () => {
     router.push('/dashboard/questions?tab=tags');
   };
-  
+
   // 处理输入变化
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
-  
+
   // 创建问题标签
   const handleSubmit = async () => {
     // 表单验证
@@ -44,7 +43,7 @@ export default function CreateQuestionTagPage() {
       toast.error('请输入标签名称');
       return;
     }
-    
+
     setIsSubmitting(true);
     try {
       await questionTagService.createQuestionTag(formData);
@@ -57,7 +56,7 @@ export default function CreateQuestionTagPage() {
       setIsSubmitting(false);
     }
   };
-  
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -69,7 +68,7 @@ export default function CreateQuestionTagPage() {
           <ArrowLeft className="h-4 w-4 mr-2" />
           返回列表
         </Button>
-        
+
         <Button
           size="sm"
           onClick={handleSubmit}
@@ -79,9 +78,9 @@ export default function CreateQuestionTagPage() {
           保存
         </Button>
       </div>
-      
+
       <Separator />
-      
+
       <Card>
         <CardHeader>
           <CardTitle>创建标签</CardTitle>
@@ -103,21 +102,11 @@ export default function CreateQuestionTagPage() {
                 placeholder="输入标签名称"
               />
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="description">标签描述</Label>
-              <Textarea
-                id="description"
-                name="description"
-                value={formData.description || ''}
-                onChange={handleInputChange}
-                placeholder="输入标签描述（可选）"
-                rows={4}
-              />
-            </div>
+
+            {/* 后端DTO中没有description字段，暂时移除 */}
           </div>
         </CardContent>
       </Card>
     </div>
   );
-} 
+}

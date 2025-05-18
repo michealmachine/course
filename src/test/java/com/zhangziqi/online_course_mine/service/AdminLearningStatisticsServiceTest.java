@@ -523,8 +523,19 @@ public class AdminLearningStatisticsServiceTest {
         course3.setInstitutionId(2L);
 
         List<Course> allCourses = Arrays.asList(course1, course2, course3);
+        List<Course> institution1Courses = Arrays.asList(course1, course2);
 
-        when(courseRepository.findAll()).thenReturn(allCourses);
+        // 模拟分页结果
+        Page<Course> allCoursesPage = new org.springframework.data.domain.PageImpl<>(allCourses);
+        Page<Course> institution1CoursesPage = new org.springframework.data.domain.PageImpl<>(institution1Courses);
+
+        // 模拟findByStatusAndIsPublishedVersion方法
+        when(courseRepository.findByStatusAndIsPublishedVersion(eq(4), eq(true), any(Pageable.class)))
+            .thenReturn(allCoursesPage);
+
+        // 模拟findByInstitutionIdAndStatusAndIsPublishedVersion方法
+        when(courseRepository.findByInstitutionIdAndStatusAndIsPublishedVersion(eq(1L), eq(4), eq(true), any(Pageable.class)))
+            .thenReturn(institution1CoursesPage);
 
         // 模拟学习时长数据
         when(learningRecordRepository.findTotalLearningDurationByCourse(1L)).thenReturn(5000L);

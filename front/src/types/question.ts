@@ -78,7 +78,6 @@ export interface QuestionTag {
 // 问题标签DTO
 export interface QuestionTagDTO {
   name: string;
-  description?: string;
   institutionId: number;
 }
 

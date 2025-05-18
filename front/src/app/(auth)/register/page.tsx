@@ -184,10 +184,9 @@ export default function RegisterPage() {
         setCountdown(prev => prev - 1);
       }, 1000);
       return () => clearInterval(timer);
-    } else if (countdown === 0 && codeSent) {
-      setCodeSent(false);
     }
-  }, [countdown, codeSent]);
+    // 移除重置codeSent的逻辑，确保用户可以继续完成注册
+  }, [countdown]);
 
   return (
     <Card className="w-full">
@@ -313,9 +312,9 @@ export default function RegisterPage() {
                   variant="outline"
                   className="w-full"
                   onClick={onSendEmailCode}
-                  disabled={isLoading || codeSent}
+                  disabled={isLoading || countdown > 0}
                 >
-                  {isLoading ? '发送中...' : codeSent ? `重新发送(${countdown}s)` : '发送验证码'}
+                  {isLoading ? '发送中...' : countdown > 0 ? `重新发送(${countdown}s)` : '发送验证码'}
                 </Button>
 
                 <FormField
@@ -332,7 +331,7 @@ export default function RegisterPage() {
                   )}
                 />
 
-                <Button type="submit" className="w-full" disabled={isLoading || !codeSent}>
+                <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? '注册中...' : '完成注册'}
                 </Button>
 

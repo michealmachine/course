@@ -515,6 +515,7 @@ public class CourseServiceTest {
     void getCoursesByTagId_Success() {
         // 准备测试数据
         Long tagId = 1L;
+        Boolean publishedOnly = true;
         Pageable pageable = PageRequest.of(0, 10);
 
         when(tagRepository.findById(tagId)).thenReturn(Optional.of(testTag));
@@ -522,7 +523,7 @@ public class CourseServiceTest {
                 .thenReturn(new PageImpl<>(List.of(testCourse), pageable, 1));
 
         // 执行测试
-        Page<CourseVO> result = courseService.getCoursesByTagId(tagId, pageable);
+        Page<CourseVO> result = courseService.getCoursesByTagId(tagId, publishedOnly, pageable);
 
         // 验证结果
         assertNotNull(result);
@@ -539,12 +540,13 @@ public class CourseServiceTest {
     void getCoursesByTagId_TagNotFound() {
         // 准备测试数据
         Long tagId = 1L;
+        Boolean publishedOnly = true;
         Pageable pageable = PageRequest.of(0, 10);
 
         when(tagRepository.findById(tagId)).thenReturn(Optional.empty());
 
         // 执行测试并验证异常
-        assertThrows(ResourceNotFoundException.class, () -> courseService.getCoursesByTagId(tagId, pageable));
+        assertThrows(ResourceNotFoundException.class, () -> courseService.getCoursesByTagId(tagId, publishedOnly, pageable));
 
         // 验证交互
         verify(tagRepository).findById(tagId);
@@ -556,6 +558,7 @@ public class CourseServiceTest {
     void getCoursesByCategoryId_Success() {
         // 准备测试数据
         Long categoryId = 1L;
+        Boolean publishedOnly = true;
         Pageable pageable = PageRequest.of(0, 10);
 
         when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(testCategory));
@@ -563,7 +566,7 @@ public class CourseServiceTest {
                 .thenReturn(new PageImpl<>(List.of(testCourse), pageable, 1));
 
         // 执行测试
-        Page<CourseVO> result = courseService.getCoursesByCategoryId(categoryId, pageable);
+        Page<CourseVO> result = courseService.getCoursesByCategoryId(categoryId, publishedOnly, pageable);
 
         // 验证结果
         assertNotNull(result);
@@ -580,12 +583,13 @@ public class CourseServiceTest {
     void getCoursesByCategoryId_CategoryNotFound() {
         // 准备测试数据
         Long categoryId = 1L;
+        Boolean publishedOnly = true;
         Pageable pageable = PageRequest.of(0, 10);
 
         when(categoryRepository.findById(categoryId)).thenReturn(Optional.empty());
 
         // 执行测试并验证异常
-        assertThrows(ResourceNotFoundException.class, () -> courseService.getCoursesByCategoryId(categoryId, pageable));
+        assertThrows(ResourceNotFoundException.class, () -> courseService.getCoursesByCategoryId(categoryId, publishedOnly, pageable));
 
         // 验证交互
         verify(categoryRepository).findById(categoryId);
@@ -635,6 +639,29 @@ public class CourseServiceTest {
 
         // 验证方法调用
         verify(courseRepository).findByStatus(CourseStatus.PENDING_REVIEW.getValue(), pageable);
+    }
+
+    @Test
+    @DisplayName("获取所有课程 - 成功")
+    void getAllCourses_Success() {
+        // 准备测试数据
+        Boolean publishedOnly = true;
+        Pageable pageable = PageRequest.of(0, 10);
+        List<Course> courseList = List.of(testCourse);
+        Page<Course> coursePage = new PageImpl<>(courseList, pageable, courseList.size());
+
+        when(courseRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(coursePage);
+
+        // 执行方法
+        Page<CourseVO> result = courseService.getAllCourses(publishedOnly, pageable);
+
+        // 验证结果
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(testCourse.getId(), result.getContent().get(0).getId());
+
+        // 验证方法调用
+        verify(courseRepository).findAll(any(Specification.class), eq(pageable));
     }
 
     @Test

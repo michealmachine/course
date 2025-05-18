@@ -89,7 +89,8 @@ export default function CourseManagement() {
       // 构建查询参数
       const params: any = {
         page: currentPage,
-        size: pageSize
+        size: pageSize,
+        publishedOnly: true // 默认只显示发布版本
       };
 
       if (searchQuery) {
@@ -105,6 +106,8 @@ export default function CourseManagement() {
       // 如果选择了特定机构，使用机构课程API
       if (institutionFilter !== 'all') {
         url = `/admin/courses/institutions/${institutionFilter}/workspace`;
+        // 工作区API不需要publishedOnly参数
+        delete params.publishedOnly;
       }
 
       const response = await request.get<PaginationResult<CourseVO>>(url, { params });
@@ -148,7 +151,8 @@ export default function CourseManagement() {
       const coursesResponse = await request.get<PaginationResult<CourseVO>>('/admin/courses', {
         params: {
           page: 0,
-          size: 1000 // 获取足够多的课程以计算统计数据
+          size: 1000, // 获取足够多的课程以计算统计数据
+          publishedOnly: true // 只获取发布版本
         }
       });
 

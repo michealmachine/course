@@ -28,8 +28,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Card, CardContent } from '@/components/ui/card';
-import { 
-  MoreHorizontal, 
+import {
+  MoreHorizontal,
   Search,
   Plus,
   Edit,
@@ -52,24 +52,23 @@ export function QuestionTagList({ institutionId }: QuestionTagListProps) {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [searchName, setSearchName] = useState('');
-  
+
   // 弹窗状态
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [currentTag, setCurrentTag] = useState<QuestionTag | null>(null);
   const [formData, setFormData] = useState<QuestionTagDTO>({
     name: '',
-    description: '',
     institutionId: institutionId
   });
-  
+
   // 初始加载
   useEffect(() => {
     if (institutionId) {
       fetchTags();
     }
   }, [institutionId, page, pageSize]);
-  
+
   // 获取问题标签列表
   const fetchTags = async () => {
     setIsLoading(true);
@@ -80,7 +79,7 @@ export function QuestionTagList({ institutionId }: QuestionTagListProps) {
         name: searchName || undefined,
         institutionId
       });
-      
+
       setTags(response.content);
       setTotalCount(response.totalElements);
     } catch (error) {
@@ -90,35 +89,33 @@ export function QuestionTagList({ institutionId }: QuestionTagListProps) {
       setIsLoading(false);
     }
   };
-  
+
   // 搜索处理
   const handleSearch = () => {
     setPage(0);
     fetchTags();
   };
-  
+
   // 打开创建对话框
   const handleOpenCreateDialog = () => {
     setCurrentTag(null);
     setFormData({
       name: '',
-      description: '',
       institutionId
     });
     setIsDialogOpen(true);
   };
-  
+
   // 打开编辑对话框
   const handleOpenEditDialog = (tag: QuestionTag) => {
     setCurrentTag(tag);
     setFormData({
       name: tag.name,
-      description: tag.description || '',
       institutionId
     });
     setIsDialogOpen(true);
   };
-  
+
   // 表单输入变更
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -127,7 +124,7 @@ export function QuestionTagList({ institutionId }: QuestionTagListProps) {
       [name]: value
     }));
   };
-  
+
   // 保存问题标签
   const handleSaveTag = async () => {
     try {
@@ -135,7 +132,7 @@ export function QuestionTagList({ institutionId }: QuestionTagListProps) {
         toast.error('标签名不能为空');
         return;
       }
-      
+
       if (currentTag) {
         // 更新已有问题标签
         await questionTagService.updateQuestionTag(currentTag.id, formData);
@@ -145,7 +142,7 @@ export function QuestionTagList({ institutionId }: QuestionTagListProps) {
         await questionTagService.createQuestionTag(formData);
         toast.success('创建成功');
       }
-      
+
       setIsDialogOpen(false);
       fetchTags();
     } catch (error) {
@@ -153,17 +150,17 @@ export function QuestionTagList({ institutionId }: QuestionTagListProps) {
       toast.error('保存失败，请重试');
     }
   };
-  
+
   // 打开删除确认
   const handleOpenDeleteConfirm = (tag: QuestionTag) => {
     setCurrentTag(tag);
     setIsDeleteConfirmOpen(true);
   };
-  
+
   // 删除问题标签
   const handleDeleteTag = async () => {
     if (!currentTag) return;
-    
+
     try {
       await questionTagService.deleteQuestionTag(currentTag.id);
       toast.success('删除成功');
@@ -174,7 +171,7 @@ export function QuestionTagList({ institutionId }: QuestionTagListProps) {
       toast.error('删除失败，请重试');
     }
   };
-  
+
   // 格式化日期
   const formatDate = (dateString?: string) => {
     if (!dateString) return '-';
@@ -186,7 +183,7 @@ export function QuestionTagList({ institutionId }: QuestionTagListProps) {
       minute: '2-digit'
     });
   };
-  
+
   // 加载骨架屏
   if (isLoading && tags.length === 0) {
     return (
@@ -199,7 +196,7 @@ export function QuestionTagList({ institutionId }: QuestionTagListProps) {
             </div>
           </CardContent>
         </Card>
-        
+
         <div className="rounded-md border">
           <Table>
             <TableHeader>
@@ -241,7 +238,7 @@ export function QuestionTagList({ institutionId }: QuestionTagListProps) {
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-4">
       {/* 搜索栏 */}
@@ -259,7 +256,7 @@ export function QuestionTagList({ institutionId }: QuestionTagListProps) {
                 <Search className="h-4 w-4" />
               </Button>
             </div>
-            
+
             <Button onClick={handleOpenCreateDialog} size="sm">
               <Plus className="h-4 w-4 mr-2" />
               新建标签
@@ -267,14 +264,13 @@ export function QuestionTagList({ institutionId }: QuestionTagListProps) {
           </div>
         </CardContent>
       </Card>
-      
+
       {/* 问题标签列表 */}
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>标签名称</TableHead>
-              <TableHead>描述</TableHead>
               <TableHead>创建时间</TableHead>
               <TableHead className="text-right">操作</TableHead>
             </TableRow>
@@ -282,7 +278,7 @@ export function QuestionTagList({ institutionId }: QuestionTagListProps) {
           <TableBody>
             {tags.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
                   暂无数据
                 </TableCell>
               </TableRow>
@@ -295,11 +291,7 @@ export function QuestionTagList({ institutionId }: QuestionTagListProps) {
                       <span className="font-medium">{tag.name}</span>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="truncate max-w-md" title={tag.description || ''}>
-                      {tag.description || <span className="text-muted-foreground text-xs">无描述</span>}
-                    </div>
-                  </TableCell>
+
                   <TableCell>{formatDate(tag.createdAt)}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
@@ -326,7 +318,7 @@ export function QuestionTagList({ institutionId }: QuestionTagListProps) {
           </TableBody>
         </Table>
       </div>
-      
+
       {/* 创建/编辑对话框 */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
@@ -338,7 +330,7 @@ export function QuestionTagList({ institutionId }: QuestionTagListProps) {
               {currentTag ? '修改标签信息' : '创建一个新的题目标签'}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label htmlFor="name" className="text-sm font-medium">
@@ -352,21 +344,10 @@ export function QuestionTagList({ institutionId }: QuestionTagListProps) {
                 placeholder="输入标签名称"
               />
             </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="description" className="text-sm font-medium">
-                描述
-              </label>
-              <Input
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                placeholder="输入标签描述（可选）"
-              />
-            </div>
+
+            {/* 后端DTO中没有description字段，暂时移除 */}
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               取消
@@ -375,7 +356,7 @@ export function QuestionTagList({ institutionId }: QuestionTagListProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
+
       {/* 删除确认对话框 */}
       <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
         <DialogContent>
@@ -386,7 +367,7 @@ export function QuestionTagList({ institutionId }: QuestionTagListProps) {
               删除标签不会影响已标记的题目，但这些题目将不再与此标签关联。
             </DialogDescription>
           </DialogHeader>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)}>
               取消
@@ -399,4 +380,4 @@ export function QuestionTagList({ institutionId }: QuestionTagListProps) {
       </Dialog>
     </div>
   );
-} 
+}

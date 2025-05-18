@@ -43,7 +43,7 @@ export default function CreateQuestionPage() {
   // 问题表单数据
   const [question, setQuestion] = useState<Partial<QuestionDTO>>({
     title: '',
-    description: '',
+    content: '',
     type: QuestionType.SINGLE_CHOICE,
     difficulty: QuestionDifficulty.MEDIUM,
     options: [],
@@ -270,10 +270,9 @@ export default function CreateQuestionPage() {
     setIsSubmitting(true);
     try {
       // 准备提交数据，创建深拷贝避免修改原始状态
-      const { description, tagIds, ...questionData } = question as QuestionDTO;
+      const { tagIds, ...questionData } = question as QuestionDTO;
       const submitData: QuestionDTO = {
-        ...questionData,
-        content: description // 确保content字段设置为description的值
+        ...questionData
       };
 
       // 如果有选项，确保设置orderIndex字段以匹配后端API期望
@@ -573,13 +572,13 @@ export default function CreateQuestionPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">问题描述</Label>
+                <Label htmlFor="content">问题内容</Label>
                 <Textarea
-                  id="description"
-                  name="description"
-                  value={question.description || ''}
+                  id="content"
+                  name="content"
+                  value={question.content || ''}
                   onChange={handleInputChange}
-                  placeholder="输入问题描述（可选）"
+                  placeholder="输入问题内容"
                   rows={3}
                 />
               </div>
@@ -692,8 +691,8 @@ export default function CreateQuestionPage() {
               <div className="border rounded-md p-4 space-y-4">
                 <div>
                   <h3 className="font-medium">{question.title || '问题标题'}</h3>
-                  {question.description && (
-                    <p className="text-sm text-muted-foreground mt-1">{question.description}</p>
+                  {question.content && (
+                    <p className="text-sm text-muted-foreground mt-1">{question.content}</p>
                   )}
                 </div>
 

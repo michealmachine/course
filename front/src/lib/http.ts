@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 // 创建axios实例
 const instance = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080',
-  timeout: 10000,
+  timeout: 30000, // 增加超时时间到30秒
   headers: {
     'Content-Type': 'application/json',
   },
@@ -29,19 +29,19 @@ instance.interceptors.request.use(
 instance.interceptors.response.use(
   (response) => {
     const { code, message, data } = response.data;
-    
+
     // 如果code不是200，说明请求出错
     if (code !== 200) {
       toast.error(message || '请求失败');
       return Promise.reject(new Error(message));
     }
-    
+
     return response.data;
   },
   (error) => {
     if (error.response) {
       const { status, data } = error.response;
-      
+
       // 处理常见的HTTP错误
       switch (status) {
         case 401:
@@ -65,25 +65,25 @@ instance.interceptors.response.use(
     } else {
       toast.error('请求配置错误');
     }
-    
+
     return Promise.reject(error);
   }
 );
 
 // HTTP工具类
 export const http = {
-  get: <T>(url: string, config?: any) => 
+  get: <T>(url: string, config?: any) =>
     instance.get<any, T>(url, config),
-    
-  post: <T>(url: string, data?: any, config?: any) => 
+
+  post: <T>(url: string, data?: any, config?: any) =>
     instance.post<any, T>(url, data, config),
-    
-  put: <T>(url: string, data?: any, config?: any) => 
+
+  put: <T>(url: string, data?: any, config?: any) =>
     instance.put<any, T>(url, data, config),
-    
-  delete: <T>(url: string, config?: any) => 
+
+  delete: <T>(url: string, config?: any) =>
     instance.delete<any, T>(url, config),
-    
-  patch: <T>(url: string, data?: any, config?: any) => 
+
+  patch: <T>(url: string, data?: any, config?: any) =>
     instance.patch<any, T>(url, data, config),
-}; 
+};

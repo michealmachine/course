@@ -15,60 +15,69 @@ import java.util.Optional;
  */
 @Repository
 public interface CategoryRepository extends JpaRepository<Category, Long>, JpaSpecificationExecutor<Category> {
-    
+
     /**
      * 根据编码查找分类
-     * 
+     *
      * @param code 分类编码
      * @return 分类
      */
     Optional<Category> findByCode(String code);
-    
+
     /**
      * 根据名称查找分类
-     * 
+     *
      * @param name 分类名称
      * @return 分类
      */
     Optional<Category> findByName(String name);
-    
+
     /**
      * 查找所有根分类（无父分类的分类）
-     * 
+     *
      * @return 根分类列表
      */
     List<Category> findByParentIsNull();
-    
+
     /**
      * 根据父分类ID查找子分类
-     * 
+     *
      * @param parentId 父分类ID
      * @return 子分类列表
      */
     List<Category> findByParentId(Long parentId);
-    
+
     /**
      * 根据层级查找分类
-     * 
+     *
      * @param level 层级
      * @return 分类列表
      */
     List<Category> findByLevel(Integer level);
-    
+
     /**
      * 检查分类下是否有课程
-     * 
+     *
      * @param categoryId 分类ID
      * @return 课程数量
      */
     @Query("SELECT COUNT(c) FROM Course c WHERE c.category.id = :categoryId")
     long countCoursesByCategoryId(@Param("categoryId") Long categoryId);
-    
+
+    /**
+     * 统计分类下已发布版本的课程数量
+     *
+     * @param categoryId 分类ID
+     * @return 已发布版本的课程数量
+     */
+    @Query("SELECT COUNT(c) FROM Course c WHERE c.category.id = :categoryId AND c.status = 4 AND c.isPublishedVersion = true")
+    long countPublishedCoursesByCategoryId(@Param("categoryId") Long categoryId);
+
     /**
      * 根据父分类ID统计子分类数量
-     * 
+     *
      * @param parentId 父分类ID
      * @return 子分类数量
      */
     long countByParentId(Long parentId);
-} 
+}
